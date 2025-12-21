@@ -1,0 +1,11 @@
+open in terminal
+cd D:\Apps\Sdk\emulator
+emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
+
+flutter devices
+Should show emulator-5554 • Android 13 • Android Emulator
+
+cd C:\path\to\your\flutter_project
+flutter clean
+flutter pub get
+flutter run
