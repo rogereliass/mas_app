@@ -46,4 +46,16 @@ class AppColors {
   // Overlay colors
   static const Color overlay = Color(0x66000000);
   static const Color shimmer = Color(0x33FFFFFF);
+  
+  // Folder colors
+  static const Color folderIconColor = Color(0xFFFDB827);
+  static const Color folderBackgroundLight = Color(0xFFE8E4D0);
+  static const Color folderBackgroundDark = Color(0xFF4A4A3A);
+  
+  // File type colors
+  static const Color fileTypePdf = Color(0xFFE53E3E);
+  static const Color fileTypeImage = Color(0xFF48BB78);
+  static const Color fileTypeVideo = Color(0xFF9F7AEA);
+  static const Color fileTypeDocument = Color(0xFF4299E1);
+  static const Color fileTypeMap = Color(0xFF9F7AEA);
 }

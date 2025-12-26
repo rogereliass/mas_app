@@ -1,6 +1,7 @@
 open in terminal
 cd D:\Apps\Sdk\emulator
 emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
+emulator -avd Pixel_6 -gpu swiftshader_indirect
 
 flutter devices
 Should show emulator-5554 • Android 13 • Android Emulator
