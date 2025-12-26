@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import '../startup/startup_page.dart';
 import '../auth/ui/login_page.dart';
+import '../auth/ui/register_page.dart';
+import '../auth/ui/register_success_page.dart';
 import '../library/ui/folder_page.dart';
+import '../library/ui/folder_detail_page.dart';
+import '../library/ui/all_folders_page.dart';
+import '../library/ui/about_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -25,11 +30,20 @@ class AppRouter {
   /// Login page route
   static const String login = '/login';
   
+  /// Registration page route
+  static const String register = '/register';
+  
+  /// Registration success page route
+  static const String registerSuccess = '/register-success';
+  
   /// Main library page route (root folder view)
   static const String library = '/library';
   
-  /// Folder detail page route (requires folderId parameter)
-  static const String folderDetail = '/folder';
+  /// All folders page route
+  static const String allFolders = '/all-folders';
+  
+  /// About page route
+  static const String about = '/about';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -40,10 +54,11 @@ class AppRouter {
   static Map<String, WidgetBuilder> get routes => {
     startup: (context) => const StartupPage(),
     login: (context) => const LoginPage(),
-    library: (context) => const FolderPage(
-      folderId: null,
-      folderName: 'Library',
-    ),
+    register: (context) => const RegisterPage(),
+    registerSuccess: (context) => const RegisterSuccessPage(),
+    library: (context) => const LibraryHomePage(),
+    allFolders: (context) => const AllFoldersPage(),
+    about: (context) => const AboutPage(),
   };
 
   // ============================================================================
@@ -114,17 +129,29 @@ class AppRouter {
     return Navigator.of(context).pushNamed(library);
   }
 
-  /// Navigate to specific folder
+  /// Navigate to all folders page
+  static Future<void> goToAllFolders(BuildContext context) {
+    return Navigator.of(context).pushNamed(allFolders);
+  }
+
+  /// Navigate to about page
+  static Future<void> goToAbout(BuildContext context) {
+    return Navigator.of(context).pushNamed(about);
+  }
+
+  /// Navigate to specific folder with dynamic route
   static Future<void> goToFolder(
     BuildContext context, {
     required String folderId,
     required String folderName,
+    List<String>? breadcrumbs,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => FolderPage(
+        builder: (context) => FolderDetailPage(
           folderId: folderId,
           folderName: folderName,
+          breadcrumbs: breadcrumbs,
         ),
       ),
     );
