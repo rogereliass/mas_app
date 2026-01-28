@@ -178,19 +178,52 @@ class LibraryProvider with ChangeNotifier {
 
   /// Get signed URL for a file
   /// Returns null for text files or on error
+  /// Falls back to iconUrl if storage file not found
   Future<String?> getFileUrl(String fileId) async {
     try {
       final file = await getFile(fileId);
-      if (file == null) return null;
+      if (file == null) {
+        print('⚠️ File not found: $fileId');
+        return null;
+      }
 
       // Text files should not use signed URLs
       if (file.isTextFile) {
         return null;
       }
 
-      return await _service.getFileSignedUrl(file);
+      final url = await _service.getFileSignedUrl(file);
+      
+      if (url == null || url.isEmpty) {
+        print('⚠️ No URL generated for file: ${file.title}');
+      }
+      
+      return url;
     } catch (e) {
       _logError('getFileUrl', e);
+      return null;
+    }
+  }
+
+  /// Get text content for a text file
+  /// First tries textContent field, then loads from storage if empty
+  Future<String?> getTextFileContent(String fileId) async {
+    try {
+      final file = await getFile(fileId);
+      if (file == null) return null;
+
+      // If text_content is populated in database, use it
+      if (file.textContent != null && file.textContent!.isNotEmpty) {
+        print('✅ Using text_content from database (${file.textContent!.length} chars)');
+        return file.textContent;
+      }
+
+      // Otherwise, load from storage
+      print('📄 text_content empty, loading from storage...');
+      final content = await _service.loadTextFileContent(file);
+      return content;
+    } catch (e) {
+      _logError('getTextFileContent', e);
       return null;
     }
   }

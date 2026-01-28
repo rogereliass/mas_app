@@ -28,15 +28,12 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace with actual Supabase signed URL
-    // Example:
-    // final signedUrl = await Supabase.instance.client.storage
-    //     .from('files')
-    //     .createSignedUrl(widget.url, 3600);
-
+    // Handle empty or null URLs
     if (widget.url.isEmpty) {
       return _buildPlaceholder();
     }
+
+    print('🖼️ ImageViewer loading URL: ${widget.url}');
 
     return InteractiveViewer(
       transformationController: _transformationController,
@@ -122,7 +119,7 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Image Viewer',
+              'Image Not Available',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -131,7 +128,8 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Pinch to zoom • Pan to move',
+              'File not found in storage\nCheck storage_path in database',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.white70,

@@ -63,12 +63,18 @@ class _FileViewerPageState extends State<FileViewerPage> {
     
     try {
       final file = await provider.getFile(widget.fileId);
+      print('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
+      print('📁 Storage path: ${file?.storagePath}');
+      print('🔗 Icon URL: ${file?.iconUrl}');
+      
       if (file != null) {
         _file = file;
         
         // Get signed URL for non-text files
         if (!file.isTextFile) {
           final url = await provider.getFileUrl(widget.fileId);
+          print('🔗 Generated signed URL: $url');
+          
           if (mounted) {
             setState(() {
               _fileUrl = url;
@@ -76,13 +82,37 @@ class _FileViewerPageState extends State<FileViewerPage> {
             });
           }
         } else {
+          // For text files, load content from storage if text_content is empty
+          final textContent = await provider.getTextFileContent(widget.fileId);
+          print('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
+          
           if (mounted) {
             setState(() {
+              // Update the file object with loaded content
+              if (textContent != null) {
+                _file = LibraryFile(
+                  id: file.id,
+                  folderId: file.folderId,
+                  title: file.title,
+                  description: file.description,
+                  fileType: file.fileType,
+                  storagePath: file.storagePath,
+                  sizeBytes: file.sizeBytes,
+                  iconUrl: file.iconUrl,
+                  visibilityRoleId: file.visibilityRoleId,
+                  allowedRoles: file.allowedRoles,
+                  textContent: textContent, // Use loaded content
+                  serverVersion: file.serverVersion,
+                  tags: file.tags,
+                  createdAt: file.createdAt,
+                );
+              }
               _isLoadingFile = false;
             });
           }
         }
       } else {
+        print('❌ File not found');
         if (mounted) {
           setState(() {
             _isLoadingFile = false;
@@ -90,6 +120,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         }
       }
     } catch (e) {
+      print('❌ Error loading file: $e');
       if (mounted) {
         setState(() {
           _isLoadingFile = false;
@@ -397,8 +428,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build appropriate file viewer based on file type
   Widget _buildFileViewer(String fileType) {
+    print('🎬 Building viewer for type: $fileType');
+    
     // For text files, pass the text content directly
     if (fileType == 'text' || fileType == 'txt') {
+      print('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
       return TxtViewerWidget(
         url: '',
         textContent: _file?.textContent,
@@ -407,8 +441,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
     // For other files, use the signed URL
     final streamUrl = _fileUrl ?? widget.fileUrl ?? '';
+    print('🔗 Using URL for viewer: $streamUrl');
 
-    switch (fileType) {
+    switch (fileType.toLowerCase()) {
       case 'pdf':
         return PDFViewerWidget(url: streamUrl);
       case 'jpg':
