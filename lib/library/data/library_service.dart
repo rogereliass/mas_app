@@ -189,7 +189,12 @@ class LibraryService {
         throw Exception('Text files should not use signed URLs. Use textContent directly.');
       }
 
-      final path = file.storagePath;
+      if (file.storagePath == null || file.storagePath!.isEmpty) {
+        print('⚠️ Storage path is null or empty');
+        return file.iconUrl; // Fallback to iconUrl
+      }
+
+      final path = file.storagePath!;
       print('🔍 Attempting to get signed URL for path: $path');
 
       try {
@@ -239,9 +244,13 @@ class LibraryService {
   /// Use for actual downloads, not for viewing
   Future<List<int>> downloadFileBytes(LibraryFile file) async {
     try {
+      if (file.storagePath == null || file.storagePath!.isEmpty) {
+        throw Exception('Storage path is null or empty');
+      }
+
       final bytes = await _supabase.storage
           .from(_storageBucket)
-          .download(file.storagePath);
+          .download(file.storagePath!);
 
       return bytes;
     } catch (e) {
@@ -255,11 +264,15 @@ class LibraryService {
   /// Used when text_content field is empty in database
   Future<String> loadTextFileContent(LibraryFile file) async {
     try {
+      if (file.storagePath == null || file.storagePath!.isEmpty) {
+        throw Exception('Storage path is null or empty');
+      }
+
       print('📄 Loading text file from storage: ${file.storagePath}');
       
       final bytes = await _supabase.storage
           .from(_storageBucket)
-          .download(file.storagePath);
+          .download(file.storagePath!);
 
       final content = String.fromCharCodes(bytes);
       print('✅ Loaded ${content.length} characters from text file');

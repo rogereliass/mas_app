@@ -343,7 +343,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
               return FileTile(
                 fileId: file.id,
                 fileName: file.title,
-                fileType: file.fileType.toUpperCase(),
+                fileType: file.fileType?.toUpperCase() ?? 'UNKNOWN',
                 fileSize: file.formattedSize,
                 lastModified: _formatDate(file.createdAt),
                 onTap: () async {
@@ -355,7 +355,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
                     context,
                     fileId: file.id,
                     fileName: file.title,
-                    fileType: file.fileType,
+                    fileType: file.fileType ?? 'unknown',
                     fileSizeBytes: file.sizeBytes,
                     description: file.description,
                   );

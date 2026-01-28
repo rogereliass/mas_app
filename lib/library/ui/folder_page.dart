@@ -299,7 +299,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               return FileTile(
                 fileId: file.id,
                 fileName: file.title,
-                fileType: file.fileType.toUpperCase(),
+                fileType: file.fileType?.toUpperCase() ?? '',
                 fileSize: file.formattedSize,
                 lastModified: _formatDate(file.createdAt),
                 onTap: () async {
@@ -311,7 +311,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                     context,
                     fileId: file.id,
                     fileName: file.title,
-                    fileType: file.fileType,
+                    fileType: file.fileType ?? '',
                     fileSizeBytes: file.sizeBytes,
                     description: file.description,
                   );

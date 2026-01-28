@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 /// PDF Viewer Widget
 /// 
@@ -17,105 +18,28 @@ class PDFViewerWidget extends StatefulWidget {
 }
 
 class _PDFViewerWidgetState extends State<PDFViewerWidget> {
-  bool _isLoading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPDF();
-  }
-
-  Future<void> _loadPDF() async {
-    try {
-      // TODO: Implement PDF streaming from Supabase
-      // Use packages like: flutter_pdfview, syncfusion_flutter_pdfviewer, or pdfx
-      // Example:
-      // final response = await Supabase.instance.client.storage
-      //     .from('files')
-      //     .createSignedUrl(widget.url, 3600); // 1 hour expiry
-      // 
-      // Load PDF from signed URL without downloading:
-      // await PdfController.loadFromUrl(response);
-
-      // Simulate loading
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = e.toString();
-        });
-      }
-    }
-  }
+  final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildLoading();
+    // Show placeholder if URL is empty
+    if (widget.url.isEmpty) {
+      return _buildPlaceholder();
     }
 
-    if (_error != null) {
-      return _buildError();
-    }
+    print('📄 PDFViewer loading URL: ${widget.url}');
 
-    // TODO: Replace with actual PDF viewer
-    // Example using syncfusion_flutter_pdfviewer:
-    // return SfPdfViewer.network(
-    //   widget.url,
-    //   enableDoubleTapZooming: true,
-    //   enableTextSelection: true,
-    // );
-
-    return _buildPlaceholder();
-  }
-
-  Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading PDF...'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red.withOpacity(0.7),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Failed to load PDF',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.red.withOpacity(0.7),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _error ?? '',
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    // Use Syncfusion PDF Viewer to display PDF from URL
+    return SfPdfViewer.network(
+      widget.url,
+      key: _pdfViewerKey,
+      enableDoubleTapZooming: true,
+      enableTextSelection: true,
+      canShowScrollHead: true,
+      canShowScrollStatus: true,
+      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+        print('❌ PDF load failed: ${details.error} - ${details.description}');
+      },
     );
   }
 
@@ -149,7 +73,7 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             ),
             const SizedBox(height: 24),
             const Text(
-              'PDF Viewer',
+              'PDF Not Available',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -158,7 +82,8 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Streaming from Supabase',
+              'File not found in storage\nCheck storage_path in database',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.white70,

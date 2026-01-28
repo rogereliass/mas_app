@@ -61,11 +61,11 @@ class LibraryFolder {
 /// Maps to the 'files' table in Supabase
 class LibraryFile {
   final String id;
-  final String folderId;
+  final String? folderId;
   final String title;
   final String? description;
-  final String fileType;
-  final String storagePath;
+  final String? fileType;
+  final String? storagePath;
   final int? sizeBytes;
   final String? iconUrl;
   final String? visibilityRoleId;
@@ -77,11 +77,11 @@ class LibraryFile {
 
   LibraryFile({
     required this.id,
-    required this.folderId,
+    this.folderId,
     required this.title,
     this.description,
-    required this.fileType,
-    required this.storagePath,
+    this.fileType,
+    this.storagePath,
     this.sizeBytes,
     this.iconUrl,
     this.visibilityRoleId,
@@ -95,11 +95,11 @@ class LibraryFile {
   factory LibraryFile.fromJson(Map<String, dynamic> json) {
     return LibraryFile(
       id: json['id'] as String,
-      folderId: json['folder_id'] as String,
+      folderId: json['folder_id'] as String?,
       title: json['title'] as String,
       description: json['description'] as String?,
-      fileType: json['file_type'] as String,
-      storagePath: json['storage_path'] as String,
+      fileType: json['file_type'] as String?,
+      storagePath: json['storage_path'] as String?,
       sizeBytes: json['size_bytes'] as int?,
       iconUrl: json['icon_url'] as String?,
       visibilityRoleId: json['visibility_role_id'] as String?,
@@ -135,7 +135,11 @@ class LibraryFile {
   }
 
   /// Check if file is a text file that should be rendered directly
-  bool get isTextFile => fileType.toLowerCase() == 'text' || fileType.toLowerCase() == 'txt';
+  bool get isTextFile {
+    if (fileType == null) return false;
+    final type = fileType!.toLowerCase();
+    return type == 'text' || type == 'txt';
+  }
 
   /// Get formatted file size
   String get formattedSize {
