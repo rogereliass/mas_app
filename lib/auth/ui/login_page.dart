@@ -96,7 +96,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -146,7 +145,6 @@ class _LoginPageState extends State<LoginPage> {
                       _isPasswordVisible
                           ? Icons.visibility_off
                           : Icons.visibility,
-                      color: Colors.grey,
                     ),
                     onPressed: () {
                       setState(() {
@@ -170,10 +168,12 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       );
                     },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.tertiary,
+                    ),
                     child: const Text(
                       'Forgot Password?',
                       style: TextStyle(
-                        color: AppColors.publicAccessBadge,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -223,24 +223,21 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Text(
                       'Don\'t have an account? ',
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 15,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.pushNamed(context, AppRouter.register);
-                      ),
+                      },
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: AppColors.publicAccessBadge,
                       ),
                       child: const Text(
                         'Register Now',
                         style: TextStyle(
-                          color: AppColors.publicAccessBadge,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -257,6 +254,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Column(
       children: [
         // App icon
@@ -264,13 +264,13 @@ class _LoginPageState extends State<LoginPage> {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: AppColors.primaryBlue,
+            color: colorScheme.primary,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.menu_book,
             size: 56,
-            color: Colors.white,
+            color: colorScheme.onPrimary,
           ),
         ),
 
@@ -283,19 +283,16 @@ class _LoginPageState extends State<LoginPage> {
             vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
+            color: theme.cardTheme.color,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: Colors.grey.shade800,
+              color: theme.dividerTheme.color!,
               width: 1,
             ),
           ),
           child: Text(
             'SCOUT LIBRARY',
-            style: TextStyle(
-              color: Colors.grey.shade400,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: theme.textTheme.labelSmall?.copyWith(
               letterSpacing: 1.5,
             ),
           ),
@@ -304,13 +301,9 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 32),
 
         // Title
-        const Text(
+        Text(
           'Welcome Back',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 36,
-            fontWeight: FontWeight.bold,
-          ),
+          style: theme.textTheme.displayLarge,
         ),
 
         const SizedBox(height: 12),
@@ -319,9 +312,8 @@ class _LoginPageState extends State<LoginPage> {
         Text(
           'Sign in to access your digital\nbookshelf and resources.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: 16,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.textTheme.bodySmall?.color,
             height: 1.5,
           ),
         ),
@@ -330,31 +322,25 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildDivider() {
+    final theme = Theme.of(context);
+    
     return Row(
       children: [
-        Expanded(
-          child: Divider(
-            color: Colors.grey.shade800,
-            thickness: 1,
-          ),
+        const Expanded(
+          child: Divider(),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'OR CONTINUE WITH',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 12,
+            style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w500,
               letterSpacing: 1,
             ),
           ),
         ),
-        Expanded(
-          child: Divider(
-            color: Colors.grey.shade800,
-            thickness: 1,
-          ),
+        const Expanded(
+          child: Divider(),
         ),
       ],
     );

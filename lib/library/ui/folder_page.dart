@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/config/theme_provider.dart';
+import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/filter_chip_row.dart';
 import 'components/folder_card.dart';
@@ -28,47 +29,15 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
   String _selectedCategory = 'All';
   int _currentNavIndex = 0;
 
-  // TODO: Fetch folders from Supabase
-  // Replace with actual API call: supabase.from('folders').select()
-  final List<Map<String, dynamic>> _mockFolders = [
-    {'id': '1', 'name': 'المناهج الكشفية', 'name_en': 'Scout Programs', 'itemCount': 12},
-    {'id': '2', 'name': 'الصور والوسائط', 'name_en': 'Photos & Media', 'itemCount': 45},
-    {'id': '3', 'name': 'الشارات والأوسمة', 'name_en': 'Badges & Awards', 'itemCount': 8},
-    {'id': '4', 'name': 'التقارير السنوية', 'name_en': 'Annual Reports', 'itemCount': 3},
-  ];
-
-  // TODO: Fetch recent files from Supabase
-  // Replace with actual API call: supabase.from('files').select().order('created_at', desc: true).limit(10)
-  final List<Map<String, dynamic>> _mockRecentFiles = [
-    {
-      'id': '1',
-      'name': 'دليل القائد للكشافة.pdf',
-      'type': 'PDF',
-      'size': '2.4 MB',
-      'date': '2 days ago',
-    },
-    {
-      'id': '2',
-      'name': 'فيديو تدريبي - رحلات الجبال.mp4',
-      'type': 'MP4',
-      'size': '15.8 MB',
-      'date': 'Nov 24',
-    },
-    {
-      'id': '3',
-      'name': 'شعار المعسكر الصيفي.png',
-      'type': 'PNG',
-      'size': '450 KB',
-      'date': 'Nov 20',
-    },
-    {
-      'id': '4',
-      'name': 'تقرير الفعاليات.docx',
-      'type': 'DOCX',
-      'size': '1.2 MB',
-      'date': 'Nov 18',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load root contents on page load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<LibraryProvider>(context, listen: false);
+      provider.loadRootContents();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +145,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
   /// Build folders section with grid
   Widget _buildFoldersSection() {
     final theme = Theme.of(context);
+    final provider = Provider.of<LibraryProvider>(context);
+    final folders = provider.rootFolders;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,43 +162,83 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.allFolders);
-                },
-                child: const Text('View All'),
-              ),
+              if (folders.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRouter.allFolders);
+                  },
+                  child: const Text('View All'),
+                ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 170,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            itemCount: _mockFolders.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final folder = _mockFolders[index];
-              return SizedBox(
-                width: 180,
-                child: FolderCard(
-                  folderId: folder['id'],
-                  folderName: folder['name'],
-                  itemCount: folder['itemCount'],
-                  onTap: () {
-                    AppRouter.goToFolder(
-                      context,
-                      folderId: folder['id'],
-                      folderName: folder['name'],
-                    );
-                  },
-                ),
-              );
-            },
+        if (provider.isLoadingRoot)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (provider.hasError)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                children: [
+                  Text(
+                    provider.error ?? 'An error occurred',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => provider.refreshRootContents(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (folders.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'No folders found',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 170,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              itemCount: folders.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final folder = folders[index];
+                return SizedBox(
+                  width: 180,
+                  child: FolderCard(
+                    folderId: folder.id,
+                    folderName: folder.name,
+                    itemCount: folder.itemCount,
+                    onTap: () {
+                      AppRouter.goToFolder(
+                        context,
+                        folderId: folder.id,
+                        folderName: folder.name,
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
@@ -235,6 +246,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
   /// Build recent files section with list
   Widget _buildRecentFilesSection() {
     final theme = Theme.of(context);
+    final provider = Provider.of<LibraryProvider>(context);
+    final files = provider.recentFiles;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,29 +272,74 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
             ],
           ),
         ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _mockRecentFiles.length,
-          itemBuilder: (context, index) {
-            final file = _mockRecentFiles[index];
-            return FileTile(
-              fileId: file['id'],
-              fileName: file['name'],
-              fileType: file['type'],
-              fileSize: file['size'],
-              lastModified: file['date'],
-              onTap: () {
-                // TODO: Open file viewer
-              },
-              onMorePressed: () {
-                // TODO: Show file options
-              },
-            );
-          },
-        ),
+        if (provider.isLoadingRoot)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (files.isEmpty && !provider.hasError)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'No recent files',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: files.length,
+            itemBuilder: (context, index) {
+              final file = files[index];
+              return FileTile(
+                fileId: file.id,
+                fileName: file.title,
+                fileType: file.fileType.toUpperCase(),
+                fileSize: file.formattedSize,
+                lastModified: _formatDate(file.createdAt),
+                onTap: () async {
+                  // Record view and navigate to file viewer
+                  await provider.recordFileView(file.id);
+                  
+                  if (!mounted) return;
+                  AppRouter.goToFileViewer(
+                    context,
+                    fileId: file.id,
+                    fileName: file.title,
+                    fileType: file.fileType,
+                    fileSizeBytes: file.sizeBytes,
+                    description: file.description,
+                  );
+                },
+                onMorePressed: () {
+                  // TODO: Show file options
+                },
+              );
+            },
+          ),
       ],
     );
+  }
+
+  /// Format date for display
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
   }
 
   /// Build about content

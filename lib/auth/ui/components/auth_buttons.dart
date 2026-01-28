@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 
 /// Primary button component for authentication flows
 /// 
-/// Follows design system with blue background
+/// Theme-aware button with loading state and optional icon
+/// Uses ThemeData for all styling - no hardcoded colors
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -20,26 +20,20 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
-          disabledBackgroundColor: AppColors.primaryBlue.withOpacity(0.5),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 0,
-        ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
-                  color: Colors.white,
+                  color: colorScheme.onPrimary,
                   strokeWidth: 2.5,
                 ),
               )
@@ -66,6 +60,8 @@ class PrimaryButton extends StatelessWidget {
 }
 
 /// Secondary button for social sign-in
+/// 
+/// Theme-aware outlined button with icon and provider label
 class SocialButton extends StatelessWidget {
   final String provider;
   final IconData icon;
@@ -91,16 +87,6 @@ class SocialButton extends StatelessWidget {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-            ),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white,
-            side: BorderSide(
-              color: Colors.grey.shade800,
-              width: 1,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),

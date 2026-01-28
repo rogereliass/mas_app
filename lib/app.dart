@@ -6,9 +6,9 @@ import 'routing/app_router.dart';
 
 /// Main application widget
 /// 
-/// This is the root widget of the app that:
-/// - Consumes the ThemeProvider for theme management
-/// - Configures Material 3 design system
+/// Root widget that:
+/// - Consumes ThemeProvider for theme management
+/// - Configures Material 3 with centralized theme system
 /// - Sets up navigation routing
 /// - Provides app-wide configuration
 class MyApp extends StatelessWidget {
@@ -24,20 +24,14 @@ class MyApp extends StatelessWidget {
           title: 'Scout Digital Library',
           debugShowCheckedModeBanner: false,
           
-          // Theme configuration - uses centralized theme system
-          // Light theme for Brightness.light mode
+          // Theme configuration - uses centralized AppTheme
           theme: AppTheme.lightTheme,
-          // Dark theme for Brightness.dark mode
           darkTheme: AppTheme.darkTheme,
-          // Current theme mode from provider (light/dark/system)
           themeMode: themeProvider.themeMode,
           
           // Navigation configuration
-          // Initial route when app launches
           initialRoute: AppRouter.startup,
-          // All app routes defined in centralized router
           routes: AppRouter.routes,
-          // Handle unknown routes gracefully
           onUnknownRoute: AppRouter.onUnknownRoute,
         );
       },

@@ -15,6 +15,7 @@ class AppTheme {
       colorScheme: ColorScheme.light(
         primary: AppColors.primaryBlue,
         secondary: AppColors.accentBlue,
+        tertiary: AppColors.publicAccessBadge,
         surface: AppColors.surfaceLight,
         background: AppColors.backgroundLight,
         error: AppColors.error,
@@ -168,6 +169,7 @@ class AppTheme {
       colorScheme: ColorScheme.dark(
         primary: AppColors.primaryBlue,
         secondary: AppColors.accentBlue,
+        tertiary: AppColors.publicAccessBadge,
         surface: AppColors.surfaceDark,
         background: AppColors.backgroundDark,
         error: AppColors.error,

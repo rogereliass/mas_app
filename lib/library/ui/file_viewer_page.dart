@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../logic/library_provider.dart';
+import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
 import 'components/bottom_nav_bar.dart';
 import 'file_viewer/pdf_viewer_widget.dart';
@@ -15,7 +18,7 @@ class FileViewerPage extends StatefulWidget {
   final String fileId;
   final String fileName;
   final String fileType;
-  final int fileSizeBytes;
+  final int? fileSizeBytes;
   final String? fileUrl; // Supabase storage URL
   final String? description;
   final String? publisher;
@@ -27,7 +30,7 @@ class FileViewerPage extends StatefulWidget {
     required this.fileId,
     required this.fileName,
     required this.fileType,
-    required this.fileSizeBytes,
+    this.fileSizeBytes,
     this.fileUrl,
     this.description,
     this.publisher,
@@ -44,10 +47,56 @@ class _FileViewerPageState extends State<FileViewerPage> {
   double _downloadProgress = 0.0;
   bool _isAvailableOffline = false;
   int _currentNavIndex = 0;
+  LibraryFile? _file;
+  String? _fileUrl;
+  bool _isLoadingFile = true;
 
   @override
   void initState() {
     super.initState();
+    _loadFileData();
+  }
+
+  /// Load file data from provider
+  Future<void> _loadFileData() async {
+    final provider = Provider.of<LibraryProvider>(context, listen: false);
+    
+    try {
+      final file = await provider.getFile(widget.fileId);
+      if (file != null) {
+        _file = file;
+        
+        // Get signed URL for non-text files
+        if (!file.isTextFile) {
+          final url = await provider.getFileUrl(widget.fileId);
+          if (mounted) {
+            setState(() {
+              _fileUrl = url;
+              _isLoadingFile = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _isLoadingFile = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingFile = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFile = false;
+        });
+      }
+    }
+    
     _checkOfflineAvailability();
   }
 
@@ -70,27 +119,24 @@ class _FileViewerPageState extends State<FileViewerPage> {
     });
 
     try {
-      // TODO: Implement Supabase file download with progress
-      // final supabase = Supabase.instance.client;
-      // final bytes = await supabase.storage
-      //     .from('files')
-      //     .download(widget.fileUrl ?? '');
-      // 
-      // // Save to local storage
-      // await LocalStorageService.saveFile(
-      //   fileId: widget.fileId,
-      //   fileName: widget.fileName,
-      //   bytes: bytes,
-      //   onProgress: (progress) {
-      //     setState(() {
-      //       _downloadProgress = progress;
-      //     });
-      //   },
-      // );
+      final provider = Provider.of<LibraryProvider>(context, listen: false);
+      
+      // Download file bytes
+      final bytes = await provider.downloadFile(widget.fileId);
+      
+      if (bytes == null) {
+        throw Exception('Failed to download file');
+      }
 
-      // Simulate download progress
+      // TODO: Save to local storage using path_provider
+      // final directory = await getApplicationDocumentsDirectory();
+      // final filePath = '${directory.path}/${widget.fileName}';
+      // final file = File(filePath);
+      // await file.writeAsBytes(bytes);
+      
+      // Simulate progress
       for (int i = 0; i <= 100; i += 10) {
-        await Future.delayed(const Duration(milliseconds: 200));
+        await Future.delayed(const Duration(milliseconds: 100));
         if (!mounted) return;
         setState(() {
           _downloadProgress = i / 100;
@@ -120,11 +166,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Get formatted file size
   String get _formattedFileSize {
-    if (widget.fileSizeBytes < 1024) return '${widget.fileSizeBytes}B';
-    if (widget.fileSizeBytes < 1024 * 1024) {
-      return '${(widget.fileSizeBytes / 1024).toStringAsFixed(1)}KB';
+    final bytes = widget.fileSizeBytes;
+    if (bytes == null) return 'Unknown';
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)}KB';
     }
-    return '${(widget.fileSizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   @override
@@ -203,6 +251,34 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build main file viewer content
   Widget _buildFileViewerContent() {
+    if (_isLoadingFile) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_file == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            const Text('File not found'),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,13 +296,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
           const SizedBox(height: 24),
 
           // Description section
-          if (widget.description != null) ...[
+          if (_file!.description != null && _file!.description!.isNotEmpty) ...[
             _buildDescription(),
             const SizedBox(height: 24),
           ],
 
-          // Publisher and Language info
-          _buildMetadata(),
+          // Tags section
+          if (_file!.tags != null && _file!.tags!.isNotEmpty) ...[
+            _buildTags(),
+            const SizedBox(height: 24),
+          ],
 
           const SizedBox(height: 32),
         ],
@@ -318,8 +397,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build appropriate file viewer based on file type
   Widget _buildFileViewer(String fileType) {
-    // TODO: Replace with actual Supabase streaming URL
-    final streamUrl = widget.fileUrl ?? '';
+    // For text files, pass the text content directly
+    if (fileType == 'text' || fileType == 'txt') {
+      return TxtViewerWidget(
+        url: '',
+        textContent: _file?.textContent,
+      );
+    }
+
+    // For other files, use the signed URL
+    final streamUrl = _fileUrl ?? widget.fileUrl ?? '';
 
     switch (fileType) {
       case 'pdf':
@@ -333,9 +420,6 @@ class _FileViewerPageState extends State<FileViewerPage> {
       case 'mov':
       case 'video':
         return VideoViewerWidget(url: streamUrl);
-      case 'txt':
-      case 'text':
-        return TxtViewerWidget(url: streamUrl);
       default:
         return _buildUnsupportedFileType();
     }
@@ -375,7 +459,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.fileName,
+            _file?.title ?? widget.fileName,
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: theme.brightness == Brightness.dark
@@ -387,9 +471,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           Row(
             children: [
               Text(
-                widget.pageCount != null
-                    ? '${widget.pageCount} Pages • $_formattedFileSize'
-                    : _formattedFileSize,
+                _file?.formattedSize ?? _formattedFileSize,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.brightness == Brightness.dark
                       ? AppColors.textSecondaryDark
@@ -459,7 +541,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            widget.description ?? '',
+            _file?.description ?? widget.description ?? '',
             style: theme.textTheme.bodyLarge?.copyWith(
               height: 1.6,
               color: theme.brightness == Brightness.dark
@@ -472,86 +554,54 @@ class _FileViewerPageState extends State<FileViewerPage> {
     );
   }
 
-  /// Build metadata section (Publisher & Language)
-  Widget _buildMetadata() {
+  /// Build tags section
+  Widget _buildTags() {
     final theme = Theme.of(context);
+    final tags = _file?.tags ?? [];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? AppColors.surfaceDark
-                    : AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'PUBLISHER',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: theme.brightness == Brightness.dark
-                          ? AppColors.textTertiaryDark
-                          : AppColors.textTertiaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.publisher ?? 'Unknown',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.white
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                ],
-              ),
+          Text(
+            'TAGS',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              color: theme.brightness == Brightness.dark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? AppColors.surfaceDark
-                    : AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'LANGUAGE',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: theme.brightness == Brightness.dark
-                          ? AppColors.textTertiaryDark
-                          : AppColors.textTertiaryLight,
-                    ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: tags.map((tag) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.dark
+                      ? AppColors.surfaceDark
+                      : AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.language ?? 'English',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.white
-                          : AppColors.textPrimaryLight,
-                    ),
+                ),
+                child: Text(
+                  tag,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

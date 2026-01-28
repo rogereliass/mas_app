@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 
 /// Reusable custom text field component
 /// 
-/// Follows design system with dark theme styling
-/// Supports validation, obscured text, and suffix icons
+/// Theme-aware text input with validation, obscured text, and suffix icons
+/// Uses ThemeData for all styling - no hardcoded colors
 class CustomTextField extends StatelessWidget {
   final String label;
   final String? placeholder;
@@ -33,6 +32,9 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -40,20 +42,13 @@ class CustomTextField extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
+              style: textTheme.titleMedium,
             ),
             if (!isRequired) ...[
               const SizedBox(width: 8),
               Text(
                 'Optional',
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 14,
-                ),
+                style: textTheme.bodySmall,
               ),
             ],
           ],
@@ -66,59 +61,14 @@ class CustomTextField extends StatelessWidget {
           maxLength: maxLength,
           validator: validator,
           onChanged: onChanged,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-          ),
+          style: textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: placeholder ?? 'Enter your $label',
-            hintStyle: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
-            filled: true,
-            fillColor: const Color(0xFF1E2530),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.grey.shade800,
-                width: 1,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: Colors.grey.shade800,
-                width: 1,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primaryBlue,
-                width: 2,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 1,
-              ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.error,
-                width: 2,
-              ),
+            hintStyle: textTheme.bodyMedium?.copyWith(
+              color: textTheme.bodySmall?.color,
             ),
             suffixIcon: suffixIcon,
             counterText: '',
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
           ),
         ),
       ],

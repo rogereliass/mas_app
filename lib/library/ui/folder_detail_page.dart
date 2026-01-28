@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../routing/app_router.dart';
+import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
 import 'components/bottom_nav_bar.dart';
@@ -31,46 +34,15 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
   bool _isGridView = false;
   int _currentNavIndex = 0;
 
-  // TODO: Fetch subfolders from Supabase based on parent folderId
-  // Replace with: supabase.from('folders').select().eq('parent_id', widget.folderId)
-  final List<Map<String, dynamic>> _mockSubfolders = [
-    {'id': 's1', 'name': 'Photos & Media', 'name_ar': 'الصور والوسائط', 'itemCount': 45},
-    {'id': 's2', 'name': 'Daily Reports', 'name_ar': 'التقارير اليومية', 'itemCount': 12},
-    {'id': 's3', 'name': 'Maps & Guides', 'name_ar': 'الخرائط والأدلة', 'itemCount': 8},
-  ];
-
-  // TODO: Fetch files from Supabase based on folderId
-  // Replace with: supabase.from('files').select().eq('folder_id', widget.folderId)
-  final List<Map<String, dynamic>> _mockFiles = [
-    {
-      'id': 'f1',
-      'name': 'General Scout Rules',
-      'type': 'PDF',
-      'size': '2.4 MB',
-      'date': 'Mar 12, 2023',
-    },
-    {
-      'id': 'f2',
-      'name': 'Opening Ceremony - Video',
-      'type': 'MP4',
-      'size': '145 MB',
-      'date': 'Mar 10, 2023',
-    },
-    {
-      'id': 'f3',
-      'name': 'Team Group Photo',
-      'type': 'JPG',
-      'size': '4.2 MB',
-      'date': 'Mar 09, 2023',
-    },
-    {
-      'id': 'f4',
-      'name': 'Camp Location Coords',
-      'type': 'KML',
-      'size': '18 KB',
-      'date': 'Mar 08, 2023',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Load folder contents on page load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<LibraryProvider>(context, listen: false);
+      provider.loadFolderContents(widget.folderId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +107,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
 
   /// Build folder content view
   Widget _buildFolderContent() {
+    final provider = Provider.of<LibraryProvider>(context);
+    final subfolders = provider.currentSubfolders;
+    
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,16 +121,49 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
           
           const SizedBox(height: 24),
           
-          // Subfolders section
-          if (_mockSubfolders.isNotEmpty) ...[
-            _buildSubfoldersSection(),
+          // Loading indicator
+          if (provider.isLoadingFolder)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          // Error state
+          else if (provider.hasError)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    Text(
+                      provider.error ?? 'An error occurred',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => provider.refreshFolderContents(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          // Content
+          else ...[
+            // Subfolders section
+            if (subfolders.isNotEmpty) ...[
+              _buildSubfoldersSection(),
+              const SizedBox(height: 24),
+            ],
+            
+            // Files section
+            _buildFilesSection(),
+            
             const SizedBox(height: 24),
           ],
-          
-          // Files section
-          _buildFilesSection(),
-          
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -210,6 +218,8 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
   /// Build subfolders section
   Widget _buildSubfoldersSection() {
     final theme = Theme.of(context);
+    final provider = Provider.of<LibraryProvider>(context);
+    final subfolders = provider.currentSubfolders;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,12 +235,6 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextButton(
-                onPressed: () {
-                  // TODO: Show all subfolders
-                },
-                child: const Text('View All'),
-              ),
             ],
           ),
         ),
@@ -240,28 +244,28 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _mockSubfolders.length,
+            itemCount: subfolders.length,
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
-              final folder = _mockSubfolders[index];
+              final folder = subfolders[index];
               return SizedBox(
                 width: 180,
                 child: FolderCard(
-                  folderId: folder['id'],
-                  folderName: folder['name'],
-                  itemCount: folder['itemCount'],
+                  folderId: folder.id,
+                  folderName: folder.name,
+                  itemCount: folder.itemCount,
                   onTap: () {
                     // Navigate to nested folder
                     final newBreadcrumbs = [
-                      ...(widget.breadcrumbs ?? ['Library', 'Events']),
+                      ...(widget.breadcrumbs ?? ['Library']),
                       widget.folderName,
                     ];
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => FolderDetailPage(
-                          folderId: folder['id'],
-                          folderName: folder['name'],
+                          folderId: folder.id,
+                          folderName: folder.name,
                           breadcrumbs: newBreadcrumbs,
                         ),
                       ),
@@ -279,6 +283,8 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
   /// Build files section
   Widget _buildFilesSection() {
     final theme = Theme.of(context);
+    final provider = Provider.of<LibraryProvider>(context);
+    final files = provider.currentFiles;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,29 +323,67 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
             ],
           ),
         ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _mockFiles.length,
-          itemBuilder: (context, index) {
-            final file = _mockFiles[index];
-            return FileTile(
-              fileId: file['id'],
-              fileName: file['name'],
-              fileType: file['type'],
-              fileSize: file['size'],
-              lastModified: file['date'],
-              onTap: () {
-                // TODO: Open file viewer
-              },
-              onMorePressed: () {
-                // TODO: Show file options
-              },
-            );
-          },
-        ),
+        if (files.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Text(
+                'No files in this folder',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: files.length,
+            itemBuilder: (context, index) {
+              final file = files[index];
+              return FileTile(
+                fileId: file.id,
+                fileName: file.title,
+                fileType: file.fileType.toUpperCase(),
+                fileSize: file.formattedSize,
+                lastModified: _formatDate(file.createdAt),
+                onTap: () async {
+                  // Record view and navigate to file viewer
+                  await provider.recordFileView(file.id);
+                  
+                  if (!mounted) return;
+                  AppRouter.goToFileViewer(
+                    context,
+                    fileId: file.id,
+                    fileName: file.title,
+                    fileType: file.fileType,
+                    fileSizeBytes: file.sizeBytes,
+                    description: file.description,
+                  );
+                },
+                onMorePressed: () {
+                  // TODO: Show file options
+                },
+              );
+            },
+          ),
       ],
     );
+  }
+
+  /// Format date for display
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
   }
 
   /// Build about content placeholder

@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../routing/app_router.dart';
+import '../../../core/widgets/app_bottom_nav_bar.dart';
 import 'components/auth_buttons.dart';
 
 /// Registration Success Page
 /// 
-/// Displays confirmation message after successful registration
-/// Includes navigation to public library
+/// Theme-aware confirmation screen after successful registration
+/// Uses reusable bottom nav component
 class RegisterSuccessPage extends StatelessWidget {
   const RegisterSuccessPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
         automaticallyImplyLeading: false,
         title: Container(
           padding: const EdgeInsets.symmetric(
@@ -25,7 +25,7 @@ class RegisterSuccessPage extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             border: Border.all(
-              color: AppColors.publicAccessBadge,
+              color: colorScheme.tertiary,
               width: 2,
             ),
             borderRadius: BorderRadius.circular(8),
@@ -33,18 +33,15 @@ class RegisterSuccessPage extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.group,
-                color: AppColors.publicAccessBadge,
+                color: colorScheme.tertiary,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 'SCOUT LOGO',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                style: theme.textTheme.labelSmall?.copyWith(
                   letterSpacing: 1.5,
                 ),
               ),
@@ -62,18 +59,14 @@ class RegisterSuccessPage extends StatelessWidget {
               const Spacer(),
 
               // Success icon with glow effect
-              _buildSuccessIcon(),
+              _buildSuccessIcon(context),
 
               const SizedBox(height: 48),
 
               // Title
-              const Text(
+              Text(
                 'Submitted!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: theme.textTheme.displayLarge,
               ),
 
               const SizedBox(height: 16),
@@ -82,9 +75,8 @@ class RegisterSuccessPage extends StatelessWidget {
               Text(
                 'Thank you for your contribution. Your\nsubmission has been sent to a Unit\nLeader for approval.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 16,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
                   height: 1.5,
                 ),
               ),
@@ -108,11 +100,13 @@ class RegisterSuccessPage extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNav(context),
+      bottomNavigationBar: const AppBottomNavBar(currentIndex: 1),
     );
   }
 
-  Widget _buildSuccessIcon() {
+  Widget _buildSuccessIcon(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       width: 160,
       height: 160,
@@ -120,7 +114,7 @@ class RegisterSuccessPage extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: AppColors.publicAccessBadge.withOpacity(0.4),
+            color: colorScheme.tertiary.withOpacity(0.4),
             blurRadius: 60,
             spreadRadius: 20,
           ),
@@ -130,100 +124,21 @@ class RegisterSuccessPage extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: AppColors.publicAccessBadge,
+            color: colorScheme.tertiary,
             width: 4,
           ),
           gradient: RadialGradient(
             colors: [
-              AppColors.publicAccessBadge.withOpacity(0.2),
-              Colors.transparent,
+              colorScheme.tertiary.withOpacity(0.2),
+              colorScheme.surface.withOpacity(0),
             ],
           ),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.check,
           size: 80,
-          color: AppColors.publicAccessBadge,
+          color: colorScheme.tertiary,
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
-                isActive: false,
-                onTap: () {},
-              ),
-              _buildNavItem(
-                icon: Icons.menu_book,
-                label: 'Library',
-                isActive: true,
-                onTap: () {},
-              ),
-              _buildNavItem(
-                icon: Icons.search,
-                label: 'Search',
-                isActive: false,
-                onTap: () {},
-              ),
-              _buildNavItem(
-                icon: Icons.person_outline,
-                label: 'Profile',
-                isActive: false,
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isActive ? AppColors.publicAccessBadge : Colors.grey.shade600,
-            size: 28,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isActive ? AppColors.publicAccessBadge : Colors.grey.shade600,
-              fontSize: 12,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-        ],
       ),
     );
   }

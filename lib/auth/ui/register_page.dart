@@ -191,21 +191,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: const BackButton(),
         title: Text(
           'SCOUT LOGO',
-          style: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+          style: theme.textTheme.labelSmall?.copyWith(
             letterSpacing: 1.5,
           ),
         ),
@@ -225,13 +218,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 32),
 
                 // Title
-                const Text(
+                Text(
                   'Start your reading\njourney',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                  style: theme.textTheme.displayLarge?.copyWith(
                     height: 1.2,
                   ),
                 ),
@@ -242,9 +232,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 Text(
                   'Register to access thousands of digital\nresources and join our community.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 16,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.textTheme.bodySmall?.color,
                     height: 1.5,
                   ),
                 ),
@@ -311,17 +300,19 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildLogo() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
-      width: 100,
-      height: 100,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
-        color: AppColors.primaryBlue,
-        borderRadius: BorderRadius.circular(24),
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.menu_book,
         size: 56,
-        color: Colors.white,
+        color: colorScheme.onPrimary,
       ),
     );
   }
@@ -350,7 +341,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     _passwordVisibility[field.key] == true
                         ? Icons.visibility_off
                         : Icons.visibility,
-                    color: Colors.grey,
                   ),
                   onPressed: () {
                     setState(() {
@@ -360,7 +350,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   },
                 )
               : (field.key == 'email'
-                  ? const Icon(Icons.check_circle, color: AppColors.success)
+                  ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.tertiary)
                   : null),
         ),
       );
@@ -375,6 +365,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildTermsCheckbox() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -388,44 +381,31 @@ class _RegisterPageState extends State<RegisterPage> {
                 _agreedToTerms = value ?? false;
               });
             },
-            fillColor: MaterialStateProperty.resolveWith((states) {
-              if (states.contains(MaterialState.selected)) {
-                return AppColors.primaryBlue;
-              }
-              return Colors.transparent;
-            }),
-            side: BorderSide(
-              color: Colors.grey.shade700,
-              width: 2,
-            ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: TextStyle(
-                color: Colors.grey.shade400,
-                fontSize: 14,
-              ),
-              children: const [
-                TextSpan(text: 'I agree to the '),
+              style: theme.textTheme.bodyMedium,
+              children: [
+                const TextSpan(text: 'I agree to the '),
                 TextSpan(
                   text: 'Terms of Service',
                   style: TextStyle(
-                    color: AppColors.primaryBlue,
+                    color: colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                TextSpan(text: ' and '),
+                const TextSpan(text: ' and '),
                 TextSpan(
                   text: 'Privacy\nPolicy',
                   style: TextStyle(
-                    color: AppColors.primaryBlue,
+                    color: colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                TextSpan(text: '.'),
+                const TextSpan(text: '.'),
               ],
             ),
           ),

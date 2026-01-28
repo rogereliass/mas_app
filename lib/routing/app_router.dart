@@ -5,6 +5,7 @@ import '../auth/ui/register_page.dart';
 import '../auth/ui/register_success_page.dart';
 import '../library/ui/folder_page.dart';
 import '../library/ui/folder_detail_page.dart';
+import '../library/ui/file_viewer_page.dart';
 import '../library/ui/all_folders_page.dart';
 import '../library/ui/about_page.dart';
 
@@ -152,6 +153,36 @@ class AppRouter {
           folderId: folderId,
           folderName: folderName,
           breadcrumbs: breadcrumbs,
+        ),
+      ),
+    );
+  }
+
+  /// Navigate to file viewer with dynamic route
+  static Future<void> goToFileViewer(
+    BuildContext context, {
+    required String fileId,
+    required String fileName,
+    required String fileType,
+    int? fileSizeBytes,
+    String? fileUrl,
+    String? description,
+    String? publisher,
+    String? language,
+    int? pageCount,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FileViewerPage(
+          fileId: fileId,
+          fileName: fileName,
+          fileType: fileType,
+          fileSizeBytes: fileSizeBytes,
+          fileUrl: fileUrl,
+          description: description,
+          publisher: publisher,
+          language: language,
+          pageCount: pageCount,
         ),
       ),
     );
