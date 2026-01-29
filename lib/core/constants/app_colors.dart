@@ -8,9 +8,9 @@ class AppColors {
   static const Color accentBlue = Color(0xFF5B9AFF);
   
   // Background colors - Light theme
-  static const Color backgroundLight = Color(0xFFFFFFFF);
-  static const Color surfaceLight = Color(0xFFF5F5F5);
-  static const Color cardLight = Color(0xFFFFFFFF);
+  static const Color backgroundLight = Color(0xFFFAF7F2); // Light cream
+  static const Color surfaceLight = Color(0xFFF5F2ED); // Slightly darker cream
+  static const Color cardLight = Color(0xFFFFFFFF); // Keep cards white for contrast
   
   // Background colors - Dark theme
   static const Color backgroundDark = Color(0xFF1A1F2E);

@@ -195,7 +195,14 @@ class _RegisterPageState extends State<RegisterPage> {
     
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRouter.startup,
+            (route) => false,
+          ),
+        ),
         title: Text(
           'SCOUT LOGO',
           style: theme.textTheme.labelSmall?.copyWith(

@@ -428,7 +428,7 @@ class _FooterSection extends StatelessWidget {
       textAlign: TextAlign.center,
       style: theme.textTheme.bodySmall?.copyWith(
         // Slightly transparent for subtle appearance
-        color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+        color: theme.textTheme.bodySmall?.color?.withOpacity(0.9),
       ),
     );
   }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 /// Video Viewer Widget
 /// 
-/// Displays videos streamed from Supabase URL
-/// Supports play/pause, seek, and fullscreen controls
+/// Displays YouTube videos embedded in the app
+/// Extracts video ID from YouTube URLs stored in storagePath
 class VideoViewerWidget extends StatefulWidget {
   final String url;
 
@@ -17,9 +19,11 @@ class VideoViewerWidget extends StatefulWidget {
 }
 
 class _VideoViewerWidgetState extends State<VideoViewerWidget> {
-  bool _isInitialized = false;
-  bool _isPlaying = false;
+  YoutubePlayerController? _controller;
   bool _hasError = false;
+  String? _errorMessage;
+  bool _isPlayerReady = false;
+  bool _isFullScreen = false;
 
   @override
   void initState() {
@@ -29,57 +33,78 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
 
   Future<void> _initializeVideo() async {
     try {
-      // TODO: Implement video streaming from Supabase
-      // Use video_player package
-      // Example:
-      // final signedUrl = await Supabase.instance.client.storage
-      //     .from('files')
-      //     .createSignedUrl(widget.url, 3600);
-      // 
-      // _videoController = VideoPlayerController.network(signedUrl);
-      // await _videoController.initialize();
-      // 
-      // if (mounted) {
-      //   setState(() {
-      //     _isInitialized = true;
-      //   });
-      // }
+      // Extract YouTube video ID from URL
+      final videoId = YoutubePlayer.convertUrlToId(widget.url);
+      
+      if (videoId == null) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Invalid YouTube URL';
+        });
+        return;
+      }
 
-      // Simulate initialization
-      await Future.delayed(const Duration(seconds: 2));
+      // Initialize YouTube player controller
+      _controller = YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          enableCaption: true,
+          loop: false,
+          controlsVisibleAtStart: true,
+          hideControls: false,
+          forceHD: false,
+        ),
+      )..addListener(_listener);
 
       if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _hasError = true;
+          _errorMessage = 'Error loading video: $e';
         });
+      }
+    }
+  }
+
+  void _listener() {
+    if (_controller != null && mounted) {
+      if (_controller!.value.isReady && !_isPlayerReady) {
+        setState(() {
+          _isPlayerReady = true;
+        });
+      }
+      
+      // Handle fullscreen changes only when state actually changes
+      if (_controller!.value.isFullScreen != _isFullScreen) {
+        _isFullScreen = _controller!.value.isFullScreen;
+        if (_isFullScreen) {
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        } else {
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+          ]);
+        }
       }
     }
   }
 
   @override
   void dispose() {
-    // TODO: Dispose video controller
-    // _videoController?.dispose();
+    _controller?.removeListener(_listener);
+    _controller?.dispose();
+    // Reset orientation when leaving
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
     super.dispose();
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
-
-    // TODO: Implement play/pause
-    // if (_isPlaying) {
-    //   _videoController.play();
-    // } else {
-    //   _videoController.pause();
-    // }
   }
 
   @override
@@ -88,32 +113,36 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
       return _buildError();
     }
 
-    if (!_isInitialized) {
+    if (_controller == null) {
       return _buildLoading();
     }
 
-    // TODO: Replace with actual video player
-    // Example using video_player:
-    // return Stack(
-    //   alignment: Alignment.center,
-    //   children: [
-    //     AspectRatio(
-    //       aspectRatio: _videoController.value.aspectRatio,
-    //       child: VideoPlayer(_videoController),
-    //     ),
-    //     VideoProgressIndicator(
-    //       _videoController,
-    //       allowScrubbing: true,
-    //     ),
-    //     if (!_isPlaying)
-    //       IconButton(
-    //         icon: Icon(Icons.play_circle_fill, size: 80),
-    //         onPressed: _togglePlayPause,
-    //       ),
-    //   ],
-    // );
-
-    return _buildPlaceholder();
+    return YoutubePlayerBuilder(
+      onExitFullScreen: () {
+        // Reset orientation when exiting fullscreen
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+        ]);
+      },
+      player: YoutubePlayer(
+        controller: _controller!,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: Colors.red,
+        progressColors: const ProgressBarColors(
+          playedColor: Colors.red,
+          handleColor: Colors.redAccent,
+        ),
+        onReady: () {
+          setState(() {
+            _isPlayerReady = true;
+          });
+        },
+        aspectRatio: 16 / 9,
+      ),
+      builder: (context, player) {
+        return player;
+      },
+    );
   }
 
   Widget _buildLoading() {
@@ -137,83 +166,16 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
           Icon(
             Icons.error_outline,
             size: 64,
-            color: Colors.red.withOpacity(0.7),
+            color: Colors.red,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
-            'Failed to load video',
-            style: TextStyle(
+            _errorMessage ?? 'Failed to load video',
+            style: const TextStyle(
               fontSize: 16,
-              color: Colors.red.withOpacity(0.7),
+              color: Colors.red,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.purple.shade300,
-            Colors.purple.shade600,
-          ],
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_circle_fill,
-                  size: 80,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Video Player',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Streaming from Supabase',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
-          ),
-          Positioned(
-            bottom: 32,
-            child: ElevatedButton.icon(
-              onPressed: _togglePlayPause,
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-              label: Text(_isPlaying ? 'Pause' : 'Play'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

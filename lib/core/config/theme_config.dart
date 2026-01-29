@@ -87,7 +87,7 @@ class AppTheme {
         ),
         bodySmall: TextStyle(
           fontSize: 12,
-          color: AppColors.textTertiaryLight,
+          color: Color(0xFF5A5A5A),
         ),
       ),
       
@@ -241,7 +241,7 @@ class AppTheme {
         ),
         bodySmall: TextStyle(
           fontSize: 12,
-          color: AppColors.textTertiaryDark,
+          color: Color(0xFF9A9A9A),
         ),
       ),
       

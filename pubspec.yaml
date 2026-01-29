@@ -55,6 +55,9 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^27.2.5
   device_info_plus: ^10.1.2
 
+  # YouTube player
+  youtube_player_flutter: ^9.0.3
+
   # UI helpers
   flutter_svg: ^2.0.10
   cached_network_image: ^3.4.1

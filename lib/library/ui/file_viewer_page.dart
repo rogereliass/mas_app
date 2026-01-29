@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
-import 'components/bottom_nav_bar.dart';
 import 'file_viewer/pdf_viewer_widget.dart';
 import 'file_viewer/image_viewer_widget.dart';
 import 'file_viewer/video_viewer_widget.dart';
@@ -46,7 +45,6 @@ class _FileViewerPageState extends State<FileViewerPage> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   bool _isAvailableOffline = false;
-  int _currentNavIndex = 0;
   LibraryFile? _file;
   String? _fileUrl;
   bool _isLoadingFile = true;
@@ -70,8 +68,21 @@ class _FileViewerPageState extends State<FileViewerPage> {
       if (file != null) {
         _file = file;
         
-        // Get signed URL for non-text files
-        if (!file.isTextFile) {
+        // Check if it's a video file (YouTube URL stored in storagePath)
+        final isVideo = file.fileType?.toLowerCase() == 'video';
+        
+        if (isVideo) {
+          // For video files, use storagePath directly (YouTube URL)
+          print('🎥 Video file - using storagePath: ${file.storagePath}');
+          
+          if (mounted) {
+            setState(() {
+              _fileUrl = file.storagePath; // Use storagePath as YouTube URL
+              _isLoadingFile = false;
+            });
+          }
+        } else if (!file.isTextFile) {
+          // Get signed URL for non-video, non-text files
           final url = await provider.getFileUrl(widget.fileId);
           print('🔗 Generated signed URL: $url');
           
@@ -215,17 +226,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ? AppColors.backgroundDark
           : AppColors.backgroundLight,
       appBar: _buildAppBar(),
-      body: _currentNavIndex == 0 
-          ? _buildFileViewerContent()
-          : _buildAboutContent(),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-        },
-      ),
+      body: _buildFileViewerContent(),
     );
   }
 
@@ -236,46 +237,44 @@ class _FileViewerPageState extends State<FileViewerPage> {
         icon: const Icon(Icons.arrow_back),
         onPressed: () => Navigator.pop(context),
       ),
-      title: Image.asset(
-        'assets/images/mas_logo.png',
-        height: 40,
-        errorBuilder: (context, error, stackTrace) {
-          return const Text(
-            'SCOUT LOGO',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
-            ),
-          );
-        },
+      title: Text(
+        _file?.title ?? widget.fileName,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       centerTitle: true,
       actions: [
-        if (_isDownloading)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                value: _downloadProgress,
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.primaryBlue,
+        // Hide download button for videos
+        if (widget.fileType.toLowerCase() != 'video') ...[        
+          if (_isDownloading)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  value: _downloadProgress,
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.primaryBlue,
+                  ),
                 ),
               ),
+            )
+          else
+            IconButton(
+              icon: Icon(
+                _isAvailableOffline ? Icons.download_done : Icons.download,
+                color: _isAvailableOffline ? AppColors.success : null,
+              ),
+              onPressed: _isAvailableOffline ? null : _downloadFile,
+              tooltip: _isAvailableOffline ? 'Available Offline' : 'Download',
             ),
-          )
-        else
-          IconButton(
-            icon: Icon(
-              _isAvailableOffline ? Icons.download_done : Icons.download,
-              color: _isAvailableOffline ? AppColors.success : null,
-            ),
-            onPressed: _isAvailableOffline ? null : _downloadFile,
-            tooltip: _isAvailableOffline ? 'Available Offline' : 'Download',
-          ),
+        ],
       ],
     );
   }
@@ -327,7 +326,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
           const SizedBox(height: 24),
 
           // Description section
-          if (_file!.description != null && _file!.description!.isNotEmpty) ...[
+          if (_file?.description != null && 
+              _file!.description!.trim().isNotEmpty) ...[
             _buildDescription(),
             const SizedBox(height: 24),
           ],
@@ -348,11 +348,12 @@ class _FileViewerPageState extends State<FileViewerPage> {
   Widget _buildFilePreview() {
     final theme = Theme.of(context);
     final fileType = widget.fileType.toLowerCase();
+    final isVideo = fileType == 'video';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        height: 500,
+        height: isVideo ? null : MediaQuery.of(context).size.height * 0.7, // Dynamic height for videos
         decoration: BoxDecoration(
           color: theme.brightness == Brightness.dark
               ? AppColors.cardDark
@@ -436,6 +437,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
       return TxtViewerWidget(
         url: '',
         textContent: _file?.textContent,
+        iconUrl: _file?.iconUrl,
       );
     }
 
@@ -487,69 +489,58 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Build file info section
   Widget _buildFileInfo() {
     final theme = Theme.of(context);
+    final fileSize = _file?.formattedSize ?? _formattedFileSize;
+    final showFileSize = fileSize != 'Unknown';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            _file?.title ?? widget.fileName,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.brightness == Brightness.dark
-                  ? Colors.white
-                  : AppColors.textPrimaryLight,
+          if (showFileSize) ...[
+            Text(
+              fileSize,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.brightness == Brightness.dark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                _file?.formattedSize ?? _formattedFileSize,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.brightness == Brightness.dark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
+            const SizedBox(width: 16),
+          ],
+          if (_isAvailableOffline)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.publicAccessBadge.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.publicAccessBadge,
+                  width: 1.5,
                 ),
               ),
-              const SizedBox(width: 16),
-              if (_isAvailableOffline)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: AppColors.publicAccessBadge,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.publicAccessBadge.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
+                  SizedBox(width: 6),
+                  Text(
+                    'Available Offline',
+                    style: TextStyle(
                       color: AppColors.publicAccessBadge,
-                      width: 1.5,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: AppColors.publicAccessBadge,
-                      ),
-                      SizedBox(width: 6),
-                      Text(
-                        'Available Offline',
-                        style: TextStyle(
-                          color: AppColors.publicAccessBadge,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -640,13 +631,6 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ),
         ],
       ),
-    );
-  }
-
-  /// Build about content placeholder
-  Widget _buildAboutContent() {
-    return const Center(
-      child: Text('About section'),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 import 'library_models.dart';
 
 /// Supabase Library Service
@@ -274,7 +275,8 @@ class LibraryService {
           .from(_storageBucket)
           .download(file.storagePath!);
 
-      final content = String.fromCharCodes(bytes);
+      // Use UTF-8 decoding to properly handle Arabic and other Unicode characters
+      final content = utf8.decode(bytes, allowMalformed: true);
       print('✅ Loaded ${content.length} characters from text file');
       
       return content;

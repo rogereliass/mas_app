@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
+import 'about_page.dart';
 import 'components/file_tile.dart';
 import 'components/bottom_nav_bar.dart';
 
@@ -30,18 +31,39 @@ class FolderDetailPage extends StatefulWidget {
   State<FolderDetailPage> createState() => _FolderDetailPageState();
 }
 
-class _FolderDetailPageState extends State<FolderDetailPage> {
+class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBindingObserver {
   bool _isGridView = false;
   int _currentNavIndex = 0;
+  bool _hasLoadedInitially = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Load folder contents on page load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<LibraryProvider>(context, listen: false);
-      provider.loadFolderContents(widget.folderId);
+      _loadFolderContents();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reload when app comes to foreground
+    if (state == AppLifecycleState.resumed && _hasLoadedInitially) {
+      _loadFolderContents();
+    }
+  }
+
+  void _loadFolderContents() {
+    final provider = Provider.of<LibraryProvider>(context, listen: false);
+    provider.loadFolderContents(widget.folderId);
+    _hasLoadedInitially = true;
   }
 
   @override
@@ -172,7 +194,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
   /// Build breadcrumb navigation
   Widget _buildBreadcrumbs() {
     final theme = Theme.of(context);
-    final breadcrumbs = widget.breadcrumbs ?? ['Library', 'Events'];
+    final breadcrumbs = widget.breadcrumbs ?? ['Library'];
     
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -254,13 +276,13 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
                   folderId: folder.id,
                   folderName: folder.name,
                   itemCount: folder.itemCount,
-                  onTap: () {
+                  onTap: () async {
                     // Navigate to nested folder
                     final newBreadcrumbs = [
                       ...(widget.breadcrumbs ?? ['Library']),
                       widget.folderName,
                     ];
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => FolderDetailPage(
@@ -270,6 +292,8 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
                         ),
                       ),
                     );
+                    // Reload folder contents when returning from subfolder
+                    _loadFolderContents();
                   },
                 ),
               );
@@ -386,11 +410,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> {
     }
   }
 
-  /// Build about content placeholder
+  /// Build about content
   Widget _buildAboutContent() {
-    return Center(
-      child: Text('About screen'),
-    );
+    return const AboutContent();
   }
 }
 

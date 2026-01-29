@@ -75,14 +75,6 @@ class FolderCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
-              // Item count
-              Text(
-                '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
-                ),
-              ),
             ],
           ),
         ),
