@@ -58,6 +58,9 @@ dependencies:
   # YouTube player
   youtube_player_flutter: ^9.0.3
 
+  # Audio player
+  audioplayers: ^6.1.0
+
   # UI helpers
   flutter_svg: ^2.0.10
   cached_network_image: ^3.4.1

@@ -7,6 +7,7 @@ import 'file_viewer/pdf_viewer_widget.dart';
 import 'file_viewer/image_viewer_widget.dart';
 import 'file_viewer/video_viewer_widget.dart';
 import 'file_viewer/txt_viewer_widget.dart';
+import 'file_viewer/audio_viewer_widget.dart';
 
 /// File Viewer Page
 /// 
@@ -68,8 +69,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
       if (file != null) {
         _file = file;
         
-        // Check if it's a video file (YouTube URL stored in storagePath)
+        // Check if it's a video or audio file
         final isVideo = file.fileType?.toLowerCase() == 'video';
+        final isAudio = file.fileType?.toLowerCase() == 'audio';
         
         if (isVideo) {
           // For video files, use storagePath directly (YouTube URL)
@@ -78,6 +80,18 @@ class _FileViewerPageState extends State<FileViewerPage> {
           if (mounted) {
             setState(() {
               _fileUrl = file.storagePath; // Use storagePath as YouTube URL
+              _isLoadingFile = false;
+            });
+          }
+        } else if (isAudio) {
+          // For audio files, get signed URL from Supabase storage
+          print('🎵 Audio file - getting signed URL');
+          final url = await provider.getFileUrl(widget.fileId);
+          print('🔗 Generated signed URL for audio: $url');
+          
+          if (mounted) {
+            setState(() {
+              _fileUrl = url;
               _isLoadingFile = false;
             });
           }
@@ -248,8 +262,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
       ),
       centerTitle: true,
       actions: [
-        // Hide download button for videos
-        if (widget.fileType.toLowerCase() != 'video') ...[        
+        // Hide download button for videos and audio
+        if (widget.fileType.toLowerCase() != 'video' && widget.fileType.toLowerCase() != 'audio') ...[        
           if (_isDownloading)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -457,6 +471,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
       case 'mov':
       case 'video':
         return VideoViewerWidget(url: streamUrl);
+      case 'mp3':
+      case 'wav':
+      case 'audio':
+        return AudioViewerWidget(
+          url: streamUrl,
+          iconUrl: _file?.iconUrl,
+        );
       default:
         return _buildUnsupportedFileType();
     }
