@@ -32,6 +32,7 @@ class MyApp extends StatelessWidget {
           // Navigation configuration
           initialRoute: AppRouter.startup,
           routes: AppRouter.routes,
+          onGenerateRoute: AppRouter.onGenerateRoute,
           onUnknownRoute: AppRouter.onUnknownRoute,
         );
       },

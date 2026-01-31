@@ -13,9 +13,10 @@ flutter run
 
 
 ---------------------------------------------------------
--caching offline in device - TESTING
--login process
--file visibility by role
+-caching offline in device - TESTING image not fetched again
+-login process - login/signup are disabled
+    need to configure OTP messages then test all cases
+-file visibility by role (from prompt)
 -file views & download stats
 
 

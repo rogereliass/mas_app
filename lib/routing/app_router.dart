@@ -3,6 +3,8 @@ import '../startup/startup_page.dart';
 import '../auth/ui/login_page.dart';
 import '../auth/ui/register_page.dart';
 import '../auth/ui/register_success_page.dart';
+import '../auth/ui/otp_verification_page.dart';
+import '../home/home_page.dart';
 import '../library/ui/folder_page.dart';
 import '../library/ui/folder_detail_page.dart';
 import '../library/ui/file_viewer_page.dart';
@@ -37,6 +39,12 @@ class AppRouter {
   /// Registration success page route
   static const String registerSuccess = '/register-success';
   
+  /// OTP verification page route
+  static const String otpVerification = '/otp-verification';
+  
+  /// Home page route (after login)
+  static const String home = '/home';
+  
   /// Main library page route (root folder view)
   static const String library = '/library';
   
@@ -57,6 +65,7 @@ class AppRouter {
     login: (context) => const LoginPage(),
     register: (context) => const RegisterPage(),
     registerSuccess: (context) => const RegisterSuccessPage(),
+    home: (context) => const HomePage(),
     library: (context) => const LibraryHomePage(),
     allFolders: (context) => const AllFoldersPage(),
     about: (context) => const AboutPage(),
@@ -65,6 +74,25 @@ class AppRouter {
   // ============================================================================
   // ROUTE HANDLERS
   // ============================================================================
+  
+  /// Handle dynamic routes with arguments
+  static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    // Handle OTP verification with arguments
+    if (settings.name == otpVerification) {
+      final args = settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['phoneNumber'] != null) {
+        return MaterialPageRoute(
+          builder: (context) => OtpVerificationPage(
+            phoneNumber: args['phoneNumber'] as String,
+            isSignUp: args['isSignUp'] as bool? ?? false,
+            metadata: args['metadata'] as Map<String, dynamic>?,
+          ),
+        );
+      }
+    }
+    
+    return null; // Let onUnknownRoute handle it
+  }
   
   /// Handle unknown/undefined routes
   /// Returns a fallback page when user navigates to non-existent route

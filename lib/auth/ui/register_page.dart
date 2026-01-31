@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../logic/auth_provider.dart';
 import '../data/form_field_config.dart';
 import '../../core/constants/app_colors.dart';
 import '../../routing/app_router.dart';
 import 'components/custom_text_field.dart';
 import 'components/auth_buttons.dart';
+import 'components/auth_error_dialog.dart';
 
 /// Registration Page with Dynamic Form
-/// 
+///
 /// Builds form fields dynamically from configuration
 /// Allows easy addition/removal of fields without code changes
 class RegisterPage extends StatefulWidget {
@@ -23,8 +26,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isLoading = false;
   bool _agreedToTerms = false;
 
-  // TODO: Load this from remote config or database
-  // This allows dynamic form fields without code changes
+  // Registration form fields
   late final List<FormFieldConfig> _registrationFields;
 
   @override
@@ -35,9 +37,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _initializeFormFields() {
-    // TODO: Fetch from remote configuration
-    // Example: await RemoteConfig.getRegistrationFields();
-    
+    // Define registration fields
+    // Can be fetched from Supabase remote config in the future
+
     _registrationFields = [
       const FormFieldConfig(
         key: 'fullName',
@@ -47,23 +49,23 @@ class _RegisterPageState extends State<RegisterPage> {
         isRequired: true,
       ),
       const FormFieldConfig(
+        key: 'phoneNumber',
+        label: 'Phone Number',
+        placeholder: '+20 100 123 4567',
+        type: FormFieldType.phone,
+        isRequired: true,
+      ),
+      const FormFieldConfig(
         key: 'email',
         label: 'Email Address',
         placeholder: 'name@example.com',
         type: FormFieldType.email,
-        isRequired: true,
-      ),
-      const FormFieldConfig(
-        key: 'libraryCard',
-        label: 'Library Card Number',
-        placeholder: 'XXX-XXXX-XXXX',
-        type: FormFieldType.text,
         isRequired: false,
-        maxLength: 13,
       ),
       const FormFieldConfig(
         key: 'password',
         label: 'Password',
+        placeholder: 'At least 8 characters',
         type: FormFieldType.password,
         isRequired: true,
         isObscured: true,
@@ -71,6 +73,7 @@ class _RegisterPageState extends State<RegisterPage> {
       const FormFieldConfig(
         key: 'confirmPassword',
         label: 'Confirm Password',
+        placeholder: 'Re-enter your password',
         type: FormFieldType.password,
         isRequired: true,
         isObscured: true,
@@ -100,21 +103,55 @@ class _RegisterPageState extends State<RegisterPage> {
       return '${field.label} is required';
     }
 
-    // Custom validation rules
-    if (field.type == FormFieldType.email && value != null && value.isNotEmpty) {
-      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    // Skip validation if field is optional and empty
+    if (!field.isRequired && (value == null || value.isEmpty)) {
+      return null;
+    }
+
+    // Phone number validation
+    if (field.type == FormFieldType.phone &&
+        value != null &&
+        value.isNotEmpty) {
+      final cleanNumber = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+
+      if (!RegExp(r'^\+?\d+$').hasMatch(cleanNumber)) {
+        return 'Please enter a valid phone number';
+      }
+
+      final digitsOnly = cleanNumber.replaceAll('+', '');
+      if (digitsOnly.length < 10) {
+        return 'Phone number must be at least 10 digits';
+      }
+    }
+
+    // Email validation
+    if (field.type == FormFieldType.email &&
+        value != null &&
+        value.isNotEmpty) {
+      final emailRegex = RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$');
       if (!emailRegex.hasMatch(value)) {
         return 'Please enter a valid email';
       }
     }
 
+    // Password validation
     if (field.key == 'password' && value != null && value.isNotEmpty) {
       if (value.length < 8) {
         return 'Password must be at least 8 characters';
       }
-      // TODO: Add more password strength requirements
+
+      // Check for at least one number
+      if (!value.contains(RegExp(r'[0-9]'))) {
+        return 'Password must contain at least one number';
+      }
+
+      // Check for at least one letter
+      if (!value.contains(RegExp(r'[a-zA-Z]'))) {
+        return 'Password must contain at least one letter';
+      }
     }
 
+    // Confirm password validation
     if (field.key == 'confirmPassword') {
       final password = _controllers['password']?.text;
       if (value != password) {
@@ -131,16 +168,20 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _handleRegistration() async {
+    // Clear any previous errors
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+
+    // Validate form
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
+    // Check terms agreement
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to the Terms of Service and Privacy Policy'),
-          backgroundColor: AppColors.error,
-        ),
+      await AuthErrorDialog.showError(
+        context: context,
+        message:
+            'Please agree to the Terms of Service and Privacy Policy to continue.',
       );
       return;
     }
@@ -150,35 +191,49 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      // TODO: Implement Supabase registration
-      // final response = await Supabase.instance.client.auth.signUp(
-      //   email: _controllers['email']!.text.trim(),
-      //   password: _controllers['password']!.text,
-      //   data: {
-      //     'full_name': _controllers['fullName']!.text.trim(),
-      //     'library_card': _controllers['libraryCard']?.text.trim(),
-      //   },
-      // );
-      //
-      // if (response.user != null) {
-      //   Navigator.pushReplacementNamed(context, AppRouter.registerSuccess);
-      // }
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      // Prepare metadata
+      final metadata = {'full_name': _controllers['fullName']!.text.trim()};
+
+      // Add email if provided
+      if (_controllers['email']!.text.trim().isNotEmpty) {
+        metadata['email'] = _controllers['email']!.text.trim();
+      }
+
+      // Send OTP for registration
+      final success = await authProvider.sendSignUpOtp(
+        phoneNumber: _controllers['phoneNumber']!.text.trim(),
+      );
 
       if (!mounted) return;
 
-      // Navigate to success page
-      Navigator.pushReplacementNamed(context, AppRouter.registerSuccess);
+      if (success) {
+        // Navigate to OTP verification page
+        Navigator.pushNamed(
+          context,
+          AppRouter.otpVerification,
+          arguments: {
+            'phoneNumber': _controllers['phoneNumber']!.text.trim(),
+            'isSignUp': true,
+            'metadata': metadata,
+          },
+        );
+      } else {
+        // Show error dialog
+        await AuthErrorDialog.showError(
+          context: context,
+          message:
+              authProvider.errorMessage ??
+              'Failed to send OTP. Please try again.',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Registration failed: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      await AuthErrorDialog.showError(
+        context: context,
+        message: 'An unexpected error occurred during registration.',
       );
     } finally {
       if (mounted) {
@@ -192,7 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -205,9 +260,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         title: Text(
           'SCOUT LOGO',
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 1.5,
-          ),
+          style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
         ),
         centerTitle: true,
       ),
@@ -228,9 +281,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 Text(
                   'Start your reading\njourney',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    height: 1.2,
-                  ),
+                  style: theme.textTheme.displayLarge?.copyWith(height: 1.2),
                 ),
 
                 const SizedBox(height: 12),
@@ -308,7 +359,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildLogo() {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Container(
       width: 80,
       height: 80,
@@ -316,11 +367,7 @@ class _RegisterPageState extends State<RegisterPage> {
         color: colorScheme.primary,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Icon(
-        Icons.menu_book,
-        size: 56,
-        color: colorScheme.onPrimary,
-      ),
+      child: Icon(Icons.menu_book, size: 56, color: colorScheme.onPrimary),
     );
   }
 
@@ -338,7 +385,8 @@ class _RegisterPageState extends State<RegisterPage> {
           placeholder: field.placeholder,
           controller: controller,
           isRequired: field.isRequired,
-          isObscured: field.isObscured && !(_passwordVisibility[field.key] ?? false),
+          isObscured:
+              field.isObscured && !(_passwordVisibility[field.key] ?? false),
           keyboardType: field.keyboardType ?? field.type.keyboardType,
           maxLength: field.maxLength,
           validator: (value) => _validateField(field, value),
@@ -351,14 +399,17 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   onPressed: () {
                     setState(() {
-                      _passwordVisibility[field.key] = 
+                      _passwordVisibility[field.key] =
                           !(_passwordVisibility[field.key] ?? false);
                     });
                   },
                 )
               : (field.key == 'email'
-                  ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.tertiary)
-                  : null),
+                    ? Icon(
+                        Icons.check_circle,
+                        color: Theme.of(context).colorScheme.tertiary,
+                      )
+                    : null),
         ),
       );
 
@@ -374,7 +425,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildTermsCheckbox() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../logic/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routing/app_router.dart';
 import 'components/custom_text_field.dart';
 import 'components/auth_buttons.dart';
+import 'components/auth_error_dialog.dart';
 
 /// Login Page
-/// 
-/// Allows users to sign in with email/password or social providers
-/// Includes navigation to registration and password recovery
+///
+/// Allows users to sign in with phone number and password
+/// Includes field validation and error handling
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -17,20 +20,60 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false;
+  final _phoneController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
+  String? _validatePhoneNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Phone number is required';
+    }
+
+    // Remove spaces, dashes, parentheses for validation
+    final cleanNumber = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+
+    // Check if it contains only digits and optional + at start
+    if (!RegExp(r'^\+?\d+$').hasMatch(cleanNumber)) {
+      return 'Please enter a valid phone number';
+    }
+
+    // Check minimum length (10 digits for US numbers)
+    final digitsOnly = cleanNumber.replaceAll('+', '');
+    if (digitsOnly.length < 10) {
+      return 'Phone number must be at least 10 digits';
+    }
+
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+
+    return null;
+  }
+
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) {
+    // Clear any previous errors
+    Provider.of<AuthProvider>(context, listen: false).clearError();
+
+    // Validate phone number
+    final phoneError = _validatePhoneNumber(_phoneController.text);
+    if (phoneError != null) {
+      await AuthErrorDialog.showError(
+        context: context,
+        message: phoneError,
+      );
       return;
     }
 
@@ -39,31 +82,39 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      // TODO: Implement Supabase email/password login
-      // final response = await Supabase.instance.client.auth.signInWithPassword(
-      //   email: _emailController.text.trim(),
-      //   password: _passwordController.text,
-      // );
-      // 
-      // if (response.user != null) {
-      //   Navigator.pushReplacementNamed(context, AppRouter.library);
-      // }
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      // Send OTP to phone number
+      final success = await authProvider.sendSignInOtp(
+        phoneNumber: _phoneController.text.trim(),
+      );
 
       if (!mounted) return;
 
-      // Navigate to library
-      Navigator.pushReplacementNamed(context, AppRouter.library);
+      if (success) {
+        // Navigate to OTP verification page
+        Navigator.pushNamed(
+          context,
+          AppRouter.otpVerification,
+          arguments: {
+            'phoneNumber': _phoneController.text.trim(),
+            'isSignUp': false,
+          },
+        );
+      } else {
+        // Show error dialog
+        await AuthErrorDialog.showError(
+          context: context,
+          message:
+              authProvider.errorMessage ?? 'Failed to send OTP. Please try again.',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Login failed: $e'),
-          backgroundColor: AppColors.error,
-        ),
+      await AuthErrorDialog.showError(
+        context: context,
+        message: 'An unexpected error occurred. Please try again.',
       );
     } finally {
       if (mounted) {
@@ -72,25 +123,6 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
-  }
-
-  Future<void> _handleSocialLogin(String provider) async {
-    // TODO: Implement social authentication
-    // For Google:
-    // await Supabase.instance.client.auth.signInWithOAuth(
-    //   Provider.google,
-    //   redirectTo: 'your-app-scheme://login-callback',
-    // );
-    // 
-    // For Apple:
-    // await Supabase.instance.client.auth.signInWithOAuth(
-    //   Provider.apple,
-    //   redirectTo: 'your-app-scheme://login-callback',
-    // );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$provider sign-in not yet implemented')),
-    );
   }
 
   @override
@@ -121,108 +153,34 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 48),
 
-                // Email field
+                // Phone number field
                 CustomTextField(
-                  label: 'Email or Username',
-                  placeholder: 'Enter your email',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Email is required';
-                    }
-                    // TODO: Add proper email validation
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // Password field
-                CustomTextField(
-                  label: 'Password',
-                  placeholder: 'Enter your password',
-                  controller: _passwordController,
-                  isObscured: !_isPasswordVisible,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Password is required';
-                    }
-                    return null;
-                  },
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Forgot password link
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      // TODO: Navigate to forgot password page
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Password recovery not yet implemented'),
-                        ),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.tertiary,
-                    ),
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Login button
-                PrimaryButton(
-                  text: 'Log In',
-                  icon: Icons.arrow_forward,
-                  onPressed: _handleLogin,
-                  isLoading: _isLoading,
+                  label: 'Phone Number',
+                  placeholder: '+20 100 123 4567',
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  validator: _validatePhoneNumber,
                 ),
 
                 const SizedBox(height: 32),
 
-                // Divider
-                _buildDivider(),
+                // Info text
+                Text(
+                  'We will send you a verification code via SMS',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                  textAlign: TextAlign.center,
+                ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // Social login buttons
-                Row(
-                  children: [
-                    SocialButton(
-                      provider: 'Google',
-                      icon: Icons.g_mobiledata,
-                      onPressed: () => _handleSocialLogin('Google'),
-                    ),
-                    const SizedBox(width: 16),
-                    SocialButton(
-                      provider: 'Apple',
-                      icon: Icons.apple,
-                      onPressed: () => _handleSocialLogin('Apple'),
-                    ),
-                  ],
+                // Login button
+                PrimaryButton(
+                  text: 'Send OTP',
+                  icon: Icons.arrow_forward,
+                  onPressed: _handleLogin,
+                  isLoading: _isLoading,
                 ),
 
                 const SizedBox(height: 32),
@@ -266,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildHeader() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Column(
       children: [
         // App icon
@@ -277,44 +235,29 @@ class _LoginPageState extends State<LoginPage> {
             color: colorScheme.primary,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: Icon(
-            Icons.menu_book,
-            size: 56,
-            color: colorScheme.onPrimary,
-          ),
+          child: Icon(Icons.menu_book, size: 56, color: colorScheme.onPrimary),
         ),
 
         const SizedBox(height: 16),
 
         // Badge
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: theme.cardTheme.color,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: theme.dividerTheme.color!,
-              width: 1,
-            ),
+            border: Border.all(color: theme.dividerTheme.color!, width: 1),
           ),
           child: Text(
             'SCOUT LIBRARY',
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 1.5,
-            ),
+            style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
           ),
         ),
 
         const SizedBox(height: 32),
 
         // Title
-        Text(
-          'Welcome Back',
-          style: theme.textTheme.displayLarge,
-        ),
+        Text('Welcome Back', style: theme.textTheme.displayLarge),
 
         const SizedBox(height: 12),
 
@@ -326,31 +269,6 @@ class _LoginPageState extends State<LoginPage> {
             color: theme.textTheme.bodySmall?.color,
             height: 1.5,
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
-    final theme = Theme.of(context);
-    
-    return Row(
-      children: [
-        const Expanded(
-          child: Divider(),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'OR CONTINUE WITH',
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w500,
-              letterSpacing: 1,
-            ),
-          ),
-        ),
-        const Expanded(
-          child: Divider(),
         ),
       ],
     );
