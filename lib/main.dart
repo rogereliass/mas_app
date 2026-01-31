@@ -7,6 +7,7 @@ import 'package:masapp/core/config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/theme_provider.dart';
 import 'library/logic/library_provider.dart';
+import 'offline/offline_storage.dart';
 import 'app.dart';
 
 void main() async {
@@ -29,6 +30,9 @@ void main() async {
 
   // Initialize Hive
   await Hive.initFlutter();
+  
+  // Initialize offline storage service
+  await OfflineStorageService.initialize();
 
   runApp(
     // Wrap app with providers

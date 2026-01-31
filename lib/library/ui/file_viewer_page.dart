@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
+import '../../offline/offline_storage.dart';
+import '../../offline/download_service.dart';
 import 'file_viewer/pdf_viewer_widget.dart';
 import 'file_viewer/image_viewer_widget.dart';
 import 'file_viewer/video_viewer_widget.dart';
@@ -49,6 +51,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
   LibraryFile? _file;
   String? _fileUrl;
   bool _isLoadingFile = true;
+  final _downloadService = DownloadService();
+  bool _isCheckingUpdate = false;
 
   @override
   void initState() {
@@ -73,6 +77,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
         final isVideo = file.fileType?.toLowerCase() == 'video';
         final isAudio = file.fileType?.toLowerCase() == 'audio';
         
+        // Check if file is available offline (not for videos or text files)
+        final shouldCheckOffline = !isVideo && !file.isTextFile;
+        final offlinePath = shouldCheckOffline 
+            ? OfflineStorageService.getFilePath(widget.fileId) 
+            : null;
+        final hasOffline = offlinePath != null;
+        
         if (isVideo) {
           // For video files, use storagePath directly (YouTube URL)
           print('🎥 Video file - using storagePath: ${file.storagePath}');
@@ -80,6 +91,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
           if (mounted) {
             setState(() {
               _fileUrl = file.storagePath; // Use storagePath as YouTube URL
+              _isLoadingFile = false;
+            });
+          }
+        } else if (hasOffline) {
+          // Use offline cached file for PDFs, images, and audio
+          print('💾 Using offline cached file: $offlinePath');
+          
+          if (mounted) {
+            setState(() {
+              _fileUrl = offlinePath; // Use local file path directly
               _isLoadingFile = false;
             });
           }
@@ -129,6 +150,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   textContent: textContent, // Use loaded content
                   serverVersion: file.serverVersion,
                   tags: file.tags,
+                  downloadsAllowed: file.downloadsAllowed,
                   createdAt: file.createdAt,
                 );
               }
@@ -158,16 +180,122 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Check if file is already downloaded locally
   Future<void> _checkOfflineAvailability() async {
-    // TODO: Check Hive or local storage for downloaded file
-    // final exists = await LocalStorageService.fileExists(widget.fileId);
-    // setState(() {
-    //   _isAvailableOffline = exists;
-    // });
+    final isOffline = OfflineStorageService.isAvailableOffline(widget.fileId);
+    
+    if (mounted) {
+      setState(() {
+        _isAvailableOffline = isOffline;
+      });
+    }
+
+    // If file is offline and we have internet, check for updates
+    if (isOffline && _file != null) {
+      await _checkAndUpdateIfNeeded();
+    }
+  }
+
+  /// Check if server has newer version and auto-update
+  Future<void> _checkAndUpdateIfNeeded() async {
+    if (_isCheckingUpdate || _file == null) return;
+
+    final serverVersion = _file!.serverVersion ?? 1;
+    final needsUpdate = OfflineStorageService.needsUpdate(
+      widget.fileId,
+      serverVersion,
+    );
+
+    if (!needsUpdate) return;
+
+    // Validate storage path before updating
+    if (_file!.storagePath == null || _file!.storagePath!.isEmpty) {
+      print('⚠️ Cannot auto-update: Storage path not available');
+      return;
+    }
+
+    print('🔄 New version available, auto-updating...');
+    
+    setState(() {
+      _isCheckingUpdate = true;
+    });
+
+    try {
+      final updated = await _downloadService.checkAndUpdate(
+        fileId: widget.fileId,
+        fileName: widget.fileName,
+        storagePath: _file!.storagePath!,
+        fileType: widget.fileType,
+        serverVersion: serverVersion,
+        iconUrl: _file!.iconUrl,
+      );
+
+      if (updated && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  Icons.download_done,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Newer Version has been downloaded',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        // Reload the file with updated content
+        await _loadFileData();
+      }
+    } catch (e) {
+      print('❌ Error checking for updates: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingUpdate = false;
+        });
+      }
+    }
   }
 
   /// Download file to local storage
   Future<void> _downloadFile() async {
-    if (_isDownloading) return;
+    if (_isDownloading || _file == null) return;
+
+    // Don't allow download for videos (YouTube URLs)
+    if (widget.fileType.toLowerCase() == 'video') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Videos cannot be downloaded offline'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Validate storage path
+    if (_file!.storagePath == null || _file!.storagePath!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot download: File storage path not available'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isDownloading = true;
@@ -175,42 +303,46 @@ class _FileViewerPageState extends State<FileViewerPage> {
     });
 
     try {
-      final provider = Provider.of<LibraryProvider>(context, listen: false);
-      
-      // Download file bytes
-      final bytes = await provider.downloadFile(widget.fileId);
-      
-      if (bytes == null) {
+      // Simulate progress updates
+      _updateProgressPeriodically();
+
+      final filePath = await _downloadService.downloadAndCache(
+        fileId: widget.fileId,
+        fileName: widget.fileName,
+        storagePath: _file!.storagePath!,
+        fileType: widget.fileType,
+        serverVersion: _file!.serverVersion ?? 1,
+        iconUrl: _file!.iconUrl,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _downloadProgress = progress;
+            });
+          }
+        },
+      );
+
+      if (filePath != null) {
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = 1.0;
+          _isAvailableOffline = true;
+        });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File downloaded successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
         throw Exception('Failed to download file');
       }
-
-      // TODO: Save to local storage using path_provider
-      // final directory = await getApplicationDocumentsDirectory();
-      // final filePath = '${directory.path}/${widget.fileName}';
-      // final file = File(filePath);
-      // await file.writeAsBytes(bytes);
-      
-      // Simulate progress
-      for (int i = 0; i <= 100; i += 10) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (!mounted) return;
-        setState(() {
-          _downloadProgress = i / 100;
-        });
-      }
-
-      setState(() {
-        _isDownloading = false;
-        _isAvailableOffline = true;
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File downloaded successfully')),
-      );
     } catch (e) {
       setState(() {
         _isDownloading = false;
+        _downloadProgress = 0.0;
       });
 
       if (!mounted) return;
@@ -218,6 +350,23 @@ class _FileViewerPageState extends State<FileViewerPage> {
         SnackBar(content: Text('Download failed: $e')),
       );
     }
+  }
+
+  /// Simulate progress updates during download
+  void _updateProgressPeriodically() {
+    Future.doWhile(() async {
+      if (!_isDownloading || !mounted) return false;
+      
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      if (mounted && _downloadProgress < 0.9) {
+        setState(() {
+          _downloadProgress += 0.05;
+        });
+      }
+      
+      return _isDownloading && _downloadProgress < 0.9;
+    });
   }
 
   /// Get formatted file size
@@ -262,8 +411,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
       ),
       centerTitle: true,
       actions: [
-        // Hide download button for videos and audio
-        if (widget.fileType.toLowerCase() != 'video' && widget.fileType.toLowerCase() != 'audio') ...[        
+        // Hide download button for videos, audio, and when downloads are not allowed
+        if (widget.fileType.toLowerCase() != 'video' && 
+            widget.fileType.toLowerCase() != 'audio' && 
+            _file?.downloadsAllowed != false) ...[        
           if (_isDownloading)
             Padding(
               padding: const EdgeInsets.all(16.0),

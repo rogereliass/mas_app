@@ -73,6 +73,7 @@ class LibraryFile {
   final String? textContent; // For text files
   final int? serverVersion;
   final List<String>? tags;
+  final bool? downloadsAllowed;
   final DateTime createdAt;
 
   LibraryFile({
@@ -89,6 +90,7 @@ class LibraryFile {
     this.textContent,
     this.serverVersion,
     this.tags,
+    this.downloadsAllowed,
     required this.createdAt,
   });
 
@@ -111,6 +113,7 @@ class LibraryFile {
       tags: json['tags'] != null
           ? List<String>.from(json['tags'] as List)
           : null,
+      downloadsAllowed: json['downloads_allowed'] as bool?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -130,6 +133,7 @@ class LibraryFile {
       'text_content': textContent,
       'server_version': serverVersion,
       'tags': tags,
+      'downloads_allowed': downloadsAllowed,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -165,6 +169,7 @@ class LibraryFile {
     String? textContent,
     int? serverVersion,
     List<String>? tags,
+    bool? downloadsAllowed,
     DateTime? createdAt,
   }) {
     return LibraryFile(
@@ -181,6 +186,7 @@ class LibraryFile {
       textContent: textContent ?? this.textContent,
       serverVersion: serverVersion ?? this.serverVersion,
       tags: tags ?? this.tags,
+      downloadsAllowed: downloadsAllowed ?? this.downloadsAllowed,
       createdAt: createdAt ?? this.createdAt,
     );
   }
