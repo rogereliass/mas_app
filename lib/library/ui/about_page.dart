@@ -15,7 +15,7 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  int _currentNavIndex = 1; // Start on About tab
+  final int _currentNavIndex = 1; // Start on About tab
 
   @override
   Widget build(BuildContext context) {

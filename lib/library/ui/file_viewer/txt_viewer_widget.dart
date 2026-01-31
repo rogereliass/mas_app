@@ -75,7 +75,7 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
                       },
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return Container(
+                        return SizedBox(
                           height: 200,
                           child: Center(
                             child: CircularProgressIndicator(

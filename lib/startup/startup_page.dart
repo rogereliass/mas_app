@@ -296,7 +296,7 @@ class _TitleSection extends StatelessWidget {
             text: 'MAS ',
             style: textTheme.displayMedium?.copyWith(
               // Use theme-aware text color
-              color: theme.colorScheme.onBackground,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           // "Digital Library" in brand blue
