@@ -83,8 +83,7 @@ class AppRouter {
       if (args != null && args['phoneNumber'] != null) {
         return MaterialPageRoute(
           builder: (context) => OtpVerificationPage(
-            phoneNumber: args['phoneNumber'] as String,
-            isSignUp: args['isSignUp'] as bool? ?? false,
+            phoneNumber: args['phoneNumber'] as String,            password: args['password'] as String?,            isSignUp: args['isSignUp'] as bool? ?? false,
             metadata: args['metadata'] as Map<String, dynamic>?,
           ),
         );

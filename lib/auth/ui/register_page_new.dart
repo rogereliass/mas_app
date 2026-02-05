@@ -248,7 +248,6 @@ class _RegisterPageState extends State<RegisterPage> {
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'signup_troop': _selectedTroopId,  // Store the troop UUID
-        'generation': 'U',  // Default generation until assigned by leader
         'signup_completed': true,
       };
 
@@ -256,11 +255,6 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_emailController.text.trim().isNotEmpty) {
         metadata['email'] = _emailController.text.trim();
       }
-
-      debugPrint('=== STARTING REGISTRATION ===');
-      debugPrint('Phone: ${_phoneController.text.trim()}');
-      debugPrint('Has email: ${_emailController.text.trim().isNotEmpty}');
-      debugPrint('Troop ID: $_selectedTroopId');
 
       // Attempt registration - this will send OTP
       final success = await authProvider.signUpWithPhone(
@@ -278,7 +272,6 @@ class _RegisterPageState extends State<RegisterPage> {
           AppRouter.otpVerification,
           arguments: {
             'phoneNumber': _phoneController.text.trim(),
-            'password': _passwordController.text,
             'isSignUp': true,
             'metadata': metadata,
           },

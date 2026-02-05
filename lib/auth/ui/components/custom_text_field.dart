@@ -15,6 +15,8 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final int? maxLength;
   final void Function(String)? onChanged;
+  final TextDirection? textDirection;
+  final bool isMultiline;
 
   const CustomTextField({
     super.key,
@@ -28,6 +30,8 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.maxLength,
     this.onChanged,
+    this.textDirection,
+    this.isMultiline = false,
   });
 
   @override
@@ -61,6 +65,9 @@ class CustomTextField extends StatelessWidget {
           maxLength: maxLength,
           validator: validator,
           onChanged: onChanged,
+          textDirection: textDirection,
+          maxLines: isMultiline ? 3 : 1,
+          minLines: isMultiline ? 2 : 1,
           style: textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: placeholder ?? 'Enter your $label',
@@ -69,6 +76,7 @@ class CustomTextField extends StatelessWidget {
             ),
             suffixIcon: suffixIcon,
             counterText: '',
+            alignLabelWithHint: isMultiline,
           ),
         ),
       ],

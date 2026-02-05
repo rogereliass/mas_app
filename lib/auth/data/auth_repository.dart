@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 /// Authentication repository for Supabase operations
 ///
@@ -6,59 +7,44 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AuthRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Send OTP to phone number for sign in
-  ///
-  /// Returns true if OTP was sent successfully
-  Future<bool> sendSignInOtp({
-    required String phoneNumber,
-  }) async {
+  /// Test Supabase connection
+  Future<bool> testConnection() async {
     try {
-      // Format phone number
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
-      await _supabase.auth
-          .signInWithOtp(
-            phone: formattedPhone,
-          )
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw AuthException(
-                'Request timed out. Please check your connection and try again.',
-              );
-            },
-          );
-
+      debugPrint('=== TESTING SUPABASE CONNECTION ===');
+      debugPrint('Supabase URL: ${String.fromEnvironment('SUPABASE_URL')}');
+      
+      // Simple auth status check
+      final session = _supabase.auth.currentSession;
+      debugPrint('Current session: ${session != null ? "exists" : "none"}');
+      
       return true;
-    } on AuthException catch (e) {
-      throw _handleAuthException(e);
     } catch (e) {
-      throw AuthException('Failed to send OTP: ${e.toString()}');
+      debugPrint('Connection test failed: $e');
+      return false;
     }
   }
 
-  /// Verify OTP code for sign in
+  /// Sign in with phone number and password (no OTP required)
   ///
-  /// Returns the user if verification successful
-  Future<User> verifySignInOtp({
+  /// Returns the user if successful, throws exception if failed
+  Future<User> signInWithPassword({
     required String phoneNumber,
-    required String otpCode,
+    required String password,
   }) async {
     try {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
 
       final response = await _supabase.auth
-          .verifyOTP(
+          .signInWithPassword(
             phone: formattedPhone,
-            token: otpCode,
-            type: OtpType.sms,
+            password: password,
           )
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 60),
             onTimeout: () {
               throw AuthException(
-                'Request timed out. Please check your connection and try again.',
+                'Request timed out. Please check your internet connection.',
               );
             },
           );
@@ -75,48 +61,76 @@ class AuthRepository {
     }
   }
 
-  /// Send OTP to phone number for sign up
+  /// Register new user with phone - sends OTP for verification
   ///
-  /// Returns true if OTP was sent successfully
-  Future<bool> sendSignUpOtp({
+  /// Step 1: Send OTP to phone number
+  Future<bool> signUpWithPhone({
     required String phoneNumber,
-  }) async {
-    try {
-      // Format phone number
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
-      await _supabase.auth
-          .signInWithOtp(
-            phone: formattedPhone,
-          )
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw AuthException(
-                'Request timed out. Please check your connection and try again.',
-              );
-            },
-          );
-
-      return true;
-    } on AuthException catch (e) {
-      throw _handleAuthException(e);
-    } catch (e) {
-      throw AuthException('Failed to send OTP: ${e.toString()}');
-    }
-  }
-
-  /// Verify OTP code for sign up with metadata
-  ///
-  /// Returns the user if verification successful
-  Future<User> verifySignUpOtp({
-    required String phoneNumber,
-    required String otpCode,
+    required String password,
     Map<String, dynamic>? metadata,
   }) async {
     try {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
+      
+      debugPrint('=== SIGNUP REQUEST ===');
+      debugPrint('Raw phone: $phoneNumber');
+      debugPrint('Formatted phone: $formattedPhone');
+      debugPrint('Has password: ${password.isNotEmpty}');
+      debugPrint('Metadata fields: ${metadata?.keys.toList()}');
+
+      // Sign up with phone - Supabase will send OTP
+      // Note: Don't send metadata in signUp, add it to profile after OTP verification
+      final response = await _supabase.auth
+          .signUp(
+            phone: formattedPhone,
+            password: password,
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              debugPrint('TIMEOUT: Request took longer than 60 seconds');
+              throw AuthException(
+                'Request timed out. Please check your internet connection.',
+              );
+            },
+          );
+
+      debugPrint('=== SIGNUP RESPONSE ===');
+      debugPrint('User ID: ${response.user?.id}');
+      debugPrint('Phone: ${response.user?.phone}');
+      debugPrint('Session: ${response.session != null}');
+      debugPrint('User confirmed: ${response.user?.confirmedAt}');
+      
+      // Return true to indicate OTP was sent
+      return true;
+    } on AuthException catch (e) {
+      debugPrint('=== AUTH EXCEPTION ===');
+      debugPrint('Message: ${e.message}');
+      debugPrint('Status code: ${e.statusCode}');
+      throw _handleAuthException(e);
+    } catch (e, stackTrace) {
+      debugPrint('=== UNEXPECTED ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Failed to send OTP: ${e.toString()}');
+    }
+  }
+
+  /// Verify OTP code for sign up
+  ///
+  /// Step 2: Verify the OTP code sent to user's phone
+  Future<User> verifySignUpOtp({
+    required String phoneNumber,
+    required String otpCode,
+  }) async {
+    try {
+      // Format phone number
+      final formattedPhone = _formatPhoneNumber(phoneNumber);
+      
+      debugPrint('=== OTP VERIFICATION REQUEST ===');
+      debugPrint('Phone: $formattedPhone');
+      debugPrint('OTP Code: $otpCode');
 
       final response = await _supabase.auth
           .verifyOTP(
@@ -125,58 +139,37 @@ class AuthRepository {
             type: OtpType.sms,
           )
           .timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 60),
             onTimeout: () {
+              debugPrint('TIMEOUT: OTP verification took longer than 60 seconds');
               throw AuthException(
-                'Request timed out. Please check your connection and try again.',
+                'Request timed out. Please check your internet connection.',
               );
             },
           );
 
-      if (response.user == null) {
-        throw AuthException('Registration failed: No user created');
-      }
+      debugPrint('=== OTP VERIFICATION RESPONSE ===');
+      debugPrint('User ID: ${response.user?.id}');
+      debugPrint('Phone: ${response.user?.phone}');
+      debugPrint('Session exists: ${response.session != null}');
 
-      // Update user metadata if provided
-      if (metadata != null && metadata.isNotEmpty) {
-        await _supabase.auth.updateUser(
-          UserAttributes(
-            data: metadata,
-          ),
-        );
+      if (response.user == null) {
+        debugPrint('ERROR: No user returned after OTP verification');
+        throw AuthException('Verification failed: No user returned');
       }
 
       return response.user!;
     } on AuthException catch (e) {
+      debugPrint('=== AUTH EXCEPTION ===');
+      debugPrint('Message: ${e.message}');
+      debugPrint('Status code: ${e.statusCode}');
       throw _handleAuthException(e);
-    } catch (e) {
-      throw AuthException('Registration failed: ${e.toString()}');
+    } catch (e, stackTrace) {
+      debugPrint('=== UNEXPECTED ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Verification failed: ${e.toString()}');
     }
-  }
-
-  /// Legacy method - kept for backward compatibility
-  /// Use sendSignInOtp + verifySignInOtp instead
-  @Deprecated('Use sendSignInOtp and verifySignInOtp instead')
-  Future<User> signInWithPhone({
-    required String phoneNumber,
-    required String password,
-  }) async {
-    throw AuthException(
-      'Password authentication is deprecated. Please use OTP verification.',
-    );
-  }
-
-  /// Legacy method - kept for backward compatibility
-  /// Use sendSignUpOtp + verifySignUpOtp instead
-  @Deprecated('Use sendSignUpOtp and verifySignUpOtp instead')
-  Future<User> signUpWithPhone({
-    required String phoneNumber,
-    required String password,
-    Map<String, dynamic>? metadata,
-  }) async {
-    throw AuthException(
-      'Password authentication is deprecated. Please use OTP verification.',
-    );
   }
 
   /// Sign out current user
@@ -215,6 +208,80 @@ class AuthRepository {
     return _supabase.auth.onAuthStateChange;
   }
 
+  /// Create or update user profile in profiles table
+  ///
+  /// Should be called after successful registration
+  Future<void> createOrUpdateProfile({
+    required String userId,
+    required Map<String, dynamic> profileData,
+  }) async {
+    try {
+      debugPrint('=== CREATE/UPDATE PROFILE ===');
+      debugPrint('User ID: $userId');
+      debugPrint('Profile data keys: ${profileData.keys.toList()}');
+      
+      // Add user_id and updated_at to profile data
+      final data = {
+        'user_id': userId,
+        ...profileData,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      debugPrint('Checking if profile exists...');
+      
+      // Check if profile exists
+      final existingProfile = await _supabase
+          .from('profiles')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existingProfile == null) {
+        debugPrint('Profile does not exist, creating new...');
+        // Create new profile
+        data['created_at'] = DateTime.now().toIso8601String();
+        
+        debugPrint('Inserting profile data: ${data.keys.toList()}');
+        await _supabase.from('profiles').insert(data);
+        debugPrint('✓ Profile created successfully!');
+      } else {
+        debugPrint('Profile exists, updating...');
+        // Update existing profile
+        await _supabase
+            .from('profiles')
+            .update(data)
+            .eq('user_id', userId);
+        debugPrint('✓ Profile updated successfully!');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('=== PROFILE CREATION ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Failed to save profile: ${e.toString()}');
+    }
+  }
+
+  /// Fetch all troops from troops table with id and name
+  ///
+  /// Returns list of maps containing troop id and name for dropdown selection
+  Future<List<Map<String, dynamic>>> getTroops() async {
+    try {
+      final response = await _supabase
+          .from('troops')
+          .select('id, name')
+          .order('name');
+
+      if (response.isEmpty) {
+        return [];
+      }
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Failed to fetch troops: $e');
+      return [];
+    }
+  }
+
   /// Format phone number with proper handling for spaces and country code
   /// Default country code is +20 (Egypt)
   String _formatPhoneNumber(String phoneNumber) {
@@ -225,7 +292,7 @@ class AuthRepository {
       throw AuthException('Phone number cannot be empty');
     }
 
-    // If already has country code, validate it
+    // If already has country code, validate and return
     if (cleaned.startsWith('+')) {
       final digits = cleaned.substring(1);
       if (digits.isEmpty || !RegExp(r'^\d+$').hasMatch(digits)) {
@@ -237,11 +304,14 @@ class AuthRepository {
       return cleaned;
     }
 
-    // Remove leading zeros (common in local format)
-    cleaned = cleaned.replaceFirst(RegExp(r'^0+'), '');
+    // For Egyptian numbers starting with 0, remove the leading 0
+    // Example: 01234567890 -> 1234567890
+    if (cleaned.startsWith('0') && cleaned.length == 11) {
+      cleaned = cleaned.substring(1);
+    }
 
-    // Ensure we have remaining digits after removing zeros
-    if (cleaned.isEmpty || !RegExp(r'^\d+$').hasMatch(cleaned)) {
+    // Ensure we have digits only
+    if (!RegExp(r'^\d+$').hasMatch(cleaned)) {
       throw AuthException('Invalid phone number format');
     }
 
@@ -256,6 +326,9 @@ class AuthRepository {
   /// Handle auth exceptions and provide user-friendly messages
   AuthException _handleAuthException(AuthException e) {
     String message;
+
+    debugPrint('Handling auth exception: ${e.message}');
+    debugPrint('Status code: ${e.statusCode}');
 
     switch (e.message.toLowerCase()) {
       case String msg when msg.contains('invalid login credentials'):
@@ -278,6 +351,12 @@ class AuthRepository {
         break;
       case String msg when msg.contains('network'):
         message = 'Network error. Please check your connection';
+        break;
+      case String msg when msg.contains('phone') && msg.contains('not enabled'):
+        message = 'Phone authentication is not enabled. Please contact support.';
+        break;
+      case String msg when msg.contains('sms') || msg.contains('provider'):
+        message = 'SMS service not configured. Please contact support.';
         break;
       default:
         message = e.message;

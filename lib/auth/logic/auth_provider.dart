@@ -140,48 +140,33 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Send OTP for sign in
-  Future<bool> sendSignInOtp({
+  /// Sign in with phone number and password (no OTP)
+  Future<bool> signInWithPassword({
     required String phoneNumber,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _authRepository.sendSignInOtp(phoneNumber: phoneNumber);
-      return true;
-    } on AuthException catch (e) {
-      _setError(e.message);
-      return false;
-    } catch (e) {
-      _setError('Failed to send OTP');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// Verify OTP for sign in
-  Future<bool> verifySignInOtp({
-    required String phoneNumber,
-    required String otpCode,
+    required String password,
   }) async =>
       _executeAuthMethod(
-        () => _authRepository.verifySignInOtp(
+        () => _authRepository.signInWithPassword(
           phoneNumber: phoneNumber,
-          otpCode: otpCode,
+          password: password,
         ),
       );
 
-  /// Send OTP for sign up
-  Future<bool> sendSignUpOtp({
+  /// Sign up with phone - sends OTP for verification
+  Future<bool> signUpWithPhone({
     required String phoneNumber,
+    required String password,
+    Map<String, dynamic>? metadata,
   }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      await _authRepository.sendSignUpOtp(phoneNumber: phoneNumber);
+      await _authRepository.signUpWithPhone(
+        phoneNumber: phoneNumber,
+        password: password,
+        metadata: metadata,
+      );
       return true;
     } on AuthException catch (e) {
       _setError(e.message);
@@ -198,36 +183,52 @@ class AuthProvider with ChangeNotifier {
   Future<bool> verifySignUpOtp({
     required String phoneNumber,
     required String otpCode,
-    Map<String, dynamic>? metadata,
   }) async =>
       _executeAuthMethod(
         () => _authRepository.verifySignUpOtp(
           phoneNumber: phoneNumber,
           otpCode: otpCode,
-          metadata: metadata,
         ),
-        errorMessage: 'An unexpected error occurred during registration',
+        errorMessage: 'An unexpected error occurred during verification',
       );
 
-  /// Legacy method - kept for backward compatibility
-  @Deprecated('Use sendSignInOtp and verifySignInOtp instead')
-  Future<bool> signInWithPhone({
-    required String phoneNumber,
-    required String password,
+  /// Create or update user profile with complete data
+  Future<bool> createOrUpdateProfile({
+    required Map<String, dynamic> profileData,
   }) async {
-    _setError('Password authentication is no longer supported. Please use OTP.');
-    return false;
+    if (_currentUser == null) {
+      _setError('No user logged in');
+      return false;
+    }
+
+    _setLoading(true);
+    _clearError();
+
+    try {
+      await _authRepository.createOrUpdateProfile(
+        userId: _currentUser!.id,
+        profileData: profileData,
+      );
+      return true;
+    } on AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to save profile');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 
-  /// Legacy method - kept for backward compatibility
-  @Deprecated('Use sendSignUpOtp and verifySignUpOtp instead')
-  Future<bool> signUpWithPhone({
-    required String phoneNumber,
-    required String password,
-    Map<String, dynamic>? metadata,
-  }) async {
-    _setError('Password authentication is no longer supported. Please use OTP.');
-    return false;
+  /// Get list of troops with id and name from Supabase
+  Future<List<Map<String, dynamic>>> getTroops() async {
+    try {
+      return await _authRepository.getTroops();
+    } catch (e) {
+      debugPrint('Failed to fetch troops: $e');
+      return [];
+    }
   }
 
   /// Sign out

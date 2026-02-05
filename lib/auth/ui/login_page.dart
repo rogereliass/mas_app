@@ -21,11 +21,14 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -67,13 +70,8 @@ class _LoginPageState extends State<LoginPage> {
     // Clear any previous errors
     Provider.of<AuthProvider>(context, listen: false).clearError();
 
-    // Validate phone number
-    final phoneError = _validatePhoneNumber(_phoneController.text);
-    if (phoneError != null) {
-      await AuthErrorDialog.showError(
-        context: context,
-        message: phoneError,
-      );
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -84,29 +82,23 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Send OTP to phone number
-      final success = await authProvider.sendSignInOtp(
+      // Attempt login with phone number and password
+      final success = await authProvider.signInWithPassword(
         phoneNumber: _phoneController.text.trim(),
+        password: _passwordController.text,
       );
 
       if (!mounted) return;
 
       if (success) {
-        // Navigate to OTP verification page
-        Navigator.pushNamed(
-          context,
-          AppRouter.otpVerification,
-          arguments: {
-            'phoneNumber': _phoneController.text.trim(),
-            'isSignUp': false,
-          },
-        );
+        // Navigate to home on success
+        Navigator.pushReplacementNamed(context, AppRouter.home);
       } else {
         // Show error dialog
         await AuthErrorDialog.showError(
           context: context,
           message:
-              authProvider.errorMessage ?? 'Failed to send OTP. Please try again.',
+              authProvider.errorMessage ?? 'Login failed. Please try again.',
         );
       }
     } catch (e) {
@@ -162,22 +154,34 @@ class _LoginPageState extends State<LoginPage> {
                   validator: _validatePhoneNumber,
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 20),
 
-                // Info text
-                Text(
-                  'We will send you a verification code via SMS',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                  textAlign: TextAlign.center,
+                // Password field
+                CustomTextField(
+                  label: 'Password',
+                  placeholder: 'Enter your password',
+                  controller: _passwordController,
+                  isObscured: !_isPasswordVisible,
+                  validator: _validatePassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _isPasswordVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _isPasswordVisible = !_isPasswordVisible;
+                      });
+                    },
+                  ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 // Login button
                 PrimaryButton(
-                  text: 'Send OTP',
+                  text: 'Log In',
                   icon: Icons.arrow_forward,
                   onPressed: _handleLogin,
                   isLoading: _isLoading,

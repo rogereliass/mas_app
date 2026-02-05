@@ -16,6 +16,7 @@ class FormFieldConfig {
   final TextInputType? keyboardType;
   final Widget? suffixIcon;
   final int? maxLength;
+  final List<String>? dropdownOptions;
 
   const FormFieldConfig({
     required this.key,
@@ -29,6 +30,7 @@ class FormFieldConfig {
     this.keyboardType,
     this.suffixIcon,
     this.maxLength,
+    this.dropdownOptions,
   });
 
   /// Create a copy with modified fields
@@ -44,6 +46,7 @@ class FormFieldConfig {
     TextInputType? keyboardType,
     Widget? suffixIcon,
     int? maxLength,
+    List<String>? dropdownOptions,
   }) {
     return FormFieldConfig(
       key: key ?? this.key,
@@ -57,6 +60,7 @@ class FormFieldConfig {
       keyboardType: keyboardType ?? this.keyboardType,
       suffixIcon: suffixIcon ?? this.suffixIcon,
       maxLength: maxLength ?? this.maxLength,
+      dropdownOptions: dropdownOptions ?? this.dropdownOptions,
     );
   }
 }
@@ -70,6 +74,8 @@ enum FormFieldType {
   phone,
   url,
   multiline,
+  dropdown,
+  date,
 }
 
 /// Extension to get keyboard type from field type

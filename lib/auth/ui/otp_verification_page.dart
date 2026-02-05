@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
-import '../../logic/auth_provider.dart';
+import '../../auth/logic/auth_provider.dart';
 import '../../routing/app_router.dart';
 import 'components/auth_error_dialog.dart';
 
@@ -10,12 +10,14 @@ import 'components/auth_error_dialog.dart';
 /// Allows users to enter the OTP code sent to their phone
 class OtpVerificationPage extends StatefulWidget {
   final String phoneNumber;
+  final String? password;
   final bool isSignUp;
   final Map<String, dynamic>? metadata;
 
   const OtpVerificationPage({
     super.key,
     required this.phoneNumber,
+    this.password,
     this.isSignUp = false,
     this.metadata,
   });
@@ -80,27 +82,44 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       _isLoading = true;
     });
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
     try {
-      final success = widget.isSignUp
-          ? await authProvider.sendSignUpOtp(phoneNumber: widget.phoneNumber)
-          : await authProvider.sendSignInOtp(phoneNumber: widget.phoneNumber);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      if (!mounted) return;
+      // Clear OTP fields
+      for (var controller in _otpControllers) {
+        controller.clear();
+      }
+      _focusNodes[0].requestFocus();
 
-      if (success) {
-        _startResendTimer();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP resent successfully'),
-            backgroundColor: Colors.green,
-          ),
+      // Resend OTP using signUpWithPhone
+      if (widget.password != null) {
+        final success = await authProvider.signUpWithPhone(
+          phoneNumber: widget.phoneNumber,
+          password: widget.password!,
+          metadata: widget.metadata,
         );
+
+        if (!mounted) return;
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP resent successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _startResendTimer();
+        } else {
+          await AuthErrorDialog.showError(
+            context: context,
+            message: authProvider.errorMessage ?? 'Failed to resend OTP',
+          );
+        }
       } else {
+        // Password not available - user needs to go back
         await AuthErrorDialog.showError(
           context: context,
-          message: authProvider.errorMessage ?? 'Failed to resend OTP',
+          message: 'Please go back and submit registration form again',
         );
       }
     } finally {
@@ -130,27 +149,55 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      final success = widget.isSignUp
-          ? await authProvider.verifySignUpOtp(
-              phoneNumber: widget.phoneNumber,
-              otpCode: otpCode,
-              metadata: widget.metadata,
-            )
-          : await authProvider.verifySignInOtp(
-              phoneNumber: widget.phoneNumber,
-              otpCode: otpCode,
-            );
+      // Step 1: Verify OTP
+      final otpSuccess = await authProvider.verifySignUpOtp(
+        phoneNumber: widget.phoneNumber,
+        otpCode: otpCode,
+      );
 
       if (!mounted) return;
 
-      if (success) {
-        Navigator.of(context).pushReplacementNamed(AppRouter.home);
-      } else {
+      if (!otpSuccess) {
         await AuthErrorDialog.showError(
           context: context,
           message: authProvider.errorMessage ?? 'Invalid OTP code',
         );
+        return;
       }
+
+      debugPrint('=== OTP VERIFIED SUCCESSFULLY ===');
+      debugPrint('Current user: ${authProvider.currentUser?.id}');
+      debugPrint('Has metadata: ${widget.metadata != null}');
+      debugPrint('Metadata fields: ${widget.metadata?.keys.toList()}');
+
+      // Step 2: Create/update profile with metadata
+      if (widget.metadata != null && widget.metadata!.isNotEmpty) {
+        debugPrint('Creating profile with metadata...');
+        
+        final profileSuccess = await authProvider.createOrUpdateProfile(
+          profileData: widget.metadata!,
+        );
+
+        if (!mounted) return;
+
+        if (!profileSuccess) {
+          debugPrint('⚠️ Profile creation failed!');
+          await AuthErrorDialog.showError(
+            context: context,
+            message: authProvider.errorMessage ?? 'Failed to save profile',
+          );
+          return;
+        }
+        
+        debugPrint('✓ Profile created successfully!');
+      } else {
+        debugPrint('⚠️ No metadata provided, skipping profile creation');
+      }
+
+      if (!mounted) return;
+
+      // Step 3: Navigate to success page
+      Navigator.of(context).pushReplacementNamed(AppRouter.registerSuccess);
     } catch (e) {
       if (!mounted) return;
 
@@ -214,14 +261,17 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                       focusNode: _focusNodes[index],
                       enabled: !_isLoading,
                       textAlign: TextAlign.center,
+                      textAlignVertical: TextAlignVertical.center,
                       keyboardType: TextInputType.number,
                       maxLength: 1,
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
+                        height: 1.0,
                       ),
                       decoration: InputDecoration(
                         counterText: '',
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
