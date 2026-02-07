@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/auth_repository.dart';
 import '../data/role_repository.dart';
 import '../models/user_profile.dart';
+import '../models/role.dart';
 
 /// Authentication state management provider
 ///
@@ -24,12 +25,14 @@ class AuthProvider with ChangeNotifier {
 
   User? _currentUser;
   UserProfile? _currentUserProfile;
+  List<Role> _userRoles = [];
   bool _isLoading = false;
   String? _errorMessage;
 
   // Getters
   User? get currentUser => _currentUser;
   UserProfile? get currentUserProfile => _currentUserProfile;
+  List<Role> get userRoles => _userRoles;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
   String? get errorMessage => _errorMessage;
@@ -60,9 +63,11 @@ class AuthProvider with ChangeNotifier {
       if (_currentUser != null) {
         // Load profile first, then save data
         await _loadUserProfile();
+        await _loadUserRoles();
         await _saveUserData();
       } else {
         _currentUserProfile = null;
+        _userRoles = [];
         await _clearUserData();
       }
       
@@ -74,8 +79,9 @@ class AuthProvider with ChangeNotifier {
 
     // Load user profile if already logged in (async)
     if (_currentUser != null) {
-      _loadUserProfile().then((_) {
-        _saveUserData();
+      _loadUserProfile().then((_) async {
+        await _loadUserRoles();
+        await _saveUserData();
         notifyListeners();
       });
     }
@@ -100,6 +106,23 @@ class AuthProvider with ChangeNotifier {
       // Set profile to null so rank defaults to 0 (public)
       _currentUserProfile = null;
       // Don't throw - allow app to continue with public access
+    }
+  }
+
+  /// Load user's assigned roles from database
+  Future<void> _loadUserRoles() async {
+    if (_currentUser == null) {
+      _userRoles = [];
+      return;
+    }
+    
+    try {
+      _userRoles = await _roleRepository.getCurrentUserRoles();
+      debugPrint('✅ Loaded ${_userRoles.length} roles for user');
+    } catch (e) {
+      debugPrint('❌ Failed to load user roles: $e');
+      _userRoles = [];
+      // Don't throw - allow app to continue without roles
     }
   }
 
@@ -348,6 +371,15 @@ class AuthProvider with ChangeNotifier {
     if (minRoleRank == 0) return true; // Public content
     if (_currentUserProfile == null) return false; // Not authenticated
     return _currentUserProfile!.canAccess(minRoleRank);
+  }
+
+  /// Manually refresh the user profile and roles (e.g. on pull-to-refresh)
+  Future<void> refreshProfile() async {
+    if (_currentUser != null) {
+      await _loadUserProfile();
+      await _loadUserRoles();
+      notifyListeners();
+    }
   }
 
   /// Set loading state

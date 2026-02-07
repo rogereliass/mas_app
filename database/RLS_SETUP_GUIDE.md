@@ -30,10 +30,11 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 
 ## Step 2: Create Helper Function for User Role Rank
 
-Create a reusable function to get the current user's role rank:
+Create a reusable function to get the current user's highest role rank:
 
 ```sql
--- Function to get current user's role rank
+-- Function to get current user's highest role rank
+-- (Users can have multiple roles, returns the highest role_rank)
 CREATE OR REPLACE FUNCTION get_user_role_rank()
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -43,14 +44,13 @@ AS $$
 DECLARE
   user_rank INTEGER;
 BEGIN
-  -- Get the user's role rank from profiles -> profiles_roles -> roles
-  SELECT COALESCE(r.rank, 0)
+  -- Get the user's highest role rank from profiles -> profiles_roles -> roles
+  SELECT COALESCE(MAX(r.role_rank), 0)
   INTO user_rank
   FROM profiles p
-  LEFT JOIN profiles_roles pr ON p.user_id = pr.user_id
-  LEFT JOIN roles r ON pr.role_id = r.id
-  WHERE p.user_id = auth.uid()
-  LIMIT 1;
+  INNER JOIN profiles_roles pr ON p.id = pr.profile_id
+  INNER JOIN roles r ON pr.role_id = r.id
+  WHERE p.user_id = auth.uid();
   
   -- Return 0 (public) if no role found or user not authenticated
   RETURN COALESCE(user_rank, 0);
@@ -158,7 +158,11 @@ CREATE POLICY "Users can view their own roles"
 ON profiles_roles
 FOR SELECT
 TO authenticated
-USING (user_id = auth.uid());
+USING (
+  profile_id IN (
+    SELECT id FROM profiles WHERE user_id = auth.uid()
+  )
+);
 
 -- Admins can view all role assignments
 CREATE POLICY "Admins can view all role assignments"
@@ -242,12 +246,19 @@ CREATE INDEX IF NOT EXISTS idx_files_min_role_rank
 ON files(min_role_rank);
 
 -- Index on profiles_roles for faster role lookups
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_user_id 
-ON profiles_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_roles_profile_id 
+ON profiles_roles(profile_id);
 
--- Index on roles rank
-CREATE INDEX IF NOT EXISTS idx_roles_rank 
-ON roles(rank);
+CREATE INDEX IF NOT EXISTS idx_profiles_roles_role_id 
+ON profiles_roles(role_id);
+
+-- Index on profiles.user_id for auth lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id 
+ON profiles(user_id);
+
+-- Index on roles.role_rank
+CREATE INDEX IF NOT EXISTS idx_roles_role_rank 
+ON roles(role_rank);
 ```
 
 ---
@@ -330,7 +341,7 @@ ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 
--- 2. Create helper function
+-- 2. Create helper function (returns highest role_rank for users with multiple roles)
 CREATE OR REPLACE FUNCTION get_user_role_rank()
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -340,15 +351,26 @@ AS $$
 DECLARE
   user_rank INTEGER;
 BEGIN
-  SELECT COALESCE(r.rank, 0)
+  SELECT COALESCE(MAX(r.role_rank), 0)
   INTO user_rank
   FROM profiles p
-  LEFT JOIN profiles_roles pr ON p.user_id = pr.user_id
-  LEFT JOIN roles r ON pr.role_id = r.id
-  WHERE p.user_id = auth.uid()
-  LIMIT 1;
+  INNER JOIN profiles_roles pr ON p.id = pr.profile_id
+  INNER JOIN roles r ON pr.role_id = r.id
+  WHERE p.user_id = auth.uid();
   
   RETURN COALESCE(user_rank, 0);
+END;
+$$;
+
+-- 2a. Verify function was created successfully
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc WHERE proname = 'get_user_role_rank'
+  ) THEN
+    RAISE EXCEPTION 'Function get_user_role_rank() was not created successfully';
+  END IF;
+  RAISE NOTICE 'Function get_user_role_rank() created successfully';
 END;
 $$;
 
@@ -388,7 +410,9 @@ USING (get_user_role_rank() >= 80);
 -- 6. Profiles_roles policies
 CREATE POLICY "Users can view their own roles"
 ON profiles_roles FOR SELECT TO authenticated
-USING (user_id = auth.uid());
+USING (
+  profile_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
 
 CREATE POLICY "Admins can view all role assignments"
 ON profiles_roles FOR SELECT TO authenticated
@@ -411,8 +435,10 @@ WITH CHECK (get_user_role_rank() = 100);
 
 -- 8. Create indexes
 CREATE INDEX IF NOT EXISTS idx_files_min_role_rank ON files(min_role_rank);
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_user_id ON profiles_roles(user_id);
-CREATE INDEX IF NOT EXISTS idx_roles_rank ON roles(rank);
+CREATE INDEX IF NOT EXISTS idx_profiles_roles_profile_id ON profiles_roles(profile_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_roles_role_id ON profiles_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_roles_role_rank ON roles(role_rank);
 
 -- 9. Verify
 SELECT 'RLS Setup Complete!' as status;

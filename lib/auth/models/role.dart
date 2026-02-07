@@ -22,7 +22,7 @@ class Role {
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
-      rank: json['rank'] as int,
+      rank: json['role_rank'] as int? ?? json['rank'] as int? ?? 0, // Support both field names
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

@@ -160,4 +160,79 @@ class RoleRepository {
     
     return canUserAccess(user.id, minRank);
   }
+
+  /// Get all roles assigned to a specific user
+  ///
+  /// Returns list of roles the user has been assigned
+  /// Returns empty list if user has no roles
+  /// Throws [RoleException] on error
+  Future<List<Role>> getUserRoles(String userId) async {
+    try {
+      // First get the profile ID for this user
+      final profileResponse = await _supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (profileResponse == null) {
+        // User has no profile, return empty list
+        return [];
+      }
+
+      final profileId = profileResponse['id'] as String;
+
+      // Now get all roles for this profile
+      final response = await _supabase
+          .from('profiles_roles')
+          .select('''
+            roles!inner(
+              id,
+              name,
+              description,
+              role_rank,
+              created_at
+            )
+          ''')
+          .eq('profile_id', profileId)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw const RoleException(
+              'Request timed out while fetching user roles',
+              statusCode: '408',
+            ),
+          );
+
+      return (response as List)
+          .map((item) {
+            final roleData = item['roles'] as Map<String, dynamic>;
+            return Role.fromJson(roleData);
+          })
+          .toList();
+    } on PostgrestException catch (e) {
+      throw RoleException(
+        'Database error: ${e.message}',
+        statusCode: e.code,
+      );
+    } on RoleException {
+      rethrow;
+    } catch (e) {
+      throw RoleException('Failed to fetch user roles: $e');
+    }
+  }
+
+  /// Get all roles assigned to current authenticated user
+  ///
+  /// Returns empty list if no user is authenticated or user has no roles
+  Future<List<Role>> getCurrentUserRoles() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      return await getUserRoles(user.id);
+    } catch (e) {
+      // Return empty list on error (graceful degradation)
+      return [];
+    }
+  }
 }
