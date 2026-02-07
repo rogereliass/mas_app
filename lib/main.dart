@@ -40,8 +40,20 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => LibraryProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // LibraryProvider depends on AuthProvider for role-based filtering
+        ChangeNotifierProxyProvider<AuthProvider, LibraryProvider>(
+          create: (context) => LibraryProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) {
+            // Reuse existing provider to preserve state, just update auth reference
+            if (previous != null) {
+              return previous;
+            }
+            return LibraryProvider(authProvider: auth);
+          },
+        ),
       ],
       child: const MyApp(),
     ),

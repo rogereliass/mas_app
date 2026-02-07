@@ -31,6 +31,17 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
     _initializeVideo();
   }
 
+  @override
+  void didUpdateWidget(VideoViewerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reinitialize if URL changes
+    if (oldWidget.url != widget.url) {
+      _controller?.removeListener(_listener);
+      _controller?.dispose();
+      _initializeVideo();
+    }
+  }
+
   Future<void> _initializeVideo() async {
     try {
       // Extract YouTube video ID from URL

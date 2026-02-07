@@ -130,9 +130,11 @@ class _RegisterPageState extends State<RegisterPage> {
     return null;
   }
 
-  /// Validate email (optional)
+  /// Validate email (required)
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) return null; // Optional
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
     final emailRegex = RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(value)) {
       return 'Please enter a valid email';
@@ -250,12 +252,8 @@ class _RegisterPageState extends State<RegisterPage> {
         'signup_troop': _selectedTroopId,  // Store the troop UUID
         'generation': 'U',  // Default generation until assigned by leader
         'signup_completed': true,
+        'email': _emailController.text.trim(),  // Email is required
       };
-
-      // Add email if provided
-      if (_emailController.text.trim().isNotEmpty) {
-        metadata['email'] = _emailController.text.trim();
-      }
 
       debugPrint('=== STARTING REGISTRATION ===');
       debugPrint('Phone: ${_phoneController.text.trim()}');
@@ -379,7 +377,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 Directionality(
                   textDirection: TextDirection.rtl,
                   child: CustomTextField(
-                    label: 'Name in Arabic',
+                    label: 'الاسم بالعربية',
                     placeholder: 'أدخل اسمك بالعربية',
                     controller: _arabicNameController,
                     validator: (value) => _validateArabic(value, 'Arabic name'),
@@ -412,28 +410,161 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Gender Dropdown
-                DropdownButtonFormField<String>(
-                  value: _selectedGender,
-                  decoration: InputDecoration(
-                    labelText: 'Gender',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  items: ['Male', 'Female'].map((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedGender = newValue;
-                    });
+                // Gender Radio Buttons
+                FormField<String>(
+                  validator: (value) {
+                    if (_selectedGender == null) {
+                      return 'Please select your gender';
+                    }
+                    return null;
                   },
-                  validator: (value) =>
-                      value == null ? 'Please select your gender' : null,
+                  builder: (FormFieldState<String> field) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Gender',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedGender = 'Male';
+                                  });
+                                  field.didChange('Male');
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _selectedGender == 'Male'
+                                        ? AppColors.primaryBlue.withOpacity(0.1)
+                                        : theme.brightness == Brightness.dark
+                                            ? AppColors.cardDark
+                                            : AppColors.cardLight,
+                                    border: Border.all(
+                                      color: _selectedGender == 'Male'
+                                          ? AppColors.primaryBlue
+                                          : theme.brightness == Brightness.dark
+                                              ? Colors.grey.shade700
+                                              : Colors.grey.shade300,
+                                      width: _selectedGender == 'Male' ? 2 : 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _selectedGender == 'Male'
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: _selectedGender == 'Male'
+                                            ? AppColors.primaryBlue
+                                            : Colors.grey,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Male',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: _selectedGender == 'Male'
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          color: _selectedGender == 'Male'
+                                              ? AppColors.primaryBlue
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedGender = 'Female';
+                                  });
+                                  field.didChange('Female');
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _selectedGender == 'Female'
+                                        ? AppColors.primaryBlue.withOpacity(0.1)
+                                        : theme.brightness == Brightness.dark
+                                            ? AppColors.cardDark
+                                            : AppColors.cardLight,
+                                    border: Border.all(
+                                      color: _selectedGender == 'Female'
+                                          ? AppColors.primaryBlue
+                                          : theme.brightness == Brightness.dark
+                                              ? Colors.grey.shade700
+                                              : Colors.grey.shade300,
+                                      width: _selectedGender == 'Female' ? 2 : 1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _selectedGender == 'Female'
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: _selectedGender == 'Female'
+                                            ? AppColors.primaryBlue
+                                            : Colors.grey,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Female',
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: _selectedGender == 'Female'
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          color: _selectedGender == 'Female'
+                                              ? AppColors.primaryBlue
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (field.hasError)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, left: 12),
+                            child: Text(
+                              field.errorText!,
+                              style: TextStyle(
+                                color: theme.colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
 
@@ -451,9 +582,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email (Optional)
+                // Email
                 CustomTextField(
-                  label: 'Email Address (Optional)',
+                  label: 'Email Address',
                   placeholder: 'name@example.com',
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,

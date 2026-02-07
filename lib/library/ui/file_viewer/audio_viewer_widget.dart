@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -5,7 +7,7 @@ import '../../../core/constants/app_colors.dart';
 
 /// Audio File Viewer Widget
 /// 
-/// Displays and plays audio files stored in Supabase storage
+/// Displays and plays audio files from both network URLs and local file paths
 /// Supports displaying an optional image from iconUrl above the audio player
 class AudioViewerWidget extends StatefulWidget {
   final String url;
@@ -29,6 +31,12 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  // Store subscriptions to cancel them properly
+  StreamSubscription<PlayerState>? _playerStateSubscription;
+  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<void>? _completeSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -36,17 +44,40 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
     _initializeAudio();
   }
 
+  @override
+  void didUpdateWidget(AudioViewerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reinitialize if URL changes
+    if (oldWidget.url != widget.url) {
+      _initializeAudio();
+    }
+  }
+
+  /// Check if the URL is a local file path
+  bool _isLocalFile(String url) {
+    return !url.startsWith('http://') && !url.startsWith('https://');
+  }
+
   Future<void> _initializeAudio() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+        });
+      }
 
-      print('🎵 Initializing audio from: ${widget.url}');
+      // Cancel existing subscriptions
+      await _cancelSubscriptions();
+
+      // Stop any existing playback
+      await _audioPlayer.stop();
+
+      final isLocal = _isLocalFile(widget.url);
+      print('🎵 Initializing audio from ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
       // Listen to player state changes
-      _audioPlayer.onPlayerStateChanged.listen((state) {
+      _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
         if (mounted) {
           setState(() {
             _isPlaying = state == PlayerState.playing;
@@ -55,7 +86,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
       });
 
       // Listen to duration changes
-      _audioPlayer.onDurationChanged.listen((duration) {
+      _durationSubscription = _audioPlayer.onDurationChanged.listen((duration) {
         if (mounted) {
           setState(() {
             _duration = duration;
@@ -64,7 +95,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
       });
 
       // Listen to position changes
-      _audioPlayer.onPositionChanged.listen((position) {
+      _positionSubscription = _audioPlayer.onPositionChanged.listen((position) {
         if (mounted) {
           setState(() {
             _position = position;
@@ -73,7 +104,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
       });
 
       // Listen to completion
-      _audioPlayer.onPlayerComplete.listen((event) {
+      _completeSubscription = _audioPlayer.onPlayerComplete.listen((event) {
         if (mounted) {
           setState(() {
             _isPlaying = false;
@@ -82,21 +113,42 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
         }
       });
 
-      // Set the audio source
-      await _audioPlayer.setSourceUrl(widget.url);
+      // Set the audio source based on type
+      if (isLocal) {
+        await _audioPlayer.setSource(DeviceFileSource(widget.url));
+      } else {
+        await _audioPlayer.setSource(UrlSource(widget.url));
+      }
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
 
       print('✅ Audio initialized successfully');
     } catch (e) {
       print('❌ Error initializing audio: $e');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load audio: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load audio: $e';
+        });
+      }
     }
+  }
+
+  /// Cancel all stream subscriptions
+  Future<void> _cancelSubscriptions() async {
+    await _playerStateSubscription?.cancel();
+    await _durationSubscription?.cancel();
+    await _positionSubscription?.cancel();
+    await _completeSubscription?.cancel();
+    
+    _playerStateSubscription = null;
+    _durationSubscription = null;
+    _positionSubscription = null;
+    _completeSubscription = null;
   }
 
   Future<void> _togglePlayPause() async {
@@ -151,6 +203,8 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
 
   @override
   void dispose() {
+    // Cancel all subscriptions before disposing player
+    _cancelSubscriptions();
     _audioPlayer.dispose();
     super.dispose();
   }

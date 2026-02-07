@@ -1,8 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 /// Image Viewer Widget
 /// 
-/// Displays images streamed from Supabase URL
+/// Displays images from both network URLs and local file paths
 /// Supports pinch-to-zoom and pan gestures
 class ImageViewerWidget extends StatefulWidget {
   final String url;
@@ -26,6 +27,11 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
     super.dispose();
   }
 
+  /// Check if the URL is a local file path
+  bool _isLocalFile(String url) {
+    return !url.startsWith('http://') && !url.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
     // Handle empty or null URLs
@@ -33,58 +39,73 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
       return _buildPlaceholder();
     }
 
-    print('🖼️ ImageViewer loading URL: ${widget.url}');
+    final isLocal = _isLocalFile(widget.url);
+    print('🖼️ ImageViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
     return InteractiveViewer(
       transformationController: _transformationController,
       minScale: 0.5,
       maxScale: 4.0,
       child: Center(
-        child: Image.network(
-          widget.url,
-          fit: BoxFit.contain,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
+        child: isLocal
+            ? Image.file(
+                File(widget.url),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  print('❌ Error loading local image: $error');
+                  return _buildErrorWidget();
+                },
+              )
+            : Image.network(
+                widget.url,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
 
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Loading image...'),
-                ],
-              ),
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.broken_image,
-                    size: 64,
-                    color: Colors.grey.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Failed to load image',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.withOpacity(0.7),
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('Loading image...'),
+                      ],
                     ),
-                  ),
-                ],
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('❌ Error loading network image: $error');
+                  return _buildErrorWidget();
+                },
               ),
-            );
-          },
-        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.broken_image,
+            size: 64,
+            color: Colors.grey.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Failed to load image',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.withOpacity(0.7),
+            ),
+          ),
+        ],
       ),
     );
   }

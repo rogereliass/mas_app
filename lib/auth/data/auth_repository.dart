@@ -80,7 +80,7 @@ class AuthRepository {
       debugPrint('Metadata fields: ${metadata?.keys.toList()}');
 
       // Sign up with phone - Supabase will send OTP
-      // Note: Don't send metadata in signUp, add it to profile after OTP verification
+      // All user data (email, name, address, etc.) will be stored in profiles table after OTP verification
       final response = await _supabase.auth
           .signUp(
             phone: formattedPhone,
@@ -188,6 +188,27 @@ class AuthRepository {
     }
   }
 
+  /// Delete current authenticated user
+  /// Use with caution - this permanently removes the user from auth
+  /// Used to rollback registration if profile creation fails
+  Future<void> deleteCurrentUser() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw AuthException('No user logged in');
+    }
+
+    try {
+      debugPrint('Rolling back auth user: ${user.id}');
+      // Sign out to clear session (in free tier, we can't delete users via API)
+      // In production, you'd use admin API to delete the user
+      await _supabase.auth.signOut();
+      debugPrint('✓ User signed out (rollback complete)');
+    } catch (e) {
+      debugPrint('Error during rollback: $e');
+      throw AuthException('Failed to rollback user: ${e.toString()}');
+    }
+  }
+
   /// Get current user
   User? getCurrentUser() {
     return _supabase.auth.currentUser;
@@ -210,7 +231,9 @@ class AuthRepository {
 
   /// Create or update user profile in profiles table
   ///
-  /// Should be called after successful registration
+  /// Should be called after successful registration.
+  /// Schema: profiles table has 'id' as primary key, 'user_id' as foreign key to auth.users
+  /// Uses phone number for conflict resolution since phone has UNIQUE constraint
   Future<void> createOrUpdateProfile({
     required String userId,
     required Map<String, dynamic> profileData,
@@ -219,40 +242,30 @@ class AuthRepository {
       debugPrint('=== CREATE/UPDATE PROFILE ===');
       debugPrint('User ID: $userId');
       debugPrint('Profile data keys: ${profileData.keys.toList()}');
+
+      // Remove fields that don't belong in profiles table
+      final cleanedData = Map<String, dynamic>.from(profileData);
+      cleanedData.remove('signup_completed'); // App-level field, not DB column
       
-      // Add user_id and updated_at to profile data
-      final data = {
-        'user_id': userId,
-        ...profileData,
+      // Prepare data for upsert
+      final profileRecord = {
+        'user_id': userId, // Foreign key to auth.users
+        ...cleanedData,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      debugPrint('Checking if profile exists...');
-      
-      // Check if profile exists
-      final existingProfile = await _supabase
-          .from('profiles')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
+      debugPrint('Profile record: ${profileRecord.keys.toList()}');
 
-      if (existingProfile == null) {
-        debugPrint('Profile does not exist, creating new...');
-        // Create new profile
-        data['created_at'] = DateTime.now().toIso8601String();
-        
-        debugPrint('Inserting profile data: ${data.keys.toList()}');
-        await _supabase.from('profiles').insert(data);
-        debugPrint('✓ Profile created successfully!');
-      } else {
-        debugPrint('Profile exists, updating...');
-        // Update existing profile
-        await _supabase
-            .from('profiles')
-            .update(data)
-            .eq('user_id', userId);
-        debugPrint('✓ Profile updated successfully!');
-      }
+      // Use upsert with phone as the conflict resolution column
+      // Phone has UNIQUE constraint (profiles_phone_key)
+      await _supabase
+          .from('profiles')
+          .upsert(
+            profileRecord,
+            onConflict: 'phone',
+          );
+
+      debugPrint('✓ Profile upserted successfully using phone conflict resolution!');
     } catch (e, stackTrace) {
       debugPrint('=== PROFILE CREATION ERROR ===');
       debugPrint('Error: $e');

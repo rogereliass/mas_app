@@ -1,16 +1,20 @@
 import 'package:flutter/foundation.dart';
 import '../data/library_models.dart';
 import '../data/library_service.dart';
+import '../../auth/logic/auth_provider.dart';
 
 /// Library Provider
 /// 
 /// Manages state for the Library module
 /// Handles loading states, errors, and caching
+/// Implements role-based file filtering
 class LibraryProvider with ChangeNotifier {
   final LibraryService _service;
+  final AuthProvider? _authProvider;
 
-  LibraryProvider({LibraryService? service})
-      : _service = service ?? LibraryService.instance();
+  LibraryProvider({LibraryService? service, AuthProvider? authProvider})
+      : _service = service ?? LibraryService.instance(),
+        _authProvider = authProvider;
 
   // ==================== STATE ====================
 
@@ -48,6 +52,37 @@ class LibraryProvider with ChangeNotifier {
   bool get hasError => _error != null;
   String? get error => _error;
 
+  // ==================== ROLE-BASED FILTERING ====================
+  
+  /// Filter files based on current user's role rank
+  /// Only returns files where user's roleRank >= file's minRoleRank
+  /// Public files (minRoleRank = 0) are always visible
+  List<LibraryFile> _filterFilesByRole(List<LibraryFile> files) {
+    final userRoleRank = _authProvider?.currentUserRoleRank ?? 0;
+    
+    final filtered = files.where((file) {
+      // Public files (minRoleRank = 0) are always visible
+      if (file.minRoleRank == 0) return true;
+      
+      // Check if user has sufficient rank
+      return userRoleRank >= file.minRoleRank;
+    }).toList();
+    
+    if (filtered.length < files.length) {
+      debugPrint('🔒 Filtered ${files.length - filtered.length} files based on role (user rank: $userRoleRank)');
+    }
+    
+    return filtered;
+  }
+  
+  /// Check if current user can access a specific file
+  /// Returns true if file is public or user has sufficient rank
+  bool _canAccessFile(LibraryFile file) {
+    if (file.minRoleRank == 0) return true; // Public file
+    final userRoleRank = _authProvider?.currentUserRoleRank ?? 0;
+    return userRoleRank >= file.minRoleRank;
+  }
+
   // ==================== ROOT OPERATIONS ====================
 
   /// Load root folders and recent files
@@ -63,15 +98,18 @@ class LibraryProvider with ChangeNotifier {
       final result = await _service.fetchRootContents(recentFilesLimit: 10);
       
       _rootFolders = result.folders;
-      _recentFiles = result.recentFiles;
+      
+      // Filter files based on user role BEFORE setting state
+      final allRecentFiles = result.recentFiles;
+      _recentFiles = _filterFilesByRole(allRecentFiles);
 
       // Cache folders
       for (final folder in _rootFolders) {
         _folderCache[folder.id] = folder;
       }
 
-      // Cache files
-      for (final file in _recentFiles) {
+      // Cache ALL files (even filtered ones) for direct access
+      for (final file in allRecentFiles) {
         _fileCache[file.id] = file;
       }
 
@@ -116,15 +154,18 @@ class LibraryProvider with ChangeNotifier {
       final result = await _service.fetchFolderContents(folderId);
       
       _currentSubfolders = result.subfolders;
-      _currentFiles = result.files;
+      
+      // Filter files based on user role BEFORE setting state
+      final allFiles = result.files;
+      _currentFiles = _filterFilesByRole(allFiles);
 
       // Cache subfolders
       for (final folder in _currentSubfolders) {
         _folderCache[folder.id] = folder;
       }
 
-      // Cache files
-      for (final file in _currentFiles) {
+      // Cache ALL files (even filtered ones) for direct access
+      for (final file in allFiles) {
         _fileCache[file.id] = file;
       }
 
@@ -157,10 +198,19 @@ class LibraryProvider with ChangeNotifier {
   // ==================== FILE OPERATIONS ====================
 
   /// Get file by ID from cache or fetch from server
+  /// Returns null if file not found OR user doesn't have access
   Future<LibraryFile?> getFile(String fileId) async {
     // Check cache first
     if (_fileCache.containsKey(fileId)) {
-      return _fileCache[fileId];
+      final file = _fileCache[fileId]!;
+      
+      // Verify access even for cached files
+      if (!_canAccessFile(file)) {
+        debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+        return null;
+      }
+      
+      return file;
     }
 
     // Fetch from server
@@ -168,8 +218,16 @@ class LibraryProvider with ChangeNotifier {
       final file = await _service.fetchFileById(fileId);
       if (file != null) {
         _fileCache[fileId] = file;
+        
+        // Verify access to fetched file
+        if (!_canAccessFile(file)) {
+          debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          return null;
+        }
+        
+        return file;
       }
-      return file;
+      return null;
     } catch (e) {
       _logError('getFile', e);
       return null;
@@ -183,7 +241,7 @@ class LibraryProvider with ChangeNotifier {
     try {
       final file = await getFile(fileId);
       if (file == null) {
-        print('⚠️ File not found: $fileId');
+        debugPrint('⚠️ File not found or access denied: $fileId');
         return null;
       }
 
@@ -195,7 +253,7 @@ class LibraryProvider with ChangeNotifier {
       final url = await _service.getFileSignedUrl(file);
       
       if (url == null || url.isEmpty) {
-        print('⚠️ No URL generated for file: ${file.title}');
+        debugPrint('⚠️ No URL generated for file: ${file.title}');
       }
       
       return url;
@@ -214,12 +272,12 @@ class LibraryProvider with ChangeNotifier {
 
       // If text_content is populated in database, use it
       if (file.textContent != null && file.textContent!.isNotEmpty) {
-        print('✅ Using text_content from database (${file.textContent!.length} chars)');
+        debugPrint('✅ Using text_content from database (${file.textContent!.length} chars)');
         return file.textContent;
       }
 
       // Otherwise, load from storage
-      print('📄 text_content empty, loading from storage...');
+      debugPrint('📄 text_content empty, loading from storage...');
       final content = await _service.loadTextFileContent(file);
       return content;
     } catch (e) {
@@ -284,6 +342,29 @@ class LibraryProvider with ChangeNotifier {
   void clearCache() {
     _folderCache.clear();
     _fileCache.clear();
+    notifyListeners();
+  }
+  
+  /// Re-apply role-based filtering to current data
+  /// Call this when user authentication state changes (login/logout)
+  void refreshFiltering() {
+    // Re-filter recent files
+    if (_recentFiles.isNotEmpty) {
+      final allRecentFiles = _fileCache.values
+          .where((file) => _recentFiles.any((f) => f.id == file.id))
+          .toList();
+      _recentFiles = _filterFilesByRole(allRecentFiles);
+    }
+    
+    // Re-filter current folder files
+    if (_currentFiles.isNotEmpty) {
+      final allCurrentFiles = _fileCache.values
+          .where((file) => _currentFiles.any((f) => f.id == file.id))
+          .toList();
+      _currentFiles = _filterFilesByRole(allCurrentFiles);
+    }
+    
+    debugPrint('🔄 Reapplied role-based filtering (user rank: ${_authProvider?.currentUserRoleRank ?? 0})');
     notifyListeners();
   }
 }

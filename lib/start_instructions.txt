@@ -13,12 +13,7 @@ flutter run
 
 
 ---------------------------------------------------------
+-supabase RLS 
 -caching offline in device - TESTING image not fetched again
--login process - login/signup are disabled
-    need to configure OTP messages then test all cases
--file visibility by role (from prompt)
+-login process - Twilio Account Needed but logic is working
 -file views & download stats
-
-
---------------------------------------------------------
-now i want to implement role visibilty for files, all files on supabase have an int4 field called min_role rank that ranges between 0 (unauthenticated public) to 100 (full system admin), the app should check this min role needed against the logged in user role rank so that files are only visible if the logged in user rank is equal to or higher than min_rank of the file (files should not be even visible from the outside for user who are not authorized to view it and if there is no user logged in aka a public unauthorized role then only files that have level 0 are visible). user role rank is fetched through tables (profiles, profiles_roles,roles) on supabase. make sure this feature is implemented correctly following best practices and a clear structure that fullfils all equirments

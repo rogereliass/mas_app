@@ -102,6 +102,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
             setState(() {
               _fileUrl = offlinePath; // Use local file path directly
               _isLoadingFile = false;
+              _isAvailableOffline = true; // Set offline status immediately
             });
           }
         } else if (isAudio) {
@@ -151,6 +152,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   serverVersion: file.serverVersion,
                   tags: file.tags,
                   downloadsAllowed: file.downloadsAllowed,
+                  minRoleRank: file.minRoleRank, // Preserve role rank
                   createdAt: file.createdAt,
                 );
               }
@@ -275,6 +277,17 @@ class _FileViewerPageState extends State<FileViewerPage> {
   Future<void> _downloadFile() async {
     if (_isDownloading || _file == null) return;
 
+    // Check if downloads are allowed for this file
+    if (_file!.downloadsAllowed == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Downloads are not allowed for this file'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     // Don't allow download for videos (YouTube URLs)
     if (widget.fileType.toLowerCase() == 'video') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -330,12 +343,17 @@ class _FileViewerPageState extends State<FileViewerPage> {
         });
 
         if (!mounted) return;
+        
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('File downloaded successfully'),
             backgroundColor: AppColors.success,
           ),
         );
+        
+        // CRITICAL FIX: Reload file data to use the cached version
+        await _loadFileData();
       } else {
         throw Exception('Failed to download file');
       }
@@ -367,6 +385,79 @@ class _FileViewerPageState extends State<FileViewerPage> {
       
       return _isDownloading && _downloadProgress < 0.9;
     });
+  }
+
+  /// Remove file from offline storage
+  Future<void> _removeFromOffline() async {
+    if (_file == null || !_isAvailableOffline) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Offline File'),
+        content: const Text(
+          'Are you sure you want to remove this file from offline storage? '
+          'You will need an internet connection to view it again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Remove',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      // Delete file from offline storage
+      await OfflineStorageService.deleteFile(widget.fileId);
+
+      setState(() {
+        _isAvailableOffline = false;
+      });
+
+      if (!mounted) return;
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+              SizedBox(width: 12),
+              Text('File removed from offline storage'),
+            ],
+          ),
+          backgroundColor: AppColors.primaryBlue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Reload file data to use online version
+      await _loadFileData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to remove file: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   /// Get formatted file size
@@ -436,8 +527,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 _isAvailableOffline ? Icons.download_done : Icons.download,
                 color: _isAvailableOffline ? AppColors.success : null,
               ),
-              onPressed: _isAvailableOffline ? null : _downloadFile,
-              tooltip: _isAvailableOffline ? 'Available Offline' : 'Download',
+              onPressed: _isAvailableOffline ? _removeFromOffline : _downloadFile,
+              tooltip: _isAvailableOffline 
+                  ? 'Remove from Offline Storage' 
+                  : 'Download for Offline Use',
             ),
         ],
       ],

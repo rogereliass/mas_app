@@ -1,10 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 /// PDF Viewer Widget
 /// 
-/// Displays PDF files streamed from Supabase URL
-/// View-only mode, does not save locally
+/// Displays PDF files from both network URLs and local file paths
+/// View-only mode with text selection and zoom support
 class PDFViewerWidget extends StatefulWidget {
   final String url;
 
@@ -20,6 +21,11 @@ class PDFViewerWidget extends StatefulWidget {
 class _PDFViewerWidgetState extends State<PDFViewerWidget> {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
 
+  /// Check if the URL is a local file path
+  bool _isLocalFile(String url) {
+    return !url.startsWith('http://') && !url.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show placeholder if URL is empty
@@ -27,20 +33,33 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
       return _buildPlaceholder();
     }
 
-    print('📄 PDFViewer loading URL: ${widget.url}');
+    final isLocal = _isLocalFile(widget.url);
+    print('📄 PDFViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
-    // Use Syncfusion PDF Viewer to display PDF from URL
-    return SfPdfViewer.network(
-      widget.url,
-      key: _pdfViewerKey,
-      enableDoubleTapZooming: true,
-      enableTextSelection: true,
-      canShowScrollHead: true,
-      canShowScrollStatus: true,
-      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-        print('❌ PDF load failed: ${details.error} - ${details.description}');
-      },
-    );
+    // Use appropriate constructor based on source type
+    return isLocal
+        ? SfPdfViewer.file(
+            File(widget.url),
+            key: _pdfViewerKey,
+            enableDoubleTapZooming: true,
+            enableTextSelection: true,
+            canShowScrollHead: true,
+            canShowScrollStatus: true,
+            onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+              print('❌ PDF load failed (local): ${details.error} - ${details.description}');
+            },
+          )
+        : SfPdfViewer.network(
+            widget.url,
+            key: _pdfViewerKey,
+            enableDoubleTapZooming: true,
+            enableTextSelection: true,
+            canShowScrollHead: true,
+            canShowScrollStatus: true,
+            onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+              print('❌ PDF load failed (network): ${details.error} - ${details.description}');
+            },
+          );
   }
 
   Widget _buildPlaceholder() {

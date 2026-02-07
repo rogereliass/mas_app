@@ -74,6 +74,7 @@ class LibraryFile {
   final int? serverVersion;
   final List<String>? tags;
   final bool? downloadsAllowed;
+  final int minRoleRank; // Minimum role rank required to view (0-100)
   final DateTime createdAt;
 
   LibraryFile({
@@ -91,6 +92,7 @@ class LibraryFile {
     this.serverVersion,
     this.tags,
     this.downloadsAllowed,
+    this.minRoleRank = 0, // Default to public (0)
     required this.createdAt,
   });
 
@@ -114,6 +116,7 @@ class LibraryFile {
           ? List<String>.from(json['tags'] as List)
           : null,
       downloadsAllowed: json['downloads_allowed'] as bool?,
+      minRoleRank: json['min_role_rank'] as int? ?? 0, // Default to public
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -134,6 +137,7 @@ class LibraryFile {
       'server_version': serverVersion,
       'tags': tags,
       'downloads_allowed': downloadsAllowed,
+      'min_role_rank': minRoleRank,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -170,6 +174,7 @@ class LibraryFile {
     int? serverVersion,
     List<String>? tags,
     bool? downloadsAllowed,
+    int? minRoleRank,
     DateTime? createdAt,
   }) {
     return LibraryFile(
@@ -187,6 +192,7 @@ class LibraryFile {
       serverVersion: serverVersion ?? this.serverVersion,
       tags: tags ?? this.tags,
       downloadsAllowed: downloadsAllowed ?? this.downloadsAllowed,
+      minRoleRank: minRoleRank ?? this.minRoleRank,
       createdAt: createdAt ?? this.createdAt,
     );
   }

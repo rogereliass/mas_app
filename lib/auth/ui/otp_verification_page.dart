@@ -35,6 +35,10 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
   int _resendCountdown = 60;
   Timer? _resendTimer;
   bool _canResend = false;
+  int _attemptCount = 0;
+  static const int _maxAttempts = 3;
+  int _resendCount = 0;
+  static const int _maxResends = 3;
 
   @override
   void initState() {
@@ -78,6 +82,15 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
   Future<void> _resendOtp() async {
     if (!_canResend || _isLoading) return;
 
+    // Check if max resend limit reached
+    if (_resendCount >= _maxResends) {
+      await AuthErrorDialog.showError(
+        context: context,
+        message: 'Maximum OTP resend limit reached. Please try registering again later.',
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -91,6 +104,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       }
       _focusNodes[0].requestFocus();
 
+      // Reset attempt counter when getting new OTP
+      setState(() {
+        _attemptCount = 0;
+      });
+
       // Resend OTP using signUpWithPhone
       if (widget.password != null) {
         final success = await authProvider.signUpWithPhone(
@@ -102,9 +120,20 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         if (!mounted) return;
 
         if (success) {
+          // Increment resend counter
+          setState(() {
+            _resendCount++;
+          });
+
+          final remainingResends = _maxResends - _resendCount;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP resent successfully'),
+            SnackBar(
+              content: Text(
+                'OTP resent successfully' +
+                (remainingResends > 0 
+                    ? '. $remainingResends resend${remainingResends != 1 ? "s" : ""} remaining'
+                    : '. This was your last resend'),
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -142,6 +171,15 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       return;
     }
 
+    // Check if max attempts reached
+    if (_attemptCount >= _maxAttempts) {
+      await AuthErrorDialog.showError(
+        context: context,
+        message: 'Too many failed attempts. Please request a new OTP.',
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -158,9 +196,26 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       if (!mounted) return;
 
       if (!otpSuccess) {
+        // Increment attempt counter
+        setState(() {
+          _attemptCount++;
+          _isLoading = false;
+        });
+
+        // Clear OTP fields for retry
+        for (var controller in _otpControllers) {
+          controller.clear();
+        }
+        _focusNodes[0].requestFocus();
+
+        // Show error with attempt count
+        final remainingAttempts = _maxAttempts - _attemptCount;
         await AuthErrorDialog.showError(
           context: context,
-          message: authProvider.errorMessage ?? 'Invalid OTP code',
+          message: authProvider.errorMessage ?? 'Invalid OTP code' +
+              (remainingAttempts > 0 
+                  ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} remaining'
+                  : ''),
         );
         return;
       }
@@ -182,10 +237,21 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
         if (!profileSuccess) {
           debugPrint('⚠️ Profile creation failed!');
+          debugPrint('Rolling back - deleting auth user...');
+          
+          // CRITICAL: Delete the auth user to maintain consistency
+          // Either both auth user AND profile exist, or neither
+          await authProvider.deleteCurrentUser();
+          
+          if (!mounted) return;
+          
           await AuthErrorDialog.showError(
             context: context,
-            message: authProvider.errorMessage ?? 'Failed to save profile',
+            message: 'Registration failed: ${authProvider.errorMessage ?? "Could not save profile"}. Please try again.',
           );
+          
+          // Navigate back to registration page
+          Navigator.of(context).pop();
           return;
         }
         

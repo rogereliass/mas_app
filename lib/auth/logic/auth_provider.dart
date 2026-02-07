@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/auth_repository.dart';
+import '../data/role_repository.dart';
+import '../models/user_profile.dart';
 
 /// Authentication state management provider
 ///
@@ -10,6 +12,7 @@ import '../data/auth_repository.dart';
 /// Persists user ID and metadata for use throughout the app
 class AuthProvider with ChangeNotifier {
   final AuthRepository _authRepository = AuthRepository();
+  final RoleRepository _roleRepository = RoleRepository();
   StreamSubscription<AuthState>? _authSubscription;
   static SharedPreferences? _cachedPrefs;
 
@@ -20,14 +23,19 @@ class AuthProvider with ChangeNotifier {
   }
 
   User? _currentUser;
+  UserProfile? _currentUserProfile;
   bool _isLoading = false;
   String? _errorMessage;
 
   // Getters
   User? get currentUser => _currentUser;
+  UserProfile? get currentUserProfile => _currentUserProfile;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
   String? get errorMessage => _errorMessage;
+  
+  /// Get current user's role rank (0 if unauthenticated)
+  int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
 
   // User data getters
   String? get userId => _currentUser?.id;
@@ -45,19 +53,53 @@ class AuthProvider with ChangeNotifier {
     _currentUser = _authRepository.getCurrentUser();
 
     // Listen to auth state changes and store subscription for cleanup
-    _authSubscription = _authRepository.authStateChanges.listen((AuthState data) {
+    _authSubscription = _authRepository.authStateChanges.listen((AuthState data) async {
+      final previousUser = _currentUser;
       _currentUser = data.session?.user;
+      
       if (_currentUser != null) {
-        _saveUserData();
+        // Load profile first, then save data
+        await _loadUserProfile();
+        await _saveUserData();
       } else {
-        _clearUserData();
+        _currentUserProfile = null;
+        await _clearUserData();
       }
-      notifyListeners();
+      
+      // Only notify if state actually changed
+      if (previousUser?.id != _currentUser?.id) {
+        notifyListeners();
+      }
     });
 
-    // Save user data if already logged in
+    // Load user profile if already logged in (async)
     if (_currentUser != null) {
-      _saveUserData();
+      _loadUserProfile().then((_) {
+        _saveUserData();
+        notifyListeners();
+      });
+    }
+  }
+  
+  /// Load user profile with role rank from database
+  Future<void> _loadUserProfile() async {
+    if (_currentUser == null) {
+      _currentUserProfile = null;
+      return;
+    }
+    
+    try {
+      _currentUserProfile = await _roleRepository.getUserProfile(_currentUser!.id);
+      if (_currentUserProfile != null) {
+        debugPrint('✅ Loaded user profile - Role rank: ${_currentUserProfile!.roleRank}');
+      } else {
+        debugPrint('⚠️ No profile found for user ${_currentUser!.id} - defaulting to public (rank 0)');
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to load user profile: $e');
+      // Set profile to null so rank defaults to 0 (public)
+      _currentUserProfile = null;
+      // Don't throw - allow app to continue with public access
     }
   }
 
@@ -246,6 +288,19 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Delete current user (rollback auth if profile creation fails)
+  Future<bool> deleteCurrentUser() async {
+    try {
+      await _authRepository.deleteCurrentUser();
+      _currentUser = null;
+      await _clearUserData();
+      return true;
+    } catch (e) {
+      debugPrint('Delete user error: $e');
+      return false;
+    }
+  }
+
   /// Get user ID (helper method for quick access)
   static Future<String?> getUserId() async {
     try {
@@ -284,6 +339,15 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       return false;
     }
+  }
+  
+  /// Check if current user can access content with given minimum role rank
+  /// Returns true for public content (minRoleRank = 0)
+  /// Returns false if user is not authenticated and minRoleRank > 0
+  bool canAccessContent(int minRoleRank) {
+    if (minRoleRank == 0) return true; // Public content
+    if (_currentUserProfile == null) return false; // Not authenticated
+    return _currentUserProfile!.canAccess(minRoleRank);
   }
 
   /// Set loading state
