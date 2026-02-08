@@ -46,7 +46,6 @@ class RoleRepository {
             gender,
             signup_troop,
             generation,
-            avatar_url,
             created_at,
             updated_at
           ''')

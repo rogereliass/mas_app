@@ -80,7 +80,7 @@ class AppBottomNavBar extends StatelessWidget {
         activeIcon: Icons.person,
         label: 'Profile',
         page: 'profile',
-        onTap: () => _showComingSoon(context, 'Profile'),
+        onTap: () => _navigateTo(context, AppRouter.profile),
       ),
     ];
   }
@@ -168,6 +168,8 @@ class AppBottomNavBar extends StatelessWidget {
         return currentPage == 'library';
       case AppRouter.about:
         return currentPage == 'about';
+      case AppRouter.profile:
+        return currentPage == 'profile';
       default:
         return false;
     }

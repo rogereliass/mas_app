@@ -575,7 +575,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 // Phone Number
                 CustomTextField(
                   label: 'Phone Number',
-                  placeholder: '+20 100 123 4567',
+                  placeholder: '01001234567',
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   validator: _validatePhone,

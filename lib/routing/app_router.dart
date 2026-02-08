@@ -10,6 +10,7 @@ import '../library/ui/folder_detail_page.dart';
 import '../library/ui/file_viewer_page.dart';
 import '../library/ui/all_folders_page.dart';
 import '../library/ui/about_page.dart';
+import '../profile/profile_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -53,6 +54,9 @@ class AppRouter {
   
   /// About page route
   static const String about = '/about';
+  
+  /// Profile page route
+  static const String profile = '/profile';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -69,6 +73,7 @@ class AppRouter {
     library: (context) => const LibraryHomePage(),
     allFolders: (context) => const AllFoldersPage(),
     about: (context) => const AboutPage(),
+    profile: (context) => const ProfilePage(),
   };
 
   // ============================================================================

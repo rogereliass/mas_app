@@ -28,6 +28,8 @@ class AuthProvider with ChangeNotifier {
   List<Role> _userRoles = [];
   bool _isLoading = false;
   String? _errorMessage;
+  String? _profileLoadError;
+  bool _profileLoading = false;
 
   // Getters
   User? get currentUser => _currentUser;
@@ -36,6 +38,8 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
   String? get errorMessage => _errorMessage;
+  String? get profileLoadError => _profileLoadError;
+  bool get profileLoading => _profileLoading;
   
   /// Get current user's role rank (0 if unauthenticated)
   int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
@@ -111,9 +115,10 @@ class AuthProvider with ChangeNotifier {
         await _loadUserRoles();
         await _saveUserData();
         debugPrint('📢 Notifying listeners after initial load');
-        notifyListeners();
       }).catchError((e) {
         debugPrint('❌ Error in initial load: $e');
+        // Still notify listeners so UI can show error state
+        notifyListeners();
       });
     } else {
       debugPrint('⚠️ No user logged in at initialization');
@@ -124,13 +129,19 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUserProfile() async {
     if (_currentUser == null) {
       _currentUserProfile = null;
+      _profileLoadError = null;
       debugPrint('⚠️ Cannot load profile - no current user');
       return;
     }
 
+    _profileLoading = true;
+    _profileLoadError = null;
+    notifyListeners();
+
     try {
       debugPrint('🔄 Loading profile for user: ${_currentUser!.id}');
       _currentUserProfile = await _roleRepository.getUserProfile(_currentUser!.id);
+      
       if (_currentUserProfile != null) {
         debugPrint('✅ Loaded user profile:');
         debugPrint('   First Name: ${_currentUserProfile!.firstName}');
@@ -146,16 +157,23 @@ class AuthProvider with ChangeNotifier {
             _currentUserProfile!.lastName == null) {
           debugPrint('⚠️ WARNING: Name fields are missing in database!');
           debugPrint('   This user may need to re-register or have their profile updated.');
+          _profileLoadError = 'Profile data is incomplete. Please contact support.';
         }
+        _profileLoadError = null;
       } else {
-        debugPrint('⚠️ No profile found for user ${_currentUser!.id} - defaulting to public (rank 0)');
+        debugPrint('⚠️ No profile found for user ${_currentUser!.id}');
+        _currentUserProfile = null;
+        _profileLoadError = 'User profile not found in database. Please contact support or re-register.';
       }
     } catch (e, stackTrace) {
       debugPrint('❌ Failed to load user profile: $e');
       debugPrint('   StackTrace: $stackTrace');
-      // Set profile to null so rank defaults to 0 (public)
+      // Set profile to null and store error message
       _currentUserProfile = null;
-      // Don't throw - allow app to continue with public access
+      _profileLoadError = 'Failed to load profile: ${e.toString()}. Please check your internet connection or contact support.';
+    } finally {
+      _profileLoading = false;
+      notifyListeners();
     }
   }
 
@@ -254,9 +272,6 @@ class AuthProvider with ChangeNotifier {
         if (profile.generation != null) {
           saveTasks.add(prefs.setString('user_generation', profile.generation!));
         }
-        if (profile.avatarUrl != null) {
-          saveTasks.add(prefs.setString('user_avatar_url', profile.avatarUrl!));
-        }
 
         saveTasks.add(prefs.setInt('user_role_rank', profile.roleRank));
       }
@@ -292,7 +307,6 @@ class AuthProvider with ChangeNotifier {
         prefs.remove('user_gender'),
         prefs.remove('user_signup_troop'),
         prefs.remove('user_generation'),
-        prefs.remove('user_avatar_url'),
         prefs.remove('user_role_rank'),
         prefs.setBool('is_authenticated', false),
       ]);
@@ -499,7 +513,7 @@ class AuthProvider with ChangeNotifier {
     if (_currentUser != null) {
       await _loadUserProfile();
       await _loadUserRoles();
-      notifyListeners();
+      await _saveUserData();
     }
   }
 

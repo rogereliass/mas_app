@@ -14,6 +14,5 @@ flutter run
 
 ---------------------------------------------------------
 -supabase RLS 
--caching offline in device - TESTING image not fetched again
 -login process - Twilio Account Needed but logic is working
 -file views & download stats
