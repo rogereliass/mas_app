@@ -608,7 +608,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 // Troop Dropdown
                 DropdownButtonFormField<String>(
-                  value: _selectedTroopId,
+                  initialValue: _selectedTroopId,
                   decoration: InputDecoration(
                     labelText: 'Signup Troop',
                     border: OutlineInputBorder(

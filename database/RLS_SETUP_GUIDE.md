@@ -6,7 +6,7 @@ This guide provides SQL commands to set up Row-Level Security (RLS) policies in 
 ## Prerequisites
 - Supabase project with the following tables:
   - `profiles` (user profiles)
-  - `profiles_roles` (user-role junction table)
+  - `profile_roles` (user-role junction table)
   - `roles` (role definitions with rank field)
   - `folders` (library folders)
   - `files` (library files with min_role_rank field)
@@ -20,7 +20,7 @@ First, enable RLS on all relevant tables:
 ```sql
 -- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profiles_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
@@ -44,11 +44,11 @@ AS $$
 DECLARE
   user_rank INTEGER;
 BEGIN
-  -- Get the user's highest role rank from profiles -> profiles_roles -> roles
+  -- Get the user's highest role rank from profiles -> profile_roles -> roles
   SELECT COALESCE(MAX(r.role_rank), 0)
   INTO user_rank
   FROM profiles p
-  INNER JOIN profiles_roles pr ON p.id = pr.profile_id
+  INNER JOIN profile_roles pr ON p.id = pr.profile_id
   INNER JOIN roles r ON pr.role_id = r.id
   WHERE p.user_id = auth.uid();
   
@@ -150,12 +150,12 @@ USING (get_user_role_rank() >= 80);
 
 ---
 
-## Step 6: RLS Policies for `profiles_roles` Table
+## Step 6: RLS Policies for `profile_roles` Table
 
 ```sql
 -- Users can view their own role assignments
 CREATE POLICY "Users can view their own roles"
-ON profiles_roles
+ON profile_roles
 FOR SELECT
 TO authenticated
 USING (
@@ -166,14 +166,14 @@ USING (
 
 -- Admins can view all role assignments
 CREATE POLICY "Admins can view all role assignments"
-ON profiles_roles
+ON profile_roles
 FOR SELECT
 TO authenticated
 USING (get_user_role_rank() >= 80);
 
 -- System admins can manage role assignments
 CREATE POLICY "System admins can manage role assignments"
-ON profiles_roles
+ON profile_roles
 FOR ALL
 TO authenticated
 USING (get_user_role_rank() = 100)
@@ -245,12 +245,12 @@ Add indexes to improve query performance:
 CREATE INDEX IF NOT EXISTS idx_files_min_role_rank 
 ON files(min_role_rank);
 
--- Index on profiles_roles for faster role lookups
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_profile_id 
-ON profiles_roles(profile_id);
+-- Index on profile_roles for faster role lookups
+CREATE INDEX IF NOT EXISTS idx_profile_roles_profile_id 
+ON profile_roles(profile_id);
 
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_role_id 
-ON profiles_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_profile_roles_role_id 
+ON profile_roles(role_id);
 
 -- Index on profiles.user_id for auth lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id 
@@ -272,7 +272,7 @@ Run this comprehensive check:
 SELECT schemaname, tablename, rowsecurity
 FROM pg_tables
 WHERE schemaname = 'public'
-  AND tablename IN ('files', 'folders', 'profiles', 'profiles_roles', 'roles');
+  AND tablename IN ('files', 'folders', 'profiles', 'profile_roles', 'roles');
 
 -- Check policies exist
 SELECT schemaname, tablename, policyname, permissive, roles, cmd
@@ -289,7 +289,7 @@ SELECT get_user_role_rank() as my_rank;
 ## Common Issues & Solutions
 
 ### Issue 1: Function returns NULL
-**Cause:** User has no role assigned in `profiles_roles` table
+**Cause:** User has no role assigned in `profile_roles` table
 **Solution:** Assign a default role or ensure COALESCE returns 0
 
 ### Issue 2: No files visible even for public content
@@ -336,7 +336,7 @@ Run this complete script in your Supabase SQL Editor:
 ```sql
 -- 1. Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profiles_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
@@ -354,7 +354,7 @@ BEGIN
   SELECT COALESCE(MAX(r.role_rank), 0)
   INTO user_rank
   FROM profiles p
-  INNER JOIN profiles_roles pr ON p.id = pr.profile_id
+  INNER JOIN profile_roles pr ON p.id = pr.profile_id
   INNER JOIN roles r ON pr.role_id = r.id
   WHERE p.user_id = auth.uid();
   
@@ -407,19 +407,19 @@ CREATE POLICY "Admins can view all profiles"
 ON profiles FOR SELECT TO authenticated
 USING (get_user_role_rank() >= 80);
 
--- 6. Profiles_roles policies
-CREATE POLICY "Users can view their own roles"
-ON profiles_roles FOR SELECT TO authenticated
+-- 6. Profile_roles policies
+CREATE POLICY "Users can view their own roles" 
+ON profile_roles FOR SELECT TO authenticated
 USING (
   profile_id IN (SELECT id FROM profiles WHERE user_id = auth.uid())
 );
 
 CREATE POLICY "Admins can view all role assignments"
-ON profiles_roles FOR SELECT TO authenticated
+ON profile_roles FOR SELECT TO authenticated
 USING (get_user_role_rank() >= 80);
 
 CREATE POLICY "System admins can manage role assignments"
-ON profiles_roles FOR ALL TO authenticated
+ON profile_roles FOR ALL TO authenticated
 USING (get_user_role_rank() = 100)
 WITH CHECK (get_user_role_rank() = 100);
 
@@ -435,8 +435,8 @@ WITH CHECK (get_user_role_rank() = 100);
 
 -- 8. Create indexes
 CREATE INDEX IF NOT EXISTS idx_files_min_role_rank ON files(min_role_rank);
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_profile_id ON profiles_roles(profile_id);
-CREATE INDEX IF NOT EXISTS idx_profiles_roles_role_id ON profiles_roles(role_id);
+CREATE INDEX IF NOT EXISTS idx_profile_roles_profile_id ON profile_roles(profile_id);
+CREATE INDEX IF NOT EXISTS idx_profile_roles_role_id ON profile_roles(role_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id);
 CREATE INDEX IF NOT EXISTS idx_roles_role_rank ON roles(role_rank);
 

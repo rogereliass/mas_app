@@ -31,7 +31,7 @@ Each feature follows **3-layer clean architecture**:
 ## Critical Patterns
 
 ### 1. Role-Based Access Control (RBAC)
-Files have `min_rank` field (0-100). Users have `roleRank` from joined tables (profiles → profiles_roles → roles).
+Files have `min_rank` field (0-100). Users have `roleRank` from joined tables (profiles → profile_roles → roles).
 ```dart
 // Check access in UserProfile model
 user.canAccess(file.minRank)  // roleRank >= minRank
@@ -159,7 +159,7 @@ try {
 Reference [database/migrations/](database/migrations/) for schema. Key tables:
 - `folders` (id, name, parent_folder_id, depth)
 - `files` (id, name, folder_id, min_rank, version, url)
-- `profiles` → `profiles_roles` → `roles` (for RBAC)
+- `profiles` → `profile_roles` → `roles` (for RBAC)
 
 ## Common Tasks
 

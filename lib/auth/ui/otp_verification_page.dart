@@ -129,10 +129,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'OTP resent successfully' +
-                (remainingResends > 0 
+                'OTP resent successfully${remainingResends > 0 
                     ? '. $remainingResends resend${remainingResends != 1 ? "s" : ""} remaining'
-                    : '. This was your last resend'),
+                    : '. This was your last resend'}',
               ),
               backgroundColor: Colors.green,
             ),
@@ -212,10 +211,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         final remainingAttempts = _maxAttempts - _attemptCount;
         await AuthErrorDialog.showError(
           context: context,
-          message: authProvider.errorMessage ?? 'Invalid OTP code' +
-              (remainingAttempts > 0 
+          message: authProvider.errorMessage ?? 'Invalid OTP code${remainingAttempts > 0 
                   ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} remaining'
-                  : ''),
+                  : ''}',
         );
         return;
       }

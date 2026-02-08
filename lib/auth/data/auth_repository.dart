@@ -80,11 +80,13 @@ class AuthRepository {
       debugPrint('Metadata fields: ${metadata?.keys.toList()}');
 
       // Sign up with phone - Supabase will send OTP
-      // All user data (email, name, address, etc.) will be stored in profiles table after OTP verification
+      // Pass metadata to Supabase auth for redundancy (also available immediately on currentUser)
+      // All user data will also be stored in profiles table after OTP verification
       final response = await _supabase.auth
           .signUp(
             phone: formattedPhone,
             password: password,
+            data: metadata, // Pass metadata to Supabase auth
           )
           .timeout(
             const Duration(seconds: 60),
@@ -95,6 +97,9 @@ class AuthRepository {
               );
             },
           );
+
+      debugPrint('=== METADATA SENT TO AUTH ===');
+      debugPrint('Data keys: ${metadata?.keys.toList()}');
 
       debugPrint('=== SIGNUP RESPONSE ===');
       debugPrint('User ID: ${response.user?.id}');

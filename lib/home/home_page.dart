@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth/logic/auth_provider.dart';
+import '../core/config/theme_provider.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../routing/app_router.dart';
 
@@ -19,11 +20,20 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     // Set initial role after build completes
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      if (authProvider.userRoles.isNotEmpty && _selectedRole == null) {
-        setState(() {
-          _selectedRole = authProvider.userRoles.first.name;
-        });
+      debugPrint('🏠 HomePage initState - User: ${authProvider.fullName}');
+      debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
+      if (authProvider.userRoles.isNotEmpty) {
+        debugPrint('🏠 Roles available: ${authProvider.userRoles.map((r) => r.name).join(', ')}');
+        if (_selectedRole == null) {
+          setState(() {
+            _selectedRole = authProvider.userRoles.first.name;
+          });
+          debugPrint('🏠 Set initial role to: $_selectedRole');
+        }
+      } else {
+        debugPrint('⚠️ No roles found for user');
       }
     });
   }
@@ -35,9 +45,27 @@ class _HomePageState extends State<HomePage> {
     final authProvider = Provider.of<AuthProvider>(context);
     final userRoles = authProvider.userRoles;
 
+    // Detailed debug logging
+    debugPrint('🏠 ============ HomePage Build ============');
+    debugPrint('   Current User ID: ${authProvider.userId}');
+    debugPrint('   Full Name: ${authProvider.fullName}');
+    debugPrint('   Roles Count: ${userRoles.length}');
+    debugPrint('   Selected Role: $_selectedRole');
+    if (userRoles.isNotEmpty) {
+      debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
+    }
+    debugPrint('🏠 ======================================');
+
     // Set default role if not set and roles are available
     if (_selectedRole == null && userRoles.isNotEmpty) {
-      _selectedRole = userRoles.first.name;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedRole = userRoles.first.name;
+          });
+          debugPrint('🏠 Auto-selected first role: ${userRoles.first.name}');
+        }
+      });
     }
 
     return Scaffold(
@@ -84,30 +112,7 @@ class _HomePageState extends State<HomePage> {
                     items: userRoles.map((role) {
                       return DropdownMenuItem<String>(
                         value: role.name,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(role.name),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Rank ${role.rank}',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: Text(role.name),
                       );
                     }).toList(),
                     onChanged: (String? newValue) {
@@ -123,13 +128,47 @@ class _HomePageState extends State<HomePage> {
                 ),
         ),
         actions: [
+          // Debug: Manual reload button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload Profile & Roles',
+            onPressed: () async {
+              debugPrint('🔄 Manual reload triggered from HomePage');
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+              // Show loading
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Reloading profile...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
+
+              await authProvider.refreshProfile();
+
+              debugPrint('✅ Manual reload complete');
+              debugPrint('   Full Name after reload: ${authProvider.fullName}');
+              debugPrint('   Profile: ${authProvider.currentUserProfile}');
+
+              if (mounted) {
+                final name = authProvider.fullName ?? 'No name loaded';
+                final roleCount = authProvider.userRoles.length;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Profile: $name\nRoles: $roleCount'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          ),
           // Settings Action
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
-            onPressed: () {
-              // TODO: Navigate to settings page
-            },
+            onPressed: () => _showSettingsDialog(context),
           ),
           const SizedBox(width: 8),
         ],
@@ -181,6 +220,17 @@ class _HomePageState extends State<HomePage> {
   Widget _buildWelcomeHeader(BuildContext context, AuthProvider authProvider) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Debug logging to trace the issue
+    debugPrint('🔍 _buildWelcomeHeader DEBUG:');
+    debugPrint('   currentUser: ${authProvider.currentUser?.id}');
+    debugPrint('   currentUserProfile: ${authProvider.currentUserProfile}');
+    debugPrint('   firstName: ${authProvider.currentUserProfile?.firstName}');
+    debugPrint('   middleName: ${authProvider.currentUserProfile?.middleName}');
+    debugPrint('   lastName: ${authProvider.currentUserProfile?.lastName}');
+    debugPrint('   fullName getter: ${authProvider.fullName}');
+    debugPrint('   userMetadata: ${authProvider.userMetadata}');
+
     final userName = authProvider.fullName ?? 'User';
     final currentRole = _selectedRole ?? 'No Role';
     final roleRank = authProvider.currentUserRoleRank;
@@ -203,61 +253,31 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 8),
-        // Role and Rank Badge
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
+        // Role Badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.badge_outlined,
+                size: 16,
+                color: colorScheme.onSecondaryContainer,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.badge_outlined,
-                    size: 16,
-                    color: colorScheme.onSecondaryContainer,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    currentRole,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSecondaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 6),
+              Text(
+                currentRole,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.star_outline,
-                    size: 16,
-                    color: colorScheme.onTertiaryContainer,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Rank $roleRank',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onTertiaryContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -352,20 +372,9 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'You can access content up to rank $roleRank',
+                'Your access level determines which content you can view and interact with in the app.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Progress indicator
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: roleRank / 100,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
-                  minHeight: 8,
                 ),
               ),
               const SizedBox(height: 16),
@@ -526,6 +535,481 @@ class _HomePageState extends State<HomePage> {
       SnackBar(
         content: Text('Switched to $newRole view'),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Show settings dialog
+  void _showSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const _SettingsDialog(),
+    );
+  }
+}
+
+/// Settings Dialog Widget
+class _SettingsDialog extends StatelessWidget {
+  const _SettingsDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.settings,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Settings',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            
+            // Scrollable Settings Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Appearance Section
+                    _SettingsSection(
+                      title: 'Appearance',
+                      icon: Icons.palette_outlined,
+                      children: [
+                        _SettingItem(
+                          icon: Icons.brightness_6_outlined,
+                          title: 'Theme',
+                          subtitle: _getThemeModeLabel(themeProvider.themeMode),
+                          onTap: () => _showThemeSelector(context, themeProvider),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Account Section (Placeholder)
+                    _SettingsSection(
+                      title: 'Account',
+                      icon: Icons.person_outline,
+                      children: [
+                        _SettingItem(
+                          icon: Icons.edit_outlined,
+                          title: 'Edit Profile',
+                          subtitle: 'Update your personal information',
+                          onTap: () {
+                            // TODO: Navigate to profile edit
+                            Navigator.pop(context);
+                          },
+                        ),
+                        _SettingItem(
+                          icon: Icons.lock_outline,
+                          title: 'Change Password',
+                          subtitle: 'Update your account password',
+                          onTap: () {
+                            // TODO: Navigate to change password
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Storage Section (Placeholder)
+                    _SettingsSection(
+                      title: 'Storage',
+                      icon: Icons.storage_outlined,
+                      children: [
+                        _SettingItem(
+                          icon: Icons.download_outlined,
+                          title: 'Offline Files',
+                          subtitle: 'Manage downloaded content',
+                          onTap: () {
+                            // TODO: Navigate to offline files management
+                            Navigator.pop(context);
+                          },
+                        ),
+                        _SettingItem(
+                          icon: Icons.delete_outline,
+                          title: 'Clear Cache',
+                          subtitle: 'Free up storage space',
+                          onTap: () {
+                            // TODO: Show cache clearing dialog
+                          },
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // About Section (Placeholder)
+                    _SettingsSection(
+                      title: 'About',
+                      icon: Icons.info_outline,
+                      children: [
+                        _SettingItem(
+                          icon: Icons.privacy_tip_outlined,
+                          title: 'Privacy Policy',
+                          subtitle: 'View our privacy policy',
+                          onTap: () {
+                            // TODO: Show privacy policy
+                            Navigator.pop(context);
+                          },
+                        ),
+                        _SettingItem(
+                          icon: Icons.description_outlined,
+                          title: 'Terms of Service',
+                          subtitle: 'View terms and conditions',
+                          onTap: () {
+                            // TODO: Show terms
+                            Navigator.pop(context);
+                          },
+                        ),
+                        _SettingItem(
+                          icon: Icons.update_outlined,
+                          title: 'App Version',
+                          subtitle: '1.0.0',
+                          onTap: null, // Non-interactive
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getThemeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light Mode';
+      case ThemeMode.dark:
+        return 'Dark Mode';
+      case ThemeMode.system:
+        return 'System Default';
+    }
+  }
+
+  void _showThemeSelector(BuildContext context, ThemeProvider themeProvider) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Choose Theme',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _ThemeModeOption(
+              icon: Icons.light_mode,
+              title: 'Light Mode',
+              subtitle: 'Clean and bright interface',
+              isSelected: themeProvider.themeMode == ThemeMode.light,
+              onTap: () async {
+                await themeProvider.setLightMode();
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+            _ThemeModeOption(
+              icon: Icons.dark_mode,
+              title: 'Dark Mode',
+              subtitle: 'Easy on the eyes',
+              isSelected: themeProvider.themeMode == ThemeMode.dark,
+              onTap: () async {
+                await themeProvider.setDarkMode();
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+            _ThemeModeOption(
+              icon: Icons.brightness_auto,
+              title: 'System Default',
+              subtitle: 'Follow device settings',
+              isSelected: themeProvider.themeMode == ThemeMode.system,
+              onTap: () async {
+                await themeProvider.setSystemMode();
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Settings Section Widget
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  const _SettingsSection({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Column(
+            children: children,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Settings Item Widget
+class _SettingItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const _SettingItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isInteractive = onTap != null;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isInteractive)
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Theme Mode Option Tile
+class _ThemeModeOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ThemeModeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected 
+                          ? colorScheme.primary
+                          : colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: colorScheme.primary,
+                size: 24,
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -45,7 +45,29 @@ class AuthProvider with ChangeNotifier {
   String? get userEmail => _currentUser?.email;
   String? get userPhone => _currentUser?.phone;
   Map<String, dynamic>? get userMetadata => _currentUser?.userMetadata;
-  String? get fullName => _currentUser?.userMetadata?['full_name'] as String?;
+  
+  /// Get full name from user profile or construct from metadata
+  String? get fullName {
+    // First try from loaded profile (already constructed from first_name + middle_name + last_name)
+    if (_currentUserProfile?.fullName != null) {
+      return _currentUserProfile!.fullName;
+    }
+    
+    // Fallback: construct from user metadata if profile not loaded
+    final metadata = _currentUser?.userMetadata;
+    if (metadata != null) {
+      final firstName = metadata['first_name'] as String?;
+      final middleName = metadata['middle_name'] as String?;
+      final lastName = metadata['last_name'] as String?;
+      final parts = [firstName, middleName, lastName]
+          .where((part) => part != null && part.isNotEmpty);
+      if (parts.isNotEmpty) {
+        return parts.join(' ');
+      }
+    }
+    
+    return null;
+  }
 
   AuthProvider() {
     _initialize();
@@ -54,17 +76,22 @@ class AuthProvider with ChangeNotifier {
   /// Initialize auth state and listen to changes
   void _initialize() {
     _currentUser = _authRepository.getCurrentUser();
+    debugPrint('🚀 AuthProvider Initialize - Current User: ${_currentUser?.id}');
+    debugPrint('   Email: ${_currentUser?.email}, Phone: ${_currentUser?.phone}');
 
     // Listen to auth state changes and store subscription for cleanup
     _authSubscription = _authRepository.authStateChanges.listen((AuthState data) async {
       final previousUser = _currentUser;
       _currentUser = data.session?.user;
       
+      debugPrint('🔔 Auth state changed - User: ${_currentUser?.id}');
+      
       if (_currentUser != null) {
         // Load profile first, then save data
         await _loadUserProfile();
         await _loadUserRoles();
         await _saveUserData();
+        debugPrint('📢 Notifying listeners after auth state change');
       } else {
         _currentUserProfile = null;
         _userRoles = [];
@@ -79,11 +106,17 @@ class AuthProvider with ChangeNotifier {
 
     // Load user profile if already logged in (async)
     if (_currentUser != null) {
+      debugPrint('👤 User already logged in, loading profile and roles...');
       _loadUserProfile().then((_) async {
         await _loadUserRoles();
         await _saveUserData();
+        debugPrint('📢 Notifying listeners after initial load');
         notifyListeners();
+      }).catchError((e) {
+        debugPrint('❌ Error in initial load: $e');
       });
+    } else {
+      debugPrint('⚠️ No user logged in at initialization');
     }
   }
   
@@ -91,18 +124,35 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUserProfile() async {
     if (_currentUser == null) {
       _currentUserProfile = null;
+      debugPrint('⚠️ Cannot load profile - no current user');
       return;
     }
-    
+
     try {
+      debugPrint('🔄 Loading profile for user: ${_currentUser!.id}');
       _currentUserProfile = await _roleRepository.getUserProfile(_currentUser!.id);
       if (_currentUserProfile != null) {
-        debugPrint('✅ Loaded user profile - Role rank: ${_currentUserProfile!.roleRank}');
+        debugPrint('✅ Loaded user profile:');
+        debugPrint('   First Name: ${_currentUserProfile!.firstName}');
+        debugPrint('   Middle Name: ${_currentUserProfile!.middleName}');
+        debugPrint('   Last Name: ${_currentUserProfile!.lastName}');
+        debugPrint('   Full Name: ${_currentUserProfile!.fullName}');
+        debugPrint('   Email: ${_currentUserProfile!.email}');
+        debugPrint('   Phone: ${_currentUserProfile!.phone}');
+        debugPrint('   Role rank: ${_currentUserProfile!.roleRank}');
+
+        // Check if name fields are missing
+        if (_currentUserProfile!.firstName == null ||
+            _currentUserProfile!.lastName == null) {
+          debugPrint('⚠️ WARNING: Name fields are missing in database!');
+          debugPrint('   This user may need to re-register or have their profile updated.');
+        }
       } else {
         debugPrint('⚠️ No profile found for user ${_currentUser!.id} - defaulting to public (rank 0)');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Failed to load user profile: $e');
+      debugPrint('   StackTrace: $stackTrace');
       // Set profile to null so rank defaults to 0 (public)
       _currentUserProfile = null;
       // Don't throw - allow app to continue with public access
@@ -113,14 +163,22 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUserRoles() async {
     if (_currentUser == null) {
       _userRoles = [];
+      debugPrint('⚠️ No current user, skipping role load');
       return;
     }
     
     try {
+      debugPrint('🔄 Loading roles for user ${_currentUser!.id}...');
       _userRoles = await _roleRepository.getCurrentUserRoles();
       debugPrint('✅ Loaded ${_userRoles.length} roles for user');
-    } catch (e) {
+      if (_userRoles.isNotEmpty) {
+        debugPrint('   Roles: ${_userRoles.map((r) => '${r.name} (rank ${r.rank})').join(', ')}');
+      } else {
+        debugPrint('   ⚠️ User has no roles assigned');
+      }
+    } catch (e, stackTrace) {
       debugPrint('❌ Failed to load user roles: $e');
+      debugPrint('   StackTrace: $stackTrace');
       _userRoles = [];
       // Don't throw - allow app to continue without roles
     }
@@ -138,22 +196,74 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final prefs = await _prefs;
-      
-      // Use Future.wait for parallel operations
-      await Future.wait<void>([
+
+      // Build list of futures to save in parallel
+      final saveTasks = <Future<void>>[
         prefs.setString('user_id', _currentUser!.id),
-        if (_currentUser!.phone != null) 
-          prefs.setString('user_phone', _currentUser!.phone!),
-        if (_currentUser!.email != null) 
-          prefs.setString('user_email', _currentUser!.email!),
-        if (_currentUser!.userMetadata?['full_name'] != null)
-          prefs.setString(
-            'user_full_name',
-            _currentUser!.userMetadata!['full_name'] as String,
-          ),
         prefs.setBool('is_authenticated', true),
-      ]);
-      
+      ];
+
+      // Save basic user data
+      if (_currentUser!.phone != null) {
+        saveTasks.add(prefs.setString('user_phone', _currentUser!.phone!));
+      }
+      if (_currentUser!.email != null) {
+        saveTasks.add(prefs.setString('user_email', _currentUser!.email!));
+      }
+
+      // Save all profile data if available
+      if (_currentUserProfile != null) {
+        final profile = _currentUserProfile!;
+
+        // Save name fields
+        if (profile.firstName != null) {
+          saveTasks.add(prefs.setString('user_first_name', profile.firstName!));
+        }
+        if (profile.middleName != null) {
+          saveTasks.add(prefs.setString('user_middle_name', profile.middleName!));
+        }
+        if (profile.lastName != null) {
+          saveTasks.add(prefs.setString('user_last_name', profile.lastName!));
+        }
+        if (profile.fullName != null) {
+          saveTasks.add(prefs.setString('user_full_name', profile.fullName!));
+        }
+
+        // Save other profile fields
+        if (profile.nameAr != null) {
+          saveTasks.add(prefs.setString('user_name_ar', profile.nameAr!));
+        }
+        if (profile.email != null) {
+          saveTasks.add(prefs.setString('user_email', profile.email!));
+        }
+        if (profile.phone != null) {
+          saveTasks.add(prefs.setString('user_phone', profile.phone!));
+        }
+        if (profile.address != null) {
+          saveTasks.add(prefs.setString('user_address', profile.address!));
+        }
+        if (profile.birthdate != null) {
+          saveTasks.add(prefs.setString('user_birthdate', profile.birthdate!.toIso8601String()));
+        }
+        if (profile.gender != null) {
+          saveTasks.add(prefs.setString('user_gender', profile.gender!));
+        }
+        if (profile.signupTroopId != null) {
+          saveTasks.add(prefs.setString('user_signup_troop', profile.signupTroopId!));
+        }
+        if (profile.generation != null) {
+          saveTasks.add(prefs.setString('user_generation', profile.generation!));
+        }
+        if (profile.avatarUrl != null) {
+          saveTasks.add(prefs.setString('user_avatar_url', profile.avatarUrl!));
+        }
+
+        saveTasks.add(prefs.setInt('user_role_rank', profile.roleRank));
+      }
+
+      // Use Future.wait for parallel operations
+      await Future.wait(saveTasks);
+
       return true;
     } catch (e) {
       debugPrint('Error saving user data: $e');
@@ -166,16 +276,27 @@ class AuthProvider with ChangeNotifier {
   Future<bool> _clearUserData() async {
     try {
       final prefs = await _prefs;
-      
+
       // Use Future.wait for parallel operations
       await Future.wait<void>([
         prefs.remove('user_id'),
         prefs.remove('user_phone'),
         prefs.remove('user_email'),
+        prefs.remove('user_first_name'),
+        prefs.remove('user_middle_name'),
+        prefs.remove('user_last_name'),
         prefs.remove('user_full_name'),
+        prefs.remove('user_name_ar'),
+        prefs.remove('user_address'),
+        prefs.remove('user_birthdate'),
+        prefs.remove('user_gender'),
+        prefs.remove('user_signup_troop'),
+        prefs.remove('user_generation'),
+        prefs.remove('user_avatar_url'),
+        prefs.remove('user_role_rank'),
         prefs.setBool('is_authenticated', false),
       ]);
-      
+
       return true;
     } catch (e) {
       debugPrint('Error clearing user data: $e');
