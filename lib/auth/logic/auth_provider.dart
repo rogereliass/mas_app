@@ -328,6 +328,12 @@ class AuthProvider with ChangeNotifier {
 
     try {
       _currentUser = await authMethod();
+      
+      // Immediately load profile and roles after successful authentication
+      await _loadUserProfile();
+      await _loadUserRoles();
+      await _saveUserData();
+      
       return true;
     } on AuthException catch (e) {
       _setError(e.message);

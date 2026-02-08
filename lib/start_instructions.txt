@@ -14,5 +14,22 @@ flutter run
 
 ---------------------------------------------------------
 -supabase RLS 
+-forgot password
 -login process - Twilio Account Needed but logic is working
 -file views & download stats
+
+---------------------------------------------------------
+Homepage components:
+Admin:
+-User Acceptance (after login) module 
+-Stats (later)
+-Library Management (upload,delete,update visibilty) for files and Folders
+
+Troop Head/Leader:
+-Meeting Manager (CRUD for meetings of their troop).
+-User Acceptance (after login) module [filtered by their troop]
+-User Management (assign to patrols,& roles)
+
+Scouts:
+-View their meetings & history
+-View their attendance stats

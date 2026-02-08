@@ -231,19 +231,22 @@ class SettingsDialog extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () async {
+              // Get the navigator before closing dialogs
+              final navigator = Navigator.of(context);
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              
+              // Close both dialogs
               Navigator.pop(dialogContext); // Close confirmation dialog
               Navigator.pop(context); // Close settings dialog
               
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              // Sign out
               await authProvider.signOut();
               
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  AppRouter.startup,
-                  (route) => false,
-                );
-              }
+              // Navigate to startup page, clearing all previous routes
+              navigator.pushNamedAndRemoveUntil(
+                AppRouter.startup,
+                (route) => false,
+              );
             },
             style: FilledButton.styleFrom(
               backgroundColor: theme.colorScheme.error,

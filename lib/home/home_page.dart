@@ -4,6 +4,7 @@ import '../auth/logic/auth_provider.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../core/widgets/settings_dialog.dart';
 import '../routing/app_router.dart';
+import 'components/components.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -196,8 +197,8 @@ class _HomePageState extends State<HomePage> {
                 _buildSummaryStats(context),
                 const SizedBox(height: 32),
 
-                // Recent Activity
-                _buildRecentActivity(context),
+                // // Recent Activity
+                // _buildRecentActivity(context),
                 
                 // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
                 const SizedBox(height: 24),
@@ -328,6 +329,12 @@ class _HomePageState extends State<HomePage> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final roleRank = authProvider.currentUserRoleRank;
     
+    // Show role-specific components based on selected role
+    if (_selectedRole == 'System Admin') {
+      return const SystemAdminStats();
+    }
+    
+    // Default stats for other roles
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -452,69 +459,69 @@ class _HomePageState extends State<HomePage> {
     return 'System Admin';
   }
 
-  /// Recent Activity Feed
-  /// Shows latest updates or accessed content
-  Widget _buildRecentActivity(BuildContext context) {
-    final theme = Theme.of(context);
+  // /// Recent Activity Feed
+  // /// Shows latest updates or accessed content
+  // Widget _buildRecentActivity(BuildContext context) {
+  //   final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Recent Activity',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  // TODO: Navigate to full activity log
-                },
-                child: const Text('View All'),
-              ),
-            ],
-          ),
-        ),
-        // TODO: Connect to recent activity stream/provider
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 3, // Placeholder count
-          separatorBuilder: (context, index) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.secondaryContainer,
-                child: Icon(
-                  Icons.history,
-                  color: theme.colorScheme.onSecondaryContainer,
-                  size: 20,
-                ),
-              ),
-              title: Text('Activity Item ${index + 1}'),
-              subtitle: Text(
-                'Description of action taken',
-                style: theme.textTheme.bodySmall,
-              ),
-              trailing: Text(
-                '2h ago',
-                style: theme.textTheme.bodySmall,
-              ),
-              onTap: () {
-                // TODO: Handle activity item tap
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.only(bottom: 16),
+  //         child: Row(
+  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //           children: [
+  //             Text(
+  //               'Recent Activity',
+  //               style: theme.textTheme.titleLarge?.copyWith(
+  //                 fontWeight: FontWeight.w600,
+  //               ),
+  //             ),
+  //             TextButton(
+  //               onPressed: () {
+  //                 // TODO: Navigate to full activity log
+  //               },
+  //               child: const Text('View All'),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       // TODO: Connect to recent activity stream/provider
+  //       ListView.separated(
+  //         shrinkWrap: true,
+  //         physics: const NeverScrollableScrollPhysics(),
+  //         itemCount: 3, // Placeholder count
+  //         separatorBuilder: (context, index) => const Divider(height: 1),
+  //         itemBuilder: (context, index) {
+  //           return ListTile(
+  //             contentPadding: EdgeInsets.zero,
+  //             leading: CircleAvatar(
+  //               backgroundColor: theme.colorScheme.secondaryContainer,
+  //               child: Icon(
+  //                 Icons.history,
+  //                 color: theme.colorScheme.onSecondaryContainer,
+  //                 size: 20,
+  //               ),
+  //             ),
+  //             title: Text('Activity Item ${index + 1}'),
+  //             subtitle: Text(
+  //               'Description of action taken',
+  //               style: theme.textTheme.bodySmall,
+  //             ),
+  //             trailing: Text(
+  //               '2h ago',
+  //               style: theme.textTheme.bodySmall,
+  //             ),
+  //             onTap: () {
+  //               // TODO: Handle activity item tap
+  //             },
+  //           );
+  //         },
+  //       ),
+  //     ],
+  //   );
+  // }
 
   /// Handles pull-to-refresh action
   Future<void> _refreshData() async {
