@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'components/bottom_nav_bar.dart';
+import 'package:provider/provider.dart';
+import '../../auth/logic/auth_provider.dart';
+import '../../core/widgets/app_bottom_nav_bar.dart';
 
 /// About page with app information
 /// 
@@ -15,10 +17,10 @@ class AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<AboutPage> {
-  final int _currentNavIndex = 1; // Start on About tab
-
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -28,14 +30,9 @@ class _AboutPageState extends State<AboutPage> {
         centerTitle: true,
       ),
       body: const AboutContent(),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          if (index == 0) {
-            // Navigate back to library
-            Navigator.pop(context);
-          }
-        },
+      bottomNavigationBar: AppBottomNavBar(
+        currentPage: 'about',
+        isAuthenticated: authProvider.isAuthenticated,
       ),
     );
   }

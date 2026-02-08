@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
+import '../../auth/logic/auth_provider.dart';
+import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
-import 'about_page.dart';
 import 'components/file_tile.dart';
-import 'components/bottom_nav_bar.dart';
 
 /// Folder detail page showing subfolders and files
 /// 
@@ -33,7 +33,6 @@ class FolderDetailPage extends StatefulWidget {
 
 class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBindingObserver {
   bool _isGridView = false;
-  int _currentNavIndex = 0;
   bool _hasLoadedInitially = false;
 
   @override
@@ -70,16 +69,10 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: _currentNavIndex == 0
-          ? _buildFolderContent()
-          : _buildAboutContent(),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-        },
+      body: _buildFolderContent(),
+      bottomNavigationBar: AppBottomNavBar(
+        currentPage: 'library',
+        isAuthenticated: Provider.of<AuthProvider>(context, listen: false).isAuthenticated,
       ),
     );
   }
@@ -408,11 +401,6 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
     } else {
       return '${date.month}/${date.day}/${date.year}';
     }
-  }
-
-  /// Build about content
-  Widget _buildAboutContent() {
-    return const AboutContent();
   }
 }
 

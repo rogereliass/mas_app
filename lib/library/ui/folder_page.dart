@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/config/theme_provider.dart';
+import '../../auth/logic/auth_provider.dart';
+import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/filter_chip_row.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
-import 'components/bottom_nav_bar.dart';
-import 'about_page.dart';
 
 /// Library home page - main entry point for browsing content
 /// 
@@ -27,7 +27,6 @@ class LibraryHomePage extends StatefulWidget {
 
 class _LibraryHomePageState extends State<LibraryHomePage> {
   String _selectedCategory = 'All';
-  int _currentNavIndex = 0;
 
   @override
   void initState() {
@@ -41,18 +40,14 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: _currentNavIndex == 0 
-          ? _buildLibraryContent()
-          : _buildAboutContent(),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-        },
+      body: _buildLibraryContent(),
+      bottomNavigationBar: AppBottomNavBar(
+        currentPage: 'library',
+        isAuthenticated: authProvider.isAuthenticated,
       ),
     );
   }
@@ -61,17 +56,29 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isDark = theme.brightness == Brightness.dark;
+    final isAuthenticated = authProvider.isAuthenticated;
     
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRouter.startup,
-            (route) => false,
-          );
+          if (isAuthenticated) {
+            // If user is logged in, go back to home page
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRouter.home,
+              (route) => false,
+            );
+          } else {
+            // If not authenticated, go to startup
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRouter.startup,
+              (route) => false,
+            );
+          }
         },
       ),
       title: const Text(
@@ -340,11 +347,6 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     } else {
       return '${date.month}/${date.day}/${date.year}';
     }
-  }
-
-  /// Build about content
-  Widget _buildAboutContent() {
-    return const AboutContent();
   }
 }
 

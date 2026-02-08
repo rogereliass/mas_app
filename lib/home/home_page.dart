@@ -209,8 +209,8 @@ class _HomePageState extends State<HomePage> {
 
       // 3. Bottom Navigation Bar
       bottomNavigationBar: const AppBottomNavBar(
-        currentIndex: 0,
-        // TODO: Verify active tab index matches AppRouter logic
+        currentPage: 'home',
+        isAuthenticated: true,
       ),
     );
   }

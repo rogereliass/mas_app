@@ -100,7 +100,10 @@ class RegisterSuccessPage extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: const AppBottomNavBar(currentIndex: 1),
+      bottomNavigationBar: const AppBottomNavBar(
+        currentPage: 'library',
+        isAuthenticated: true,
+      ),
     );
   }
 
