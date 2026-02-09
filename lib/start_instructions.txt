@@ -18,6 +18,7 @@ flutter run
 -login process - Twilio Account Needed but logic is working
 -file views & download stats
 
+
 ---------------------------------------------------------
 Homepage components:
 Admin:
@@ -26,8 +27,8 @@ Admin:
 -Library Management (upload,delete,update visibilty) for files and Folders
 
 Troop Head/Leader:
--Meeting Manager (CRUD for meetings of their troop).
 -User Acceptance (after login) module [filtered by their troop]
+-Meeting Manager (CRUD for meetings of their troop).
 -User Management (assign to patrols,& roles)
 
 Scouts:

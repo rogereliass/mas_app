@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/theme_provider.dart';
 import 'library/logic/library_provider.dart';
 import 'auth/logic/auth_provider.dart';
+import 'home/pages/admin_approval/logic/admin_provider.dart';
 import 'offline/offline_storage.dart';
 import 'app.dart';
 
@@ -41,6 +42,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
         // LibraryProvider depends on AuthProvider for role-based filtering
         ChangeNotifierProxyProvider<AuthProvider, LibraryProvider>(
           create: (context) => LibraryProvider(

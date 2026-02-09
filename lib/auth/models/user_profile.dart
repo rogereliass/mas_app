@@ -2,7 +2,8 @@
 ///
 /// Links user authentication with their role rank and contains all user data
 class UserProfile {
-  final String userId;
+  final String id;  // Maps to profiles.id (primary key)
+  final String userId;  // Maps to profiles.user_id (auth UID)
   final String? firstName;
   final String? middleName;
   final String? lastName;
@@ -20,6 +21,7 @@ class UserProfile {
   final DateTime? updatedAt;
 
   const UserProfile({
+    required this.id,
     required this.userId,
     this.firstName,
     this.middleName,
@@ -50,6 +52,7 @@ class UserProfile {
   /// Expects data from profiles table with all columns
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
+      id: json['id'] as String,
       userId: json['user_id'] as String,
       firstName: json['first_name'] as String?,
       middleName: json['middle_name'] as String?,
@@ -76,6 +79,7 @@ class UserProfile {
   /// Convert UserProfile to JSON
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'user_id': userId,
       'first_name': firstName,
       'middle_name': middleName,
@@ -112,13 +116,14 @@ class UserProfile {
       identical(this, other) ||
       other is UserProfile &&
           runtimeType == other.runtimeType &&
+          id == other.id &&
           userId == other.userId &&
           roleRank == other.roleRank;
 
   @override
-  int get hashCode => userId.hashCode ^ roleRank.hashCode;
+  int get hashCode => id.hashCode ^ userId.hashCode ^ roleRank.hashCode;
 
   @override
   String toString() =>
-      'UserProfile{userId: $userId, fullName: $fullName, roleRank: $roleRank}';
+      'UserProfile{id: $id, userId: $userId, fullName: $fullName, roleRank: $roleRank}';
 }

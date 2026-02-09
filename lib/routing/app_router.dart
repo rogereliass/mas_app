@@ -11,6 +11,7 @@ import '../library/ui/file_viewer_page.dart';
 import '../library/ui/all_folders_page.dart';
 import '../library/ui/about_page.dart';
 import '../profile/profile_page.dart';
+import '../home/pages/admin_approval/ui/user_acceptance_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -57,6 +58,9 @@ class AppRouter {
   
   /// Profile page route
   static const String profile = '/profile';
+  
+  /// User acceptance page route (admin only)
+  static const String userAcceptance = '/user-acceptance';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -74,6 +78,7 @@ class AppRouter {
     allFolders: (context) => const AllFoldersPage(),
     about: (context) => const AboutPage(),
     profile: (context) => const ProfilePage(),
+    userAcceptance: (context) => const UserAcceptancePage(),
   };
 
   // ============================================================================

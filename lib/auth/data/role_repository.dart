@@ -137,7 +137,7 @@ class RoleRepository {
       final response = await _supabase
           .from('roles')
           .select()
-          .order('rank', ascending: true)
+          .order('role_rank', ascending: true)
           .timeout(
             const Duration(seconds: 10),
             onTimeout: () => throw const RoleException(

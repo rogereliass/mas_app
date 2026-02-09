@@ -13,13 +13,30 @@ lib/
 ├── library/       # Main content (folders/files)
 ├── offline/       # Hive-based offline storage
 ├── routing/       # Centralized navigation (app_router.dart)
-└── startup/       # Landing/onboarding pages
+├── startup/       # Landing/onboarding pages
+└── home/          # Home page and admin features
+    ├── home_page.dart
+    ├── components/      # Home-specific UI components
+    └── pages/           # Feature pages grouped under home
+        └── admin_approval/  # Example: Admin features
+            ├── data/
+            ├── logic/
+            ├── ui/
+            └── README.md
 ```
+
+**IMPORTANT**: For page-specific features (like admin panels, user management, etc.), organize them under the relevant parent page in a `pages/` subdirectory. Each feature follows the same 3-layer architecture.
 
 Each feature follows **3-layer clean architecture**:
 - `data/` - Models, repositories, services (Supabase calls)
 - `logic/` - Providers (state management)
 - `ui/` - Pages, components (presentation)
+
+**File Organization Rules**:
+- **Feature-specific code**: Group under parent page (e.g., `home/pages/admin_approval/`)
+- **Reusable widgets**: Place in `core/widgets/` (e.g., `loading_view.dart`, `error_view.dart`)
+- **Feature components**: Keep in feature's `ui/components/` subdirectory
+- **Shared utilities**: Place in `core/utils/`
 
 ### Key Dependencies
 - **State**: Provider (not Riverpod despite pubspec) - see [main.dart](lib/main.dart) MultiProvider
@@ -126,9 +143,11 @@ flutter run -d <device-id>  # Target specific device
 ## Code Conventions
 
 ### File Organization
-- Place reusable widgets in `ui/components/` within feature
-- Core shared widgets go in `core/widgets/` (loading_view.dart, error_view.dart, etc.)
-- Models are immutable with `copyWith()` and JSON factories
+- **Page-specific features**: Organize under parent page in `pages/` subdirectory (e.g., `home/pages/admin_approval/`)
+- **Reusable widgets**: Place in `core/widgets/` (e.g., `loading_view.dart`, `error_view.dart`, etc.)
+- **Feature-specific components**: Keep in feature's `ui/components/` subdirectory
+- **Models**: Immutable with `copyWith()` and JSON factories
+- **Services**: Singleton pattern with `.instance()` factory constructor
 
 ### Provider Pattern
 ```dart
@@ -161,7 +180,17 @@ Reference [database/migrations/](database/migrations/) for schema. Key tables:
 - `files` (id, name, folder_id, min_rank, version, url)
 - `profiles` → `profile_roles` → `roles` (for RBAC)
 
-## Common Tasks
+## Common Tasks page**: 
+1. Create under parent page: `parent_page/pages/feature_name/`
+2. Follow 3-layer architecture: `data/`, `logic/`, `ui/` subdirectories
+3. Add provider to [main.dart](lib/main.dart) MultiProvider
+4. Add routes to [app_router.dart](lib/routing/app_router.dart)
+5. Create feature exports file: `feature_name.dart`
+6. Document in feature's `README.md`
+
+Example: `home/pages/admin_approval/` with data/logic/ui structure
+
+**Add standalone feature module**: Create `feature/` folder with `data/`, `logic/`, `ui/` subdirectories at lib root level. Use for major features like `auth/`, `library/`, etc
 
 **Add new feature**: Create `feature/` folder with `data/`, `logic/`, `ui/` subdirectories. Add provider to [main.dart](lib/main.dart) MultiProvider. Add routes to [app_router.dart](lib/routing/app_router.dart).
 
