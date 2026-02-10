@@ -104,10 +104,28 @@ class AdminService {
 
   // ==================== APPROVAL OPERATIONS ====================
 
+  /// Check if profile_approvals record exists for a profile
+  /// Returns true if record exists, false otherwise
+  Future<bool> hasApprovalRecord(String profileId) async {
+    try {
+      final response = await _supabase
+          .from(_profilesApprovalsTable)
+          .select('profile_id')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      _logError('hasApprovalRecord', e);
+      return false;
+    }
+  }
+
   /// Accept a user profile
   /// 
-  /// Creates approval record with status=true and updates profile.approved=true
-  /// Also assigns roles to user by creating multiple profile_roles records
+  /// Updates existing approval record (or creates if not exists) with status=true
+  /// Also updates profile.approved=true and assigns roles
+  /// Each profile has only ONE profile_approvals record
   /// [profileId] - The profile to accept
   /// [approvedBy] - The admin profile ID performing the action
   /// [roleIds] - List of role IDs to assign to the user (can be multiple)
@@ -121,15 +139,32 @@ class AdminService {
     String? comments,
   }) async {
     try {
-      // 1. Create approval record
-      await _supabase.from(_profilesApprovalsTable).insert({
-        'profile_id': profileId,
-        'approved_by': approvedBy,
-        'status': true,
-        'comments': comments,
-      });
+      // 1. Upsert approval record with status=true
+      final hasRecord = await hasApprovalRecord(profileId);
+      
+      if (hasRecord) {
+        // Update existing record
+        debugPrint('🔄 Updating existing approval record for profile: $profileId');
+        await _supabase
+            .from(_profilesApprovalsTable)
+            .update({
+              'approved_by': approvedBy,
+              'status': true,
+              'comments': comments,
+            })
+            .eq('profile_id', profileId);
+      } else {
+        // Create new approval record
+        debugPrint('➕ Creating new approval record for profile: $profileId');
+        await _supabase.from(_profilesApprovalsTable).insert({
+          'profile_id': profileId,
+          'approved_by': approvedBy,
+          'status': true,
+          'comments': comments,
+        });
+      }
 
-      // 2. Update profile with generation
+      // 2. Update profile with generation and approved status
       await _supabase
           .from(_profilesTable)
           .update({
@@ -139,14 +174,47 @@ class AdminService {
           })
           .eq('id', profileId);
 
-      // 3. Assign multiple roles to user
-      final roleRecords = roleIds.map((roleId) => {
-        'profile_id': profileId,
-        'role_id': roleId,
-        'assigned_by': approvedBy,
-      }).toList();
+      // 3. Smart role update: only add/remove changed roles
+      // Get current roles
+      final currentRolesResponse = await _supabase
+          .from(_profileRolesTable)
+          .select('role_id')
+          .eq('profile_id', profileId);
       
-      await _supabase.from(_profileRolesTable).insert(roleRecords);
+      final currentRoleIds = (currentRolesResponse as List)
+          .map((item) => item['role_id'] as String)
+          .toSet();
+      
+      final newRoleIds = roleIds.toSet();
+      
+      // Find roles to remove (in current but not in new)
+      final rolesToRemove = currentRoleIds.difference(newRoleIds);
+      if (rolesToRemove.isNotEmpty) {
+        debugPrint('🗑️ Removing ${rolesToRemove.length} unchecked roles');
+        for (final roleId in rolesToRemove) {
+          await _supabase
+              .from(_profileRolesTable)
+              .delete()
+              .eq('profile_id', profileId)
+              .eq('role_id', roleId);
+        }
+      }
+      
+      // Find roles to add (in new but not in current)
+      final rolesToAdd = newRoleIds.difference(currentRoleIds);
+      if (rolesToAdd.isNotEmpty) {
+        debugPrint('➕ Adding ${rolesToAdd.length} new roles');
+        final roleRecords = rolesToAdd.map((roleId) => {
+          'profile_id': profileId,
+          'role_id': roleId,
+          'assigned_by': approvedBy,
+        }).toList();
+        
+        await _supabase.from(_profileRolesTable).insert(roleRecords);
+      }
+      
+      final unchangedCount = currentRoleIds.intersection(newRoleIds).length;
+      debugPrint('✅ Profile accepted - $unchangedCount roles unchanged, ${rolesToAdd.length} added, ${rolesToRemove.length} removed');
     } catch (e) {
       _logError('acceptProfile', e);
       rethrow;
@@ -155,10 +223,11 @@ class AdminService {
 
   // ==================== COMMENT OPERATIONS ====================
 
-  /// Add comment to a profile without changing approval status
+  /// Add or update comment for a profile without changing approval status
   /// 
-  /// Profile stays in pending state for future review
-  /// [profileId] - The profile to add comment to
+  /// Updates the existing profile_approvals record or creates one if not exists.
+  /// Status remains false (pending). Each profile has only ONE record.
+  /// [profileId] - The profile to add/update comment for
   /// [approvedBy] - The admin profile ID adding the comment
   /// [comments] - REQUIRED comment text
   Future<void> addProfileComment({
@@ -167,20 +236,36 @@ class AdminService {
     required String comments,
   }) async {
     try {
-      debugPrint('📝 Adding comment: profileId=$profileId, approvedBy=$approvedBy');
+      debugPrint('📝 Adding/updating comment: profileId=$profileId, approvedBy=$approvedBy');
       
-      // Create comment record with false status (keeps profile pending)
-      // TODO: Change to null once database allows nullable status
-      await _supabase.from(_profilesApprovalsTable).insert({
-        'profile_id': profileId,
-        'approved_by': approvedBy,
-        'status': false,  // Using false for "comment/pending" state
-        'comments': comments,
-      });
+      // Check if approval record already exists for this profile
+      final hasRecord = await hasApprovalRecord(profileId);
       
-      debugPrint('✅ Comment record created successfully');
+      if (hasRecord) {
+        // Update existing record (keep status as is, just update comment)
+        debugPrint('🔄 Updating existing approval record with comment');
+        await _supabase
+            .from(_profilesApprovalsTable)
+            .update({
+              'approved_by': approvedBy,
+              'comments': comments,
+              // Note: status is NOT updated, stays as current value
+            })
+            .eq('profile_id', profileId);
+        debugPrint('✅ Comment updated successfully');
+      } else {
+        // Create new approval record with status=false (pending)
+        debugPrint('➕ Creating new approval record with comment');
+        await _supabase.from(_profilesApprovalsTable).insert({
+          'profile_id': profileId,
+          'approved_by': approvedBy,
+          'status': false,  // Pending state
+          'comments': comments,
+        });
+        debugPrint('✅ Comment record created successfully');
+      }
     } catch (e) {
-      debugPrint('❌ Failed to insert comment: $e');
+      debugPrint('❌ Failed to add/update comment: $e');
       _logError('addProfileComment', e);
       rethrow;
     }
@@ -188,8 +273,9 @@ class AdminService {
 
   /// Reject a user profile
   /// 
-  /// Creates approval record with status=false (DOES NOT update profile.approved)
-  /// Comments are REQUIRED for rejection
+  /// Updates existing approval record (or creates if not exists) with status=false
+  /// Comments are REQUIRED for rejection. Does NOT update profile.approved field.
+  /// Each profile has only ONE profile_approvals record
   /// [profileId] - The profile to reject
   /// [approvedBy] - The admin profile ID performing the action
   /// [comments] - REQUIRED comments explaining rejection
@@ -203,12 +289,32 @@ class AdminService {
     }
 
     try {
-      await _supabase.from(_profilesApprovalsTable).insert({
-        'profile_id': profileId,
-        'approved_by': approvedBy,
-        'status': false,
-        'comments': comments,
-      });
+      // Upsert approval record with status=false
+      final hasRecord = await hasApprovalRecord(profileId);
+      
+      if (hasRecord) {
+        // Update existing record
+        debugPrint('🔄 Updating existing approval record with rejection');
+        await _supabase
+            .from(_profilesApprovalsTable)
+            .update({
+              'approved_by': approvedBy,
+              'status': false,
+              'comments': comments,
+            })
+            .eq('profile_id', profileId);
+      } else {
+        // Create new approval record
+        debugPrint('➕ Creating new rejection record');
+        await _supabase.from(_profilesApprovalsTable).insert({
+          'profile_id': profileId,
+          'approved_by': approvedBy,
+          'status': false,
+          'comments': comments,
+        });
+      }
+      
+      debugPrint('✅ Profile rejection recorded successfully');
     } catch (e) {
       _logError('rejectProfile', e);
       rethrow;

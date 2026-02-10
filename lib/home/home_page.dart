@@ -19,11 +19,22 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Set initial role after build completes
+    // Auth guard: redirect to startup if not authenticated
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      debugPrint('🏠 HomePage initState - User: ${authProvider.fullName}');
+      debugPrint('🏠 HomePage initState - Auth check...');
+      debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
+      debugPrint('   User: ${authProvider.fullName}');
+      
+      if (!authProvider.isAuthenticated) {
+        debugPrint('❌ User not authenticated, redirecting to startup...');
+        // User not authenticated, redirect to startup page
+        Navigator.of(context).pushReplacementNamed(AppRouter.startup);
+        return;
+      }
+      
       debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
       if (authProvider.userRoles.isNotEmpty) {
         debugPrint('🏠 Roles available: ${authProvider.userRoles.map((r) => r.name).join(', ')}');
@@ -50,12 +61,32 @@ class _HomePageState extends State<HomePage> {
     debugPrint('🏠 ============ HomePage Build ============');
     debugPrint('   Current User ID: ${authProvider.userId}');
     debugPrint('   Full Name: ${authProvider.fullName}');
+    debugPrint('   Profile Loading: ${authProvider.profileLoading}');
     debugPrint('   Roles Count: ${userRoles.length}');
     debugPrint('   Selected Role: $_selectedRole');
     if (userRoles.isNotEmpty) {
       debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
     }
     debugPrint('🏠 ======================================');
+
+    // Show loading state while profile is being fetched
+    if (authProvider.profileLoading) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Loading your profile...',
+                style: theme.textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Set default role if not set and roles are available
     if (_selectedRole == null && userRoles.isNotEmpty) {

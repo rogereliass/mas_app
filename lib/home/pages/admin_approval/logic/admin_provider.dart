@@ -3,6 +3,7 @@ import '../data/admin_service.dart';
 import '../data/models/pending_profile.dart';
 import '../data/models/profile_approval.dart';
 import '../../../../auth/models/role.dart';
+import '../../../../auth/data/role_repository.dart';
 
 /// Admin Provider
 /// 
@@ -10,6 +11,7 @@ import '../../../../auth/models/role.dart';
 /// Handles loading states, errors, and profile approval actions
 class AdminProvider with ChangeNotifier {
   final AdminService _service;
+  final RoleRepository _roleRepository = RoleRepository();
 
   AdminProvider({AdminService? service})
       : _service = service ?? AdminService.instance();
@@ -25,6 +27,7 @@ class AdminProvider with ChangeNotifier {
   // Selected profile for review
   PendingProfile? _selectedProfile;
   List<ProfileApproval> _selectedProfileApprovals = [];
+  List<Role> _selectedProfileRoles = [];
 
   // Loading states
   bool _isLoadingPending = false;
@@ -41,6 +44,7 @@ class AdminProvider with ChangeNotifier {
   List<Role> get roles => _roles;
   PendingProfile? get selectedProfile => _selectedProfile;
   List<ProfileApproval> get selectedProfileApprovals => _selectedProfileApprovals;
+  List<Role> get selectedProfileRoles => _selectedProfileRoles;
 
   bool get isLoadingPending => _isLoadingPending;
   bool get isLoadingProfile => _isLoadingProfile;
@@ -90,7 +94,7 @@ class AdminProvider with ChangeNotifier {
   }
 
   /// Select a profile for detailed review
-  /// Loads profile details and approval history
+  /// Loads profile details, approval history, and current roles
   Future<void> selectProfile(String profileId) async {
     _isLoadingProfile = true;
     _error = null;
@@ -104,9 +108,11 @@ class AdminProvider with ChangeNotifier {
 
       _selectedProfile = profile;
       _selectedProfileApprovals = await _service.fetchProfileApprovals(profileId);
+      _selectedProfileRoles = await _roleRepository.getProfileRoles(profileId);
 
       debugPrint('✅ Loaded profile: ${profile.fullName}');
       debugPrint('📋 Approval history: ${_selectedProfileApprovals.length} records');
+      debugPrint('🎭 Current roles: ${_selectedProfileRoles.length} roles assigned');
     } catch (e) {
       _error = 'Unable to load profile details. Please try again.';
       debugPrint('❌ Error loading profile: $e');
@@ -120,6 +126,7 @@ class AdminProvider with ChangeNotifier {
   void clearSelection() {
     _selectedProfile = null;
     _selectedProfileApprovals = [];
+    _selectedProfileRoles = [];
     _error = null;
     notifyListeners();
   }

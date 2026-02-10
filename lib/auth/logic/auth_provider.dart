@@ -158,8 +158,9 @@ class AuthProvider with ChangeNotifier {
           debugPrint('⚠️ WARNING: Name fields are missing in database!');
           debugPrint('   This user may need to re-register or have their profile updated.');
           _profileLoadError = 'Profile data is incomplete. Please contact support.';
+        } else {
+          _profileLoadError = null;
         }
-        _profileLoadError = null;
       } else {
         debugPrint('⚠️ No profile found for user ${_currentUser!.id}');
         _currentUserProfile = null;

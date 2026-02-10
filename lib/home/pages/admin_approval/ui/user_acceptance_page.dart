@@ -25,11 +25,28 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<AdminProvider>();
-        provider.loadPendingProfiles();
-        provider.loadRoles();
+      if (!mounted) return;
+      
+      // SECURITY: Verify user has System Admin role (rank 100)
+      final authProvider = context.read<AuthProvider>();
+      final userRank = authProvider.currentUserRoleRank;
+      
+      if (userRank < 100) {
+        debugPrint('❌ SECURITY: Unauthorized access attempt to User Acceptance page. Rank: $userRank');
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access Denied: System Admin privileges required'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
       }
+      
+      // Authorized - load data
+      final provider = context.read<AdminProvider>();
+      provider.loadPendingProfiles();
+      provider.loadRoles();
     });
   }
 
@@ -147,11 +164,16 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   }
 
   /// Show detailed profile review dialog
-  void _showProfileDetailsDialog(BuildContext context, PendingProfile profile) {
-    showDialog(
+  Future<void> _showProfileDetailsDialog(BuildContext context, PendingProfile profile) async {
+    await showDialog(
       context: context,
       builder: (dialogContext) => _ProfileDetailsDialog(profile: profile),
     );
+    
+    // Refresh the pending profiles list after dialog closes
+    if (mounted) {
+      context.read<AdminProvider>().loadPendingProfiles();
+    }
   }
 }
 
@@ -315,6 +337,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   final _commentsController = TextEditingController();
   final List<Role> _selectedRoles = [];
   bool _showApprovalHistory = false;
+  bool _rolesInitialized = false;
+  bool _commentInitialized = false;
 
   @override
   void initState() {
@@ -401,6 +425,34 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                 builder: (context, provider, _) {
                   if (provider.isLoadingProfile) {
                     return const Center(child: CircularProgressIndicator());
+                  }
+
+                  // Initialize selected roles with profile's current roles (only once)
+                  if (!_rolesInitialized && provider.selectedProfileRoles.isNotEmpty) {
+                    _rolesInitialized = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _selectedRoles.clear();
+                          _selectedRoles.addAll(provider.selectedProfileRoles);
+                        });
+                      }
+                    });
+                  }
+
+                  // Initialize comment field with existing comment if any
+                  // Since each profile has only ONE approval record, just get the first one
+                  if (!_commentInitialized && provider.selectedProfileApprovals.isNotEmpty) {
+                    _commentInitialized = true;
+                    // Get the single approval record for this profile
+                    final existingRecord = provider.selectedProfileApprovals.first;
+                    if (existingRecord.comments != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          _commentsController.text = existingRecord.comments!;
+                        }
+                      });
+                    }
                   }
 
                   return SingleChildScrollView(
@@ -698,9 +750,13 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Required - Select one or more roles to assign to this user',
+          provider.selectedProfileRoles.isEmpty
+              ? 'Required - Select one or more roles to assign to this user'
+              : 'Required - User has ${provider.selectedProfileRoles.length} role(s) already assigned (checked below)',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.error,
+            color: provider.selectedProfileRoles.isEmpty 
+                ? colorScheme.error 
+                : colorScheme.primary,
           ),
         ),
         const SizedBox(height: 12),
@@ -732,6 +788,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             child: Column(
               children: provider.roles.map((role) {
                 final isSelected = _selectedRoles.contains(role);
+                final wasAlreadyAssigned = provider.selectedProfileRoles.contains(role);
                 return CheckboxListTile(
                   value: isSelected,
                   onChanged: (bool? value) {
@@ -749,27 +806,51 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  subtitle: role.description != null
-                      ? Text(
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (role.description != null)
+                        Text(
                           role.description!,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurface.withOpacity(0.7),
                           ),
-                        )
-                      : null,
+                        ),
+                      if (wasAlreadyAssigned) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 14,
+                              color: colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Currently assigned',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                   secondary: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      color: colorScheme.error,
+                      shape: BoxShape.circle,
                     ),
+                    alignment: Alignment.center,
                     child: Text(
-                      'Rank ${role.rank}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
+                      '${role.rank}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onError,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -929,10 +1010,14 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final authProvider = context.read<AuthProvider>();
     final adminProvider = context.read<AdminProvider>();
 
-    final adminProfileId = authProvider.currentUserProfile?.id;
-    if (adminProfileId == null) {
+    final adminProfile = authProvider.currentUserProfile;
+    debugPrint('🔍 Accept - Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}');
+    
+    final adminProfileId = adminProfile?.id;
+    if (adminProfileId == null || adminProfileId.isEmpty) {
+      debugPrint('❌ Admin profile ID is null or empty');
       if (mounted) {
-        _showErrorDialog('Error: Admin user not found');
+        _showErrorDialog('Error: Admin user profile not properly loaded');
       }
       return;
     }
@@ -995,8 +1080,13 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       ),
     );
 
-    if (confirmed != true) return;
+    debugPrint('✅ Confirmation result: $confirmed');
+    if (confirmed != true) {
+      debugPrint('❌ User cancelled or dialog dismissed');
+      return;
+    }
 
+    debugPrint('🔄 Proceeding with add comment...'); 
     final authProvider = context.read<AuthProvider>();
     final adminProvider = context.read<AdminProvider>();
 
@@ -1004,9 +1094,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     debugPrint('🔍 Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}');
     
     final adminProfileId = adminProfile?.id;
-    if (adminProfileId == null) {
+    if (adminProfileId == null || adminProfileId.isEmpty) {
+      debugPrint('❌ Admin profile ID is null or empty');
       if (mounted) {
-        _showErrorDialog('Error: Admin user not found');
+        _showErrorDialog('Error: Admin user profile not properly loaded');
       }
       return;
     }
@@ -1019,12 +1110,19 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       comments: comments,
     );
 
-    if (!mounted) return;
+    debugPrint('📥 Add comment completed: success=$success');
+    
+    if (!mounted) {
+      debugPrint('⚠️ Widget no longer mounted, aborting');
+      return;
+    }
 
     if (success) {
-      _commentsController.clear();
+      debugPrint('✅ Comment added successfully');
+      Navigator.pop(context);  // Close the dialog
       _showSnackBar('Comment added - Profile remains pending');
     } else {
+      debugPrint('❌ Comment failed: ${adminProvider.error}');
       _showErrorDialog(
         adminProvider.error ?? 'Failed to add comment. Please try again.'
       );

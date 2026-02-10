@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// User profile with role information
 ///
 /// Links user authentication with their role rank and contains all user data
@@ -51,8 +53,14 @@ class UserProfile {
   ///
   /// Expects data from profiles table with all columns
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    // Debug log to diagnose missing id issue
+    if (json['id'] == null) {
+      debugPrint('⚠️ UserProfile.fromJson called with null id! JSON keys: ${json.keys.toList()}');
+      debugPrint('   JSON dump: $json');
+    }
+    
     return UserProfile(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '', // Provide empty string fallback to prevent crash
       userId: json['user_id'] as String,
       firstName: json['first_name'] as String?,
       middleName: json['middle_name'] as String?,

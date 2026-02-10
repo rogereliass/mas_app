@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import '../core/config/theme_provider.dart';
 import '../core/constants/app_colors.dart';
 import '../routing/app_router.dart';
+import '../auth/logic/auth_provider.dart';
 
 /// Startup/Landing page with public access to library
 /// 
 /// This is the first screen users see when launching the app.
 /// Features:
+/// - Auto-redirect to home if user is already logged in
 /// - App logo with theme toggle
 /// - Hero image showcasing the library
 /// - Public access badge
@@ -15,11 +17,38 @@ import '../routing/app_router.dart';
 /// - Informative messaging about public access
 /// 
 /// Design follows the specification exactly with proper theming support
-class StartupPage extends StatelessWidget {
+class StartupPage extends StatefulWidget {
   const StartupPage({super.key});
 
   @override
+  State<StartupPage> createState() => _StartupPageState();
+}
+
+class _StartupPageState extends State<StartupPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Check auth state and redirect immediately if logged in
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      debugPrint('🚀 StartupPage - Checking auth state...');
+      debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
+      
+      if (authProvider.isAuthenticated) {
+        debugPrint('✅ User logged in, redirecting to home immediately...');
+        // Redirect immediately, HomePage will handle loading roles
+        Navigator.of(context).pushReplacementNamed(AppRouter.home);
+      } else {
+        debugPrint('ℹ️ No active session, staying on startup page');
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       body: SafeArea(
         child: Padding(

@@ -161,6 +161,40 @@ class RoleRepository {
     }
   }
 
+  /// Fetch roles assigned to a specific profile
+  ///
+  /// Returns list of Role objects currently assigned to the profile
+  /// Returns empty list if profile has no roles
+  /// Throws [RoleException] on error
+  Future<List<Role>> getProfileRoles(String profileId) async {
+    try {
+      final response = await _supabase
+          .from('profile_roles')
+          .select('roles!inner(*)')
+          .eq('profile_id', profileId)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw const RoleException(
+              'Request timed out while fetching profile roles',
+              statusCode: '408',
+            ),
+          );
+
+      return (response as List)
+          .map((item) => Role.fromJson(item['roles'] as Map<String, dynamic>))
+          .toList();
+    } on PostgrestException catch (e) {
+      throw RoleException(
+        'Database error: ${e.message}',
+        statusCode: e.code,
+      );
+    } on RoleException {
+      rethrow;
+    } catch (e) {
+      throw RoleException('Failed to fetch profile roles: $e');
+    }
+  }
+
   /// Get the role rank for a specific user
   ///
   /// Returns 0 (public) if user has no profile or role
