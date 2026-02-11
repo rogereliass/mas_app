@@ -43,6 +43,23 @@ class AuthProvider with ChangeNotifier {
   
   /// Get current user's role rank (0 if unauthenticated)
   int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
+  
+  /// Get specific role by name from user's assigned roles
+  Role? getRoleByName(String roleName) {
+    try {
+      return _userRoles.firstWhere(
+        (role) => role.name.toLowerCase() == roleName.toLowerCase(),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  /// Get rank for a specific role name (returns 0 if role not found)
+  int getRankForRole(String roleName) {
+    final role = getRoleByName(roleName);
+    return role?.rank ?? 0;
+  }
 
   // User data getters
   String? get userId => _currentUser?.id;
@@ -151,6 +168,9 @@ class AuthProvider with ChangeNotifier {
         debugPrint('   Email: ${_currentUserProfile!.email}');
         debugPrint('   Phone: ${_currentUserProfile!.phone}');
         debugPrint('   Role rank: ${_currentUserProfile!.roleRank}');
+        debugPrint('   Managed Troop ID: ${_currentUserProfile!.managedTroopId ?? 'null (no troop assigned)'}');
+        debugPrint('   Is Troop Scoped: ${_currentUserProfile!.isTroopScoped}');
+        debugPrint('   Has System-Wide Access: ${_currentUserProfile!.hasSystemWideAccess}');
 
         // Check if name fields are missing
         if (_currentUserProfile!.firstName == null ||

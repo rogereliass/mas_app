@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/admin_scope_banner.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../logic/admin_provider.dart';
 import '../data/models/pending_profile.dart';
@@ -11,10 +12,19 @@ import 'package:intl/intl.dart';
 
 /// User Acceptance Page
 /// 
-/// Admin-only page for reviewing and approving/rejecting new user registrations
+/// Admin page for reviewing and approving/rejecting new user registrations
 /// Shows pending profiles with detailed review capabilities
+/// 
+/// Access levels:
+/// - System Admin (100) and Moderator (90): See ALL pending profiles
+/// - Troop Head (70) and Troop Leader (60): See ONLY their troop's pending profiles
+/// 
+/// Supports role context: When navigating from HomePage with selectedRole argument,
+/// filters data based on that specific role instead of user's highest rank
 class UserAcceptancePage extends StatefulWidget {
-  const UserAcceptancePage({super.key});
+  final String? selectedRole;
+  
+  const UserAcceptancePage({super.key, this.selectedRole});
 
   @override
   State<UserAcceptancePage> createState() => _UserAcceptancePageState();
@@ -27,33 +37,88 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       
-      // SECURITY: Verify user has System Admin role (rank 100)
       final authProvider = context.read<AuthProvider>();
-      final userRank = authProvider.currentUserRoleRank;
+      final adminProvider = context.read<AdminProvider>();
       
-      if (userRank < 100) {
-        debugPrint('❌ SECURITY: Unauthorized access attempt to User Acceptance page. Rank: $userRank');
+      // Get selected role from widget or navigation arguments
+      String? roleContext = widget.selectedRole;
+      if (roleContext == null) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        roleContext = args?['selectedRole'] as String?;
+      }
+      
+      // SECURITY: Determine effective rank based on role context
+      int effectiveRank;
+      if (roleContext != null) {
+        effectiveRank = authProvider.getRankForRole(roleContext);
+        debugPrint('🎯 User Acceptance accessed with role context: $roleContext (rank $effectiveRank)');
+        // Set role context in provider for filtering
+        adminProvider.setRoleContext(roleContext);
+      } else {
+        effectiveRank = authProvider.currentUserRoleRank;
+        debugPrint('🎯 User Acceptance accessed with default role (rank $effectiveRank)');
+        adminProvider.clearRoleContext();
+      }
+      
+      final user = authProvider.currentUserProfile;
+      
+      // Allow: System Admin (100), Moderator (90), Troop Head (70), Troop Leader (60)
+      if (effectiveRank < 60) {
+        debugPrint('❌ SECURITY: Unauthorized access attempt. Effective rank: $effectiveRank');
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Access Denied: System Admin privileges required'),
+            content: Text('Access Denied: Admin privileges required'),
             backgroundColor: Colors.red,
           ),
         );
         return;
       }
       
-      // Authorized - load data
-      final provider = context.read<AdminProvider>();
-      provider.loadPendingProfiles();
-      provider.loadRoles();
+      // Additional check: Troop-scoped roles (60-70) must have a troop assigned
+      // Only validate if user is accessing as a troop-scoped role
+      if (effectiveRank >= 60 && effectiveRank < 90) {
+        if (user?.managedTroopId == null) {
+          debugPrint('⚠️ WARNING: Accessing as troop-scoped role (rank $effectiveRank) but no troop assigned');
+          debugPrint('   User profile managedTroopId: ${user?.managedTroopId}');
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access Error: No troop assigned. Please contact an administrator.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+        debugPrint('✅ Troop-scoped access validated. Managed troop: ${user?.managedTroopId}');
+      }
+      
+      // Authorized - load scoped data based on effective role
+      debugPrint('✅ User authorized for User Acceptance (effective rank $effectiveRank)');
+      adminProvider.loadPendingProfiles();
+      adminProvider.loadRoles();
     });
+  }
+  
+  @override
+  void dispose() {
+    // Clear role context when leaving page
+    context.read<AdminProvider>().clearRoleContext();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    
+    // Get selected role from widget or route arguments
+    String? roleContext = widget.selectedRole;
+    if (roleContext == null) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      roleContext = args?['selectedRole'] as String?;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -72,34 +137,47 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await context.read<AdminProvider>().refresh();
-        },
-        child: Consumer<AdminProvider>(
-          builder: (context, provider, _) {
-            // Loading state
-            if (provider.isLoadingPending) {
-              return const LoadingView(message: 'Loading pending profiles...');
-            }
+      body: Column(
+        children: [
+          // Show current admin scope (system-wide or troop-specific)
+          AdminScopeBanner(selectedRoleName: roleContext),
+          
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await context.read<AdminProvider>().refresh();
+              },
+              child: Consumer<AdminProvider>(
+                builder: (context, provider, _) {
+                  // Loading state
+                  if (provider.isLoadingPending) {
+                    return const LoadingView(message: 'Loading pending profiles...');
+                  }
 
-            // Error state
-            if (provider.hasError) {
-              return ErrorView(
-                message: provider.error ?? 'Unknown error occurred',
-                onRetry: () => provider.loadPendingProfiles(),
-              );
-            }
+                  // Error state
+                  if (provider.hasError) {
+                    return ErrorView(
+                      message: provider.error ?? 'Unknown error occurred',
+                      onRetry: () => provider.loadPendingProfiles(),
+                    );
+                  }
 
-            // Profiles list
-            return _buildProfilesList(provider, colorScheme, theme);
-          },
-        ),
+                  // Profiles list
+                  return _buildProfilesList(provider, colorScheme, theme);
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildProfilesList(AdminProvider provider, ColorScheme colorScheme, ThemeData theme) {
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.currentUserProfile;
+    final isTroopScoped = user?.isTroopScoped ?? false;
+    
     // Empty state
     if (provider.pendingProfiles.isEmpty) {
       return Center(
@@ -118,10 +196,13 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'No pending user registrations',
+              isTroopScoped
+                  ? 'No pending registrations in your troop'
+                  : 'No pending user registrations',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.textTheme.bodySmall?.color,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -767,7 +848,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               child: CircularProgressIndicator(),
             ),
           )
-        else if (provider.roles.isEmpty)
+        else if (provider.assignableRoles.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -775,7 +856,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'No roles available. Please contact system administrator.',
+              'No roles available for assignment. Please contact system administrator.',
               style: TextStyle(color: colorScheme.onErrorContainer),
             ),
           )
@@ -786,7 +867,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
-              children: provider.roles.map((role) {
+              children: provider.assignableRoles.map((role) {
                 final isSelected = _selectedRoles.contains(role);
                 final wasAlreadyAssigned = provider.selectedProfileRoles.contains(role);
                 return CheckboxListTile(
@@ -858,24 +939,6 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               }).toList(),
             ),
           ),
-        if (_selectedRoles.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _selectedRoles.map((role) {
-              return Chip(
-                label: Text(role.name),
-                onDeleted: () {
-                  setState(() {
-                    _selectedRoles.remove(role);
-                  });
-                },
-                deleteIcon: const Icon(Icons.close, size: 18),
-              );
-            }).toList(),
-          ),
-        ],
       ],
     );
   }

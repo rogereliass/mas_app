@@ -78,7 +78,7 @@ class AppRouter {
     allFolders: (context) => const AllFoldersPage(),
     about: (context) => const AboutPage(),
     profile: (context) => const ProfilePage(),
-    userAcceptance: (context) => const UserAcceptancePage(),
+    // userAcceptance route removed from map - handled in onGenerateRoute for arguments
   };
 
   // ============================================================================
@@ -93,11 +93,22 @@ class AppRouter {
       if (args != null && args['phoneNumber'] != null) {
         return MaterialPageRoute(
           builder: (context) => OtpVerificationPage(
-            phoneNumber: args['phoneNumber'] as String,            password: args['password'] as String?,            isSignUp: args['isSignUp'] as bool? ?? false,
+            phoneNumber: args['phoneNumber'] as String,
+            password: args['password'] as String?,
+            isSignUp: args['isSignUp'] as bool? ?? false,
             metadata: args['metadata'] as Map<String, dynamic>?,
           ),
         );
       }
+    }
+    
+    // Handle User Acceptance with role context
+    if (settings.name == userAcceptance) {
+      final args = settings.arguments as Map<String, dynamic>?;
+      final selectedRole = args?['selectedRole'] as String?;
+      return MaterialPageRoute(
+        builder: (context) => UserAcceptancePage(selectedRole: selectedRole),
+      );
     }
     
     return null; // Let onUnknownRoute handle it

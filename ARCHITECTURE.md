@@ -437,6 +437,130 @@ try {
 - Sanitize before sending to backend
 - Use proper typing
 
+## Scoped Admin Features Pattern
+
+Admin features (user management, meeting manager, etc.) use a **single-file architecture** with automatic role-based data scoping. The same code serves both system-wide admins and troop-scoped leaders.
+
+### Access Levels
+- **System Admin (rank 100)**: Full access to all troops
+- **Moderator (rank 90)**: Full access to all troops  
+- **Troop Head (rank 70)**: Access limited to their assigned troop
+- **Troop Leader (rank 60)**: Access limited to their assigned troop
+
+### Implementation Pattern
+
+Admin features follow this architecture to enable automatic troop-scoping without code duplication:
+
+#### 1. **Service Layer** (data/)
+Mix in `ScopedServiceMixin` and require `UserProfile` parameter:
+```dart
+class AdminService with ScopedServiceMixin {
+  Future<List<Data>> fetchData({required UserProfile currentUser}) async {
+    var query = supabase.from('table').select();
+    query = applyScopeFilter(query, currentUser, 'signup_troop');
+    return await query;
+  }
+}
+```
+
+#### 2. **Provider Layer** (logic/)
+Inject `AuthProvider` and pass current user to service:
+```dart
+class AdminProvider extends ChangeNotifier {
+  final AdminService _service;
+  final AuthProvider _authProvider;
+  
+  AdminProvider({required AuthProvider authProvider})
+    : _authProvider = authProvider;
+    
+  Future<void> loadData() async {
+    final currentUser = _authProvider.currentUserProfile!;
+    _data = await _service.fetchData(currentUser: currentUser);
+    notifyListeners();
+  }
+}
+```
+
+#### 3. **UI Layer** (ui/)
+Gate access at rank 60+ and display scope banner:
+```dart
+class AdminPage extends StatefulWidget {
+  @override
+  void initState() {
+    super.initState();
+    // Allow all admin tiers (60, 70, 90, 100)
+    if (authProvider.currentUserRoleRank < 60) {
+      Navigator.pop(context);
+      return;
+    }
+    provider.loadData();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          AdminScopeBanner(),  // Shows scope automatically
+          Expanded(child: DataList()),
+        ],
+      ),
+    );
+  }
+}
+```
+
+### Database Schema
+
+Troop context is stored in the `profile_roles` junction table:
+```sql
+ALTER TABLE profile_roles 
+  ADD COLUMN troop_context uuid REFERENCES troops(id);
+```
+
+- **System-wide roles** (rank 90+): `troop_context = NULL`
+- **Troop-scoped roles** (rank 60, 70): `troop_context = <troop_id>`
+
+### Benefits
+
+1. **No Code Duplication**: Single codebase for all admin tiers - DRY principle maintained
+2. **Automatic Filtering**: Data layer handles scoping transparently based on current user
+3. **Type-Safe**: Compile-time enforcement via required parameters prevents forgetting user context
+4. **Secure**: Multi-layer security (app-level filtering + RLS policies provide defense-in-depth)
+5. **Transparent**: AdminScopeBanner clearly shows users their operational scope
+6. **Maintainable**: Adding new roles (e.g., District Leader) requires minimal changes
+7. **Testable**: Easy to test different roles by swapping `currentUser` parameter
+8. **Performant**: Database-level filtering via indexed columns
+
+### Feature Template
+
+When creating new scoped admin features:
+
+**Checklist:**
+- ✅ Service: `with ScopedServiceMixin`
+- ✅ Service methods: Add `required UserProfile currentUser` parameter
+- ✅ Service queries: Call `applyScopeFilter(query, currentUser, 'troop_column')`
+- ✅ Provider: Inject `AuthProvider`, pass `currentUser` to service methods
+- ✅ Provider registration: Use `ChangeNotifierProxyProvider<AuthProvider, YourProvider>`
+- ✅ Page authorization: Gate at `rank >= 60` (not `rank >= 100`)
+- ✅ Page UI: Add `AdminScopeBanner()` widget for transparency
+- ✅ Test: Verify with both system admin (100/90) AND troop leader (60/70) accounts
+
+**Example Structure:**
+```
+home/pages/user_management/
+├── data/
+│   ├── user_management_service.dart  ← with ScopedServiceMixin
+│   └── models/
+├── logic/
+│   └── user_management_provider.dart ← passes currentUser from AuthProvider
+└── ui/
+    ├── user_management_page.dart     ← rank >= 60 check + AdminScopeBanner
+    └── components/
+```
+
+Same pattern applies to: User Acceptance (implemented), User Management, Meeting Manager, Patrol CRUD, Troop Operations, Points Management, and all future admin features.
+
 ## Future Enhancements
 
 ### Planned Features

@@ -68,11 +68,11 @@ class RoleRepository {
       debugPrint('   Profile ID: $profileId');
       debugPrint('   Name: ${profileResponse['first_name']} ${profileResponse['middle_name'] ?? ''} ${profileResponse['last_name']}'.trim());
 
-      // Step 2: profiles.id → profile_roles.profile_id to get role_id
+      // Step 2: profiles.id → profile_roles.profile_id to get role_id and troop_context
       // Step 3: profile_roles.role_id → roles.id to get role_rank
       final rolesResponse = await _supabase
           .from('profile_roles')
-          .select('roles!inner(role_rank)')
+          .select('role_id, troop_context, roles!inner(role_rank)')
           .eq('profile_id', profileId)
           .timeout(
             const Duration(seconds: 10),
@@ -82,21 +82,44 @@ class RoleRepository {
             ),
           );
 
-      // Get the highest role_rank (users can have multiple roles)
+      // Get the highest role_rank and extract troop_context for troop-scoped roles
       int roleRank = 0;
+      String? managedTroopId;
+      
       if (rolesResponse.isNotEmpty) {
-        roleRank = rolesResponse
-            .map((item) => (item['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0)
-            .reduce((a, b) => a > b ? a : b);
+        // Find role with highest rank for default access level
+        var highestRole = rolesResponse.reduce((a, b) {
+          final rankA = (a['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          final rankB = (b['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          return rankA > rankB ? a : b;
+        });
+        
+        roleRank = (highestRole['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+        
+        // Extract troop_context from ANY troop-scoped role (rank 60 or 70)
+        // This is separate from highest rank - user might be System Admin (100) + Troop Head (70)
+        for (var roleEntry in rolesResponse) {
+          final entryRank = (roleEntry['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          if (entryRank == 60 || entryRank == 70) {
+            final troopContext = roleEntry['troop_context'] as String?;
+            if (troopContext != null) {
+              managedTroopId = troopContext;
+              debugPrint('   Troop-scoped role (rank $entryRank) detected. Managed troop: $managedTroopId');
+              break; // Use first found troop context
+            }
+          }
+        }
+        
         debugPrint('   Highest role rank: $roleRank');
       } else {
         debugPrint('   No roles found, defaulting to rank 0');
       }
 
-      // Add role_rank to profile data
+      // Add role_rank and managed_troop_id to profile data
       final profileData = {
         ...profileResponse,
         'role_rank': roleRank,
+        'managed_troop_id': managedTroopId,
       };
 
       final profile = UserProfile.fromJson(profileData);
@@ -356,6 +379,72 @@ class RoleRepository {
     } catch (e) {
       // Return empty list on error (graceful degradation)
       return [];
+    }
+  }
+
+  /// Get managed troop ID for a user (for troop-scoped roles)
+  ///
+  /// Returns troop_context for users with rank 60 (Troop Leader) or 70 (Troop Head)
+  /// Returns null for system-wide roles or users without troop-scoped roles
+  /// Throws [RoleException] on error
+  Future<String?> getUserManagedTroopId(String userId) async {
+    try {
+      // Get profile for this user
+      final profile = await getUserProfile(userId);
+      return profile?.managedTroopId;
+    } on RoleException {
+      rethrow;
+    } catch (e) {
+      throw RoleException('Failed to fetch managed troop: $e');
+    }
+  }
+
+  /// Assign role with optional troop context
+  ///
+  /// For troop-scoped roles (rank 60, 70), troopId should be provided
+  /// For system-wide roles (rank 90+), troopId should be null
+  /// [profileId] - The profile to assign role to
+  /// [roleId] - The role ID to assign
+  /// [troopId] - Optional troop context (required for rank 60, 70)
+  /// [assignedBy] - Profile ID of the admin assigning the role
+  /// Throws [RoleException] on error
+  Future<void> assignRoleWithTroopContext({
+    required String profileId,
+    required String roleId,
+    String? troopId,
+    required String assignedBy,
+  }) async {
+    try {
+      debugPrint('🔧 Assigning role $roleId to profile $profileId with troop context: $troopId');
+      
+      final data = {
+        'profile_id': profileId,
+        'role_id': roleId,
+        'assigned_by': assignedBy,
+        if (troopId != null) 'troop_context': troopId,
+      };
+      
+      await _supabase
+          .from('profile_roles')
+          .insert(data)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw const RoleException(
+              'Request timed out while assigning role',
+              statusCode: '408',
+            ),
+          );
+      
+      debugPrint('✅ Role assigned successfully');
+    } on PostgrestException catch (e) {
+      throw RoleException(
+        'Database error: ${e.message}',
+        statusCode: e.code,
+      );
+    } on RoleException {
+      rethrow;
+    } catch (e) {
+      throw RoleException('Failed to assign role: $e');
     }
   }
 }

@@ -144,7 +144,11 @@ class SystemAdminStats extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.userAcceptance);
+                  Navigator.pushNamed(
+                    context, 
+                    AppRouter.userAcceptance,
+                    arguments: {'selectedRole': 'System Admin'},
+                  );
                 },
                 icon: const Icon(Icons.how_to_reg),
                 label: const Text('User Acceptance'),

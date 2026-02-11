@@ -1,20 +1,89 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/admin_service.dart';
 import '../data/models/pending_profile.dart';
 import '../data/models/profile_approval.dart';
 import '../../../../auth/models/role.dart';
+import '../../../../auth/models/user_profile.dart';
+import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/data/role_repository.dart';
 
 /// Admin Provider
 /// 
 /// Manages state for admin operations, specifically user acceptance workflow
 /// Handles loading states, errors, and profile approval actions
+/// 
+/// Automatically applies troop-scoping based on current user's role or selected role context
 class AdminProvider with ChangeNotifier {
   final AdminService _service;
+  final AuthProvider _authProvider;
   final RoleRepository _roleRepository = RoleRepository();
+  
+  // Role context override for multi-role users
+  String? _selectedRoleName;
 
-  AdminProvider({AdminService? service})
-      : _service = service ?? AdminService.instance();
+  AdminProvider({
+    AdminService? service,
+    required AuthProvider authProvider,
+  })  : _service = service ?? AdminService.instance(),
+        _authProvider = authProvider;
+  
+  // ==================== ROLE CONTEXT ====================
+  
+  /// Set the selected role context for filtering (used when user has multiple roles)
+  void setRoleContext(String roleName) {
+    debugPrint('🎯 Setting role context to: $roleName');
+    _selectedRoleName = roleName;
+    notifyListeners();
+  }
+  
+  /// Clear role context (revert to highest rank)
+  void clearRoleContext() {
+    _selectedRoleName = null;
+    notifyListeners();
+  }
+  
+  /// Get effective user profile for current role context
+  /// 
+  /// If a role is selected, creates a modified profile with that role's rank and troop context
+  /// Otherwise returns the user's default profile (highest rank)
+  UserProfile? get _effectiveUserProfile {
+    final baseProfile = _authProvider.currentUserProfile;
+    if (baseProfile == null) return null;
+    
+    // No role override - use default profile
+    if (_selectedRoleName == null) return baseProfile;
+    
+    // Get selected role's rank
+    final selectedRole = _authProvider.getRoleByName(_selectedRoleName!);
+    if (selectedRole == null) {
+      debugPrint('⚠️ Selected role \"$_selectedRoleName\" not found in user roles');
+      return baseProfile;
+    }
+    
+    // Create modified profile with selected role's rank
+    // Note: managedTroopId stays the same as it's user-specific, not role-specific
+    return UserProfile(
+      id: baseProfile.id,
+      userId: baseProfile.userId,
+      firstName: baseProfile.firstName,
+      middleName: baseProfile.middleName,
+      lastName: baseProfile.lastName,
+      nameAr: baseProfile.nameAr,
+      email: baseProfile.email,
+      phone: baseProfile.phone,
+      address: baseProfile.address,
+      birthdate: baseProfile.birthdate,
+      gender: baseProfile.gender,
+      signupTroopId: baseProfile.signupTroopId,
+      generation: baseProfile.generation,
+      avatarUrl: baseProfile.avatarUrl,
+      roleRank: selectedRole.rank,  // Use selected role's rank
+      managedTroopId: baseProfile.managedTroopId,
+      createdAt: baseProfile.createdAt,
+      updatedAt: baseProfile.updatedAt,
+    );
+  }
 
   // ==================== STATE ====================
 
@@ -42,6 +111,35 @@ class AdminProvider with ChangeNotifier {
 
   List<PendingProfile> get pendingProfiles => _pendingProfiles;
   List<Role> get roles => _roles;
+  
+  /// Get roles that current user can assign
+  /// 
+  /// Universal rule: Users cannot assign roles with rank >= their own rank
+  /// Additional restriction for troop-scoped users (rank 60-70): Only ranks 1-40
+  /// 
+  /// Examples:
+  /// - System Admin (100): Can assign ranks < 100 (everything except System Admin)
+  /// - Moderator (90): Can assign ranks < 90 (cannot assign Moderator or System Admin)
+  /// - Troop Head (70): Can assign ranks < 70 AND 1-40 (effectively 1-40)
+  /// - Troop Leader (60): Can assign ranks < 60 AND 1-40 (effectively 1-40)
+  List<Role> get assignableRoles {
+    final effectiveUser = _effectiveUserProfile;
+    if (effectiveUser == null) return [];
+    
+    final effectiveRank = effectiveUser.roleRank;
+    
+    // Universal rule: Cannot assign roles with rank >= own rank
+    var filteredRoles = _roles.where((role) => role.rank < effectiveRank).toList();
+    
+    // Additional restriction for troop-scoped users (rank 60-70)
+    // Can only assign roles with rank 1-40 (Scout, Patrol Leader, L1, L2, L3)
+    if (effectiveRank >= 60 && effectiveRank < 90) {
+      filteredRoles = filteredRoles.where((role) => role.rank > 0 && role.rank <= 40).toList();
+    }
+    
+    return filteredRoles;
+  }
+  
   PendingProfile? get selectedProfile => _selectedProfile;
   List<ProfileApproval> get selectedProfileApprovals => _selectedProfileApprovals;
   List<Role> get selectedProfileRoles => _selectedProfileRoles;
@@ -54,6 +152,12 @@ class AdminProvider with ChangeNotifier {
   String? get error => _error;
 
   int get pendingCount => _pendingProfiles.length;
+  
+  /// Get current user's troop scope for UI display (computed from profile_roles)
+  String? get userTroopScope => _authProvider.currentUserProfile?.getTroopContextForScope();
+  
+  /// Check if current user has system-wide access
+  bool get isSystemWideAccess => _authProvider.currentUserProfile?.hasSystemWideAccess ?? false;
 
   // ==================== PUBLIC METHODS ====================
 
@@ -76,14 +180,25 @@ class AdminProvider with ChangeNotifier {
   }
 
   /// Load all pending profiles (approved = false)
+  /// Automatically filtered by user's role and troop context
   Future<void> loadPendingProfiles() async {
     _isLoadingPending = true;
     _error = null;
     notifyListeners();
 
     try {
-      _pendingProfiles = await _service.fetchPendingProfiles();
-      debugPrint('✅ Loaded ${_pendingProfiles.length} pending profiles');
+      final currentUser = _effectiveUserProfile;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+      
+      debugPrint('🔍 Loading pending profiles with role context: $_selectedRoleName (rank ${currentUser.roleRank})');
+      
+      // Pass effective user profile to service for automatic scoping
+      _pendingProfiles = await _service.fetchPendingProfiles(
+        currentUser: currentUser,
+      );
+      debugPrint('✅ Loaded ${_pendingProfiles.length} pending profiles (scoped)');
     } catch (e) {
       _error = 'Unable to load pending profiles. Please check your connection and try again.';
       debugPrint('❌ Error loading pending profiles: $e');
@@ -136,7 +251,7 @@ class AdminProvider with ChangeNotifier {
   /// Creates approval record, updates profile status, and assigns multiple roles
   /// [profileId] - Profile to accept
   /// [approvedBy] - Admin profile ID performing action
-  /// [roleIds] - List of role IDs to assign to the user
+  /// [roleIds] - List of role IDs to assign to the user (must not be empty)
   /// [generation] - Required generation to assign
   /// [comments] - Optional approval comments
   Future<bool> acceptProfile({
@@ -146,17 +261,33 @@ class AdminProvider with ChangeNotifier {
     required String generation,
     String? comments,
   }) async {
+    // Validation
+    if (roleIds.isEmpty) {
+      _error = 'At least one role must be selected';
+      notifyListeners();
+      return false;
+    }
+    
+    if (generation.trim().isEmpty) {
+      _error = 'Generation is required';
+      notifyListeners();
+      return false;
+    }
+    
     _isProcessing = true;
     _error = null;
     notifyListeners();
 
     try {
+      final currentUser = _effectiveUserProfile;
+      
       await _service.acceptProfile(
         profileId: profileId,
         approvedBy: approvedBy,
         roleIds: roleIds,
         generation: generation,
         comments: comments,
+        currentUser: currentUser, // Pass for security validation
       );
 
       // Remove from pending list
@@ -166,10 +297,15 @@ class AdminProvider with ChangeNotifier {
       if (_selectedProfile?.id == profileId) {
         _selectedProfile = null;
         _selectedProfileApprovals = [];
+        _selectedProfileRoles = [];
       }
 
       debugPrint('✅ Profile accepted: $profileId with ${roleIds.length} roles');
       return true;
+    } on PostgrestException catch (e) {
+      _error = 'Database error: ${e.message}';
+      debugPrint('❌ PostgrestException accepting profile: ${e.message}');
+      return false;
     } catch (e) {
       _error = 'Unable to accept profile. Please try again.';
       debugPrint('❌ Error accepting profile: $e');
@@ -202,10 +338,13 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      final currentUser = _effectiveUserProfile;
+      
       await _service.addProfileComment(
         profileId: profileId,
         approvedBy: approvedBy,
         comments: comments,
+        currentUser: currentUser, // Pass for security validation
       );
 
       // Reload profile approvals if viewing this profile
@@ -236,30 +375,43 @@ class AdminProvider with ChangeNotifier {
     required String approvedBy,
     required String comments,
   }) async {
+    // Validation
     if (comments.trim().isEmpty) {
       _error = 'Comments are required when rejecting a profile';
       notifyListeners();
       return false;
     }
-
+    
     _isProcessing = true;
     _error = null;
     notifyListeners();
 
     try {
+      final currentUser = _effectiveUserProfile;
+      
       await _service.rejectProfile(
         profileId: profileId,
         approvedBy: approvedBy,
         comments: comments,
+        currentUser: currentUser, // Pass for security validation
       );
 
-      // Reload profile approvals if viewing this profile
+      // Remove from pending list
+      _pendingProfiles.removeWhere((p) => p.id == profileId);
+
+      // Clear selection if it was the rejected profile
       if (_selectedProfile?.id == profileId) {
-        _selectedProfileApprovals = await _service.fetchProfileApprovals(profileId);
+        _selectedProfile = null;
+        _selectedProfileApprovals = [];
+        _selectedProfileRoles = [];
       }
 
       debugPrint('✅ Profile rejected: $profileId');
       return true;
+    } on PostgrestException catch (e) {
+      _error = 'Database error: ${e.message}';
+      debugPrint('❌ PostgrestException rejecting profile: ${e.message}');
+      return false;
     } catch (e) {
       _error = 'Unable to reject profile. Please try again.';
       debugPrint('❌ Error rejecting profile: $e');

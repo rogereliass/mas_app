@@ -19,6 +19,7 @@ class UserProfile {
   final String? generation;
   final String? avatarUrl;
   final int roleRank;
+  final String? managedTroopId;  // Troop context for troop-scoped roles (rank 60, 70)
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -38,6 +39,7 @@ class UserProfile {
     this.generation,
     this.avatarUrl,
     required this.roleRank,
+    this.managedTroopId,
     required this.createdAt,
     this.updatedAt,
   });
@@ -77,6 +79,7 @@ class UserProfile {
       generation: json['generation'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       roleRank: json['role_rank'] as int? ?? 0, // Default to 0 (public) if no role
+      managedTroopId: json['managed_troop_id'] as String?,  // From profile_roles.troop_context join
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -102,6 +105,7 @@ class UserProfile {
       'generation': generation,
       'avatar_url': avatarUrl,
       'role_rank': roleRank,
+      'managed_troop_id': managedTroopId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -118,6 +122,18 @@ class UserProfile {
 
   /// Check if user is system admin (rank == 100)
   bool get isSystemAdmin => roleRank == 100;
+  
+  /// Check if user is troop-scoped (Troop Leader rank 60 or Troop Head rank 70)
+  bool get isTroopScoped => roleRank == 60 || roleRank == 70;
+  
+  /// Check if user has system-wide access (Moderator 90 or System Admin 100)
+  bool get hasSystemWideAccess => roleRank >= 90;
+  
+  /// Get troop context for scope filtering
+  /// Returns managedTroopId for troop-scoped users, null for system-wide users
+  String? getTroopContextForScope() {
+    return hasSystemWideAccess ? null : managedTroopId;
+  }
 
   @override
   bool operator ==(Object other) =>

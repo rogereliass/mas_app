@@ -360,9 +360,19 @@ class _HomePageState extends State<HomePage> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final roleRank = authProvider.currentUserRoleRank;
     
+    // Show no role message if user has no roles assigned
+    if (authProvider.userRoles.isEmpty || _selectedRole == null || _selectedRole == 'No Role') {
+      return const NoRoleMessage();
+    }
+    
     // Show role-specific components based on selected role
     if (_selectedRole == 'System Admin') {
       return const SystemAdminStats();
+    }
+    
+    // Show troop head/leader management dashboard for troop-scoped roles
+    if (_selectedRole == 'Troop Head' || _selectedRole == 'Troop Leader') {
+      return const TroopHeadStats();
     }
     
     // Default stats for other roles

@@ -233,10 +233,12 @@ CREATE TABLE public.profile_roles (
   role_id uuid,
   assigned_by uuid,
   assigned_at timestamp with time zone DEFAULT now(),
+  troop_context uuid,
   CONSTRAINT profile_roles_pkey PRIMARY KEY (id),
   CONSTRAINT profile_roles_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
   CONSTRAINT profile_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles(id),
-  CONSTRAINT profile_roles_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.profiles(id)
+  CONSTRAINT profile_roles_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.profiles(id),
+  CONSTRAINT profile_roles_troop_context_fkey FOREIGN KEY (troop_context) REFERENCES public.troops(id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -267,11 +269,11 @@ CREATE TABLE public.profiles (
 );
 CREATE TABLE public.profiles_approvals (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  profile_id uuid,
+  profile_id uuid UNIQUE,
   approved_by uuid,
   comments text,
-  status bool,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  status boolean NOT NULL,
   CONSTRAINT profiles_approvals_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_approvals_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
   CONSTRAINT profiles_approvals_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.profiles(id)

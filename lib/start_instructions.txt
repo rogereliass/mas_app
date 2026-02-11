@@ -1,7 +1,8 @@
 open in terminal
 cd D:\Apps\Sdk\emulator
-emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
 emulator -avd Pixel_6 -gpu swiftshader_indirect
+emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
+
 
 flutter devices
 Should show emulator-5554 • Android 13 • Android Emulator
@@ -18,6 +19,9 @@ flutter run
 -login process - Twilio Account Needed but logic is working
 -file views & download stats
 
+---------------------------------------------------------
+
+I now want you to act down as an expert senior software engineer to review all the implementation of this feature making sure it works correctly as planned with no problems or production risks as well as abiding by the app rules and conventions, have modern UI that matched the app and has no security issues. if you find any errors please fix them immediatley in a bulletproof solution
 
 ---------------------------------------------------------
 Homepage components:

@@ -42,7 +42,16 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => AdminProvider()),
+        
+        // AdminProvider depends on AuthProvider for role-based scoping
+        ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
+          create: (context) => AdminProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+            previous ?? AdminProvider(authProvider: auth),
+        ),
+        
         // LibraryProvider depends on AuthProvider for role-based filtering
         ChangeNotifierProxyProvider<AuthProvider, LibraryProvider>(
           create: (context) => LibraryProvider(
