@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/folder_card.dart';
@@ -82,7 +83,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                     
                     // Search bar
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: CustomSearchBar(
                         hintText: 'Search topics...',
                         onChanged: (query) {
@@ -97,14 +98,16 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                     
                     // Folder count and view toggle
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'Total ${filteredFolders.length} folders',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.textTheme.bodySmall?.color,
+                              color: theme.brightness == Brightness.dark
+                                  ? AppColors.sectionHeaderGray
+                                  : theme.textTheme.bodySmall?.color,
                             ),
                           ),
                           Row(
@@ -145,9 +148,11 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                     
                     // Folders grid/list
                     Expanded(
-                      child: _isGridView 
-                          ? _buildGridView(filteredFolders) 
-                          : _buildListView(filteredFolders),
+                      child: filteredFolders.isEmpty
+                          ? _buildEmptyState(theme)
+                          : _isGridView 
+                              ? _buildGridView(filteredFolders) 
+                              : _buildListView(filteredFolders),
                     ),
                   ],
                 ),
@@ -156,22 +161,54 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
 
   /// Build custom app bar
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.of(context).pop(),
+      backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
+      elevation: 0,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.goldAccent,
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
       ),
-      title: const Text(
+      title: Text(
         'All Folders',
-        style: TextStyle(fontWeight: FontWeight.bold),
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          fontSize: 22,
+        ),
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const SettingsDialog(),
+            );
+          },
+          tooltip: 'Settings',
+        ),
+        const SizedBox(width: 4),
+      ],
     );
   }
 
-  /// Build grid view of folders
+  /// Build grid view of folders (2 columns)
   Widget _buildGridView(List folders) {
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -184,6 +221,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
         return FolderCard(
           folderId: folder.id,
           folderName: folder.name,
+          description: folder.description,
           itemCount: folder.itemCount,
           onTap: () {
             AppRouter.goToFolder(
@@ -200,46 +238,20 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
     );
   }
 
-  /// Build list view of folders
+  /// Build list view of folders (1 column vertical FolderCard list)
   Widget _buildListView(List folders) {
-    final theme = Theme.of(context);
-    
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       itemCount: folders.length,
       itemBuilder: (context, index) {
         final folder = folders[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? AppColors.folderBackgroundDark
-                    : AppColors.folderBackgroundLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.folder,
-                color: AppColors.folderIconColor,
-                size: 24,
-              ),
-            ),
-            title: Text(
-              folder.name,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            trailing: IconButton(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onPressed: () {
-                // TODO-OPTIONAL: Show folder options, three dots action 
-              },
-            ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: FolderCard(
+            folderId: folder.id,
+            folderName: folder.name,
+            description: folder.description,
+            itemCount: folder.itemCount,
             onTap: () {
               AppRouter.goToFolder(
                 context,
@@ -247,9 +259,42 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                 folderName: folder.name,
               );
             },
+            onMorePressed: () {
+              // TODO: Show folder options
+            },
           ),
         );
       },
+    );
+  }
+
+  /// Build empty state
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.folder_outlined,
+              size: 64,
+              color: theme.brightness == Brightness.dark
+                  ? AppColors.sectionHeaderGray
+                  : theme.iconTheme.color?.withOpacity(0.4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No folders found',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.brightness == Brightness.dark
+                    ? AppColors.sectionHeaderGray
+                    : theme.textTheme.bodySmall?.color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

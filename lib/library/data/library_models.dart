@@ -3,6 +3,7 @@
 class LibraryFolder {
   final String id;
   final String name;
+  final String? description;
   final String? parentFolderId;
   final int? depth;
   final DateTime createdAt;
@@ -11,6 +12,7 @@ class LibraryFolder {
   LibraryFolder({
     required this.id,
     required this.name,
+    this.description,
     this.parentFolderId,
     this.depth,
     required this.createdAt,
@@ -21,6 +23,7 @@ class LibraryFolder {
     return LibraryFolder(
       id: json['id'] as String,
       name: json['name'] as String,
+      description: json['description'] as String?,
       parentFolderId: json['parent_folder_id'] as String?,
       depth: json['depth'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -32,6 +35,7 @@ class LibraryFolder {
     return {
       'id': id,
       'name': name,
+      'description': description,
       'parent_folder_id': parentFolderId,
       'depth': depth,
       'created_at': createdAt.toIso8601String(),
@@ -41,6 +45,7 @@ class LibraryFolder {
   LibraryFolder copyWith({
     String? id,
     String? name,
+    String? description,
     String? parentFolderId,
     int? depth,
     DateTime? createdAt,
@@ -49,6 +54,7 @@ class LibraryFolder {
     return LibraryFolder(
       id: id ?? this.id,
       name: name ?? this.name,
+      description: description ?? this.description,
       parentFolderId: parentFolderId ?? this.parentFolderId,
       depth: depth ?? this.depth,
       createdAt: createdAt ?? this.createdAt,

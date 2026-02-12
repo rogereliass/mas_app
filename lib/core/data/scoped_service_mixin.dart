@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/models/user_profile.dart';
 
 /// Mixin providing automatic troop-scoping for admin service queries

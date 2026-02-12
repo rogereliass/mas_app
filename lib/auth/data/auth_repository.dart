@@ -183,13 +183,13 @@ class AuthRepository {
       await _supabase.auth.signOut().timeout(
             const Duration(seconds: 10),
             onTimeout: () {
-              throw AuthException('Sign out request timed out');
+              throw AuthException('Log out request timed out');
             },
           );
     } on AuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw AuthException('Sign out failed: ${e.toString()}');
+      throw AuthException('Log out failed: ${e.toString()}');
     }
   }
 
@@ -213,6 +213,155 @@ class AuthRepository {
       throw AuthException('Failed to rollback user: ${e.toString()}');
     }
   }
+
+  // ============================================================================
+  // PASSWORD RESET FLOW
+  // ============================================================================
+
+  /// Send OTP for password reset (Step 1)
+  /// 
+  /// - Phone number must be registered
+  /// - Sends OTP to user's phone
+  /// - Rate limited on client side (max 2 attempts)
+  Future<bool> sendPasswordResetOtp({
+    required String phoneNumber,
+  }) async {
+    try {
+      final formattedPhone = _formatPhoneNumber(phoneNumber);
+      
+      debugPrint('=== PASSWORD RESET OTP REQUEST ===');
+      debugPrint('Phone: $formattedPhone');
+
+      // Use Supabase's signInWithOtp for existing users (password reset flow)
+      await _supabase.auth
+          .signInWithOtp(
+            phone: formattedPhone,
+            // OTP will be sent to the phone number
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw AuthException(
+                'Request timed out. Please check your internet connection.',
+              );
+            },
+          );
+
+      debugPrint('✓ Password reset OTP sent successfully');
+      return true;
+    } on AuthException catch (e) {
+      debugPrint('=== AUTH EXCEPTION ===');
+      debugPrint('Message: ${e.message}');
+      throw _handleAuthException(e);
+    } catch (e, stackTrace) {
+      debugPrint('=== UNEXPECTED ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Failed to send OTP: ${e.toString()}');
+    }
+  }
+
+  /// Verify OTP for password reset (Step 2)
+  /// 
+  /// - Verifies the OTP code
+  /// - Returns authenticated session for password update
+  Future<User> verifyPasswordResetOtp({
+    required String phoneNumber,
+    required String otpCode,
+  }) async {
+    try {
+      final formattedPhone = _formatPhoneNumber(phoneNumber);
+      
+      debugPrint('=== PASSWORD RESET OTP VERIFICATION ===');
+      debugPrint('Phone: $formattedPhone');
+      debugPrint('OTP Code: $otpCode');
+
+      final response = await _supabase.auth
+          .verifyOTP(
+            phone: formattedPhone,
+            token: otpCode,
+            type: OtpType.sms,
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw AuthException(
+                'Request timed out. Please check your internet connection.',
+              );
+            },
+          );
+
+      debugPrint('✓ OTP verified successfully');
+      debugPrint('User ID: ${response.user?.id}');
+
+      if (response.user == null) {
+        throw AuthException('Verification failed: No user returned');
+      }
+
+      return response.user!;
+    } on AuthException catch (e) {
+      debugPrint('=== AUTH EXCEPTION ===');
+      debugPrint('Message: ${e.message}');
+      throw _handleAuthException(e);
+    } catch (e, stackTrace) {
+      debugPrint('=== UNEXPECTED ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Verification failed: ${e.toString()}');
+    }
+  }
+
+  /// Update user password (Step 3)
+  /// 
+  /// - Must be called after successful OTP verification
+  /// - User must have active session
+  /// - Password requirements: min 8 characters, complexity validated client-side
+  Future<bool> updatePassword({
+    required String newPassword,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw AuthException('No active session. Please verify OTP first.');
+      }
+
+      debugPrint('=== UPDATE PASSWORD ===');
+      debugPrint('User ID: ${user.id}');
+
+      final response = await _supabase.auth
+          .updateUser(
+            UserAttributes(
+              password: newPassword,
+            ),
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw AuthException(
+                'Request timed out. Please check your internet connection.',
+              );
+            },
+          );
+
+      debugPrint('✓ Password updated successfully');
+      debugPrint('User ID: ${response.user?.id}');
+
+      return response.user != null;
+    } on AuthException catch (e) {
+      debugPrint('=== AUTH EXCEPTION ===');
+      debugPrint('Message: ${e.message}');
+      throw _handleAuthException(e);
+    } catch (e, stackTrace) {
+      debugPrint('=== UNEXPECTED ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw AuthException('Failed to update password: ${e.toString()}');
+    }
+  }
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
 
   /// Get current user
   User? getCurrentUser() {

@@ -87,9 +87,13 @@ Metadata stored in Hive, files in `getApplicationDocumentsDirectory()/offline_fi
 
 ### 4. Theme System
 Centralized Material 3 theme with dark/light mode:
-- **Single source**: [core/config/app_colors.dart](lib/core/config/app_colors.dart) - NO hardcoded colors elsewhere
-- **Access**: `Theme.of(context).colorScheme.primary` (Material 3 pattern)
+- **Single source**: [core/config/app_colors.dart](lib/core/config/app_colors.dart) - **NO hardcoded colors elsewhere**
+- **Access**: Use `AppColors.colorName` for all custom colors, `Theme.of(context).colorScheme` for Material 3 colors
 - **Toggle**: `ThemeProvider().toggleTheme()` - persists to SharedPreferences
+- **CRITICAL RULE**: Every color in the UI must be wired to either `AppColors.*` constants or `Theme.of(context).colorScheme.*`
+  - ❌ WRONG: `Colors.green`, `Colors.grey[600]`, `Color(0xFF...)` hardcoded
+  - ✅ RIGHT: `AppColors.success`, `AppColors.textSecondaryLight`, `Theme.of(context).primaryColor`
+  - If a color isn't available in AppColors, add it to [app_colors.dart](lib/core/config/app_colors.dart) with clear documentation
 
 ### 5. Navigation Pattern
 ```dart
@@ -104,6 +108,18 @@ Navigator.pushNamed(
 );
 ```
 Do NOT use go_router methods - it's in pubspec but not implemented.
+
+### 6. Design System & Theming (Scout Elite)
+- **Primary Palette**: from color constants in `AppColors` (e.g., `primaryBlue`, `accentBlue`, etc.)
+- **Secondary Palette**: from color constants in `AppColors` (e.g., `sectionHeaderGray`, `dividerLight`, etc.)
+- **Dark Mode Standard**: Use `AppColors.backgroundDark` (Navy) and `AppColors.cardDark` (Slate 800) for ALL dark mode surfaces.
+- **Card Styling**:
+  - Border radius: 24px for media cards, 16px for standard containers.
+  - Shadows: Subtle drop shadows using `AppColors.overlay` or `Theme.of(context).shadowColor` blur 10, offset 0,4.
+  - Aspect Ratio: Recent asset cards should be squarish (~170x180), not tall/portrait.
+- **Role Visibility**: 
+  - Hide sensitive UI sections (Settings > Account) for unauthenticated users.
+  - Check `AuthProvider.isAuthenticated` before rendering admin features.
 
 ## Development Workflows
 

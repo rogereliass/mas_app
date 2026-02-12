@@ -26,7 +26,25 @@ class AdminProvider with ChangeNotifier {
     AdminService? service,
     required AuthProvider authProvider,
   })  : _service = service ?? AdminService.instance(),
-        _authProvider = authProvider;
+        _authProvider = authProvider {
+    // Listen to auth provider changes (e.g., when user profile loads)
+    _authProvider.addListener(_onAuthChanged);
+  }
+  
+  // ==================== CLEANUP ====================
+  
+  @override
+  void dispose() {
+    _authProvider.removeListener(_onAuthChanged);
+    super.dispose();
+  }
+  
+  /// Handle auth provider changes (e.g., user profile loaded)
+  void _onAuthChanged() {
+    // Notify listeners when auth state changes
+    // This ensures UI rebuilds when user profile becomes available
+    notifyListeners();
+  }
   
   // ==================== ROLE CONTEXT ====================
   
@@ -57,7 +75,7 @@ class AdminProvider with ChangeNotifier {
     // Get selected role's rank
     final selectedRole = _authProvider.getRoleByName(_selectedRoleName!);
     if (selectedRole == null) {
-      debugPrint('⚠️ Selected role \"$_selectedRoleName\" not found in user roles');
+      debugPrint('⚠️ Selected role "${_selectedRoleName}" not found in user roles');
       return baseProfile;
     }
     
@@ -148,6 +166,16 @@ class AdminProvider with ChangeNotifier {
   bool get isLoadingProfile => _isLoadingProfile;
   bool get isLoadingRoles => _isLoadingRoles;
   bool get isProcessing => _isProcessing;
+  
+  /// Returns true when roles are ready to display
+  /// All conditions must be met:
+  /// 1. Roles have finished loading
+  /// 2. User profile is available (not null)
+  /// 3. Auth provider has finished loading profile
+  bool get isRolesReady => 
+    !_isLoadingRoles && 
+    !_authProvider.profileLoading &&
+    _effectiveUserProfile != null;
   bool get hasError => _error != null;
   String? get error => _error;
 

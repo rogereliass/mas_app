@@ -4,6 +4,8 @@ import '../auth/ui/login_page.dart';
 import '../auth/ui/register_page.dart';
 import '../auth/ui/register_success_page.dart';
 import '../auth/ui/otp_verification_page.dart';
+import '../auth/ui/forgot_password_page.dart';
+import '../auth/ui/reset_password_page.dart';
 import '../home/home_page.dart';
 import '../library/ui/folder_page.dart';
 import '../library/ui/folder_detail_page.dart';
@@ -44,6 +46,12 @@ class AppRouter {
   /// OTP verification page route
   static const String otpVerification = '/otp-verification';
   
+  /// Forgot password page route
+  static const String forgotPassword = '/forgot-password';
+  
+  /// Reset password page route
+  static const String resetPassword = '/reset-password';
+  
   /// Home page route (after login)
   static const String home = '/home';
   
@@ -73,12 +81,13 @@ class AppRouter {
     login: (context) => const LoginPage(),
     register: (context) => const RegisterPage(),
     registerSuccess: (context) => const RegisterSuccessPage(),
+    forgotPassword: (context) => const ForgotPasswordPage(),
     home: (context) => const HomePage(),
     library: (context) => const LibraryHomePage(),
     allFolders: (context) => const AllFoldersPage(),
     about: (context) => const AboutPage(),
     profile: (context) => const ProfilePage(),
-    // userAcceptance route removed from map - handled in onGenerateRoute for arguments
+    // Dynamic routes handled in onGenerateRoute: otpVerification, resetPassword, userAcceptance
   };
 
   // ============================================================================
@@ -96,7 +105,20 @@ class AppRouter {
             phoneNumber: args['phoneNumber'] as String,
             password: args['password'] as String?,
             isSignUp: args['isSignUp'] as bool? ?? false,
+            isPasswordReset: args['isPasswordReset'] as bool? ?? false,
             metadata: args['metadata'] as Map<String, dynamic>?,
+          ),
+        );
+      }
+    }
+    
+    // Handle Reset Password with arguments
+    if (settings.name == resetPassword) {
+      final args = settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['phoneNumber'] != null) {
+        return MaterialPageRoute(
+          builder: (context) => ResetPasswordPage(
+            phoneNumber: args['phoneNumber'] as String,
           ),
         );
       }

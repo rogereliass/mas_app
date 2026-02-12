@@ -166,13 +166,12 @@ class PendingApprovalPage extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () async {
+                    // Navigate first, then sign out to prevent UI flash
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRouter.startup,
+                      (route) => false,
+                    );
                     await authProvider.signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        AppRouter.startup,
-                        (route) => false,
-                      );
-                    }
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Logout'),

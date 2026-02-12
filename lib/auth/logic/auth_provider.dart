@@ -108,19 +108,22 @@ class AuthProvider with ChangeNotifier {
       debugPrint('🔔 Auth state changed - User: ${_currentUser?.id}');
       
       if (_currentUser != null) {
-        // Load profile first, then save data
-        await _loadUserProfile();
+        // Load profile and roles without intermediate notifications
+        _profileLoading = true;
+        await _loadUserProfile(notifyOnComplete: false);
         await _loadUserRoles();
         await _saveUserData();
-        debugPrint('📢 Notifying listeners after auth state change');
+        _profileLoading = false;
+        debugPrint('📢 Notifying listeners after auth state change (profile + roles loaded)');
+        
+        // Notify listeners since user logged in
+        notifyListeners();
       } else {
         _currentUserProfile = null;
         _userRoles = [];
         await _clearUserData();
-      }
-      
-      // Only notify if state actually changed
-      if (previousUser?.id != _currentUser?.id) {
+        
+        // Notify listeners since user logged out
         notifyListeners();
       }
     });
@@ -128,12 +131,17 @@ class AuthProvider with ChangeNotifier {
     // Load user profile if already logged in (async)
     if (_currentUser != null) {
       debugPrint('👤 User already logged in, loading profile and roles...');
-      _loadUserProfile().then((_) async {
+      // CRITICAL: Set loading flag BEFORE starting async operations to prevent race condition
+      _profileLoading = true;
+      _loadUserProfile(notifyOnComplete: false).then((_) async {
         await _loadUserRoles();
         await _saveUserData();
-        debugPrint('📢 Notifying listeners after initial load');
+        _profileLoading = false;
+        debugPrint('📢 Notifying listeners after initial load complete (profile + roles)');
+        notifyListeners();
       }).catchError((e) {
         debugPrint('❌ Error in initial load: $e');
+        _profileLoading = false;
         // Still notify listeners so UI can show error state
         notifyListeners();
       });
@@ -143,7 +151,11 @@ class AuthProvider with ChangeNotifier {
   }
   
   /// Load user profile with role rank from database
-  Future<void> _loadUserProfile() async {
+  /// 
+  /// [notifyOnComplete] - If false, doesn't call notifyListeners() when done
+  /// and doesn't reset _profileLoading flag. Useful during initialization when 
+  /// we want to load both profile and roles before notifying UI.
+  Future<void> _loadUserProfile({bool notifyOnComplete = true}) async {
     if (_currentUser == null) {
       _currentUserProfile = null;
       _profileLoadError = null;
@@ -151,9 +163,11 @@ class AuthProvider with ChangeNotifier {
       return;
     }
 
-    _profileLoading = true;
-    _profileLoadError = null;
-    notifyListeners();
+    // Only set loading flag if we're managing it ourselves (notifyOnComplete = true)
+    if (notifyOnComplete) {
+      _profileLoading = true;
+      notifyListeners();
+    }
 
     try {
       debugPrint('🔄 Loading profile for user: ${_currentUser!.id}');
@@ -191,10 +205,15 @@ class AuthProvider with ChangeNotifier {
       debugPrint('   StackTrace: $stackTrace');
       // Set profile to null and store error message
       _currentUserProfile = null;
+      // Set profile to null and store error message
+      _currentUserProfile = null;
       _profileLoadError = 'Failed to load profile: ${e.toString()}. Please check your internet connection or contact support.';
     } finally {
-      _profileLoading = false;
-      notifyListeners();
+      // Only reset loading flag and notify if we're managing it ourselves
+      if (notifyOnComplete) {
+        _profileLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -351,9 +370,13 @@ class AuthProvider with ChangeNotifier {
       _currentUser = await authMethod();
       
       // Immediately load profile and roles after successful authentication
-      await _loadUserProfile();
+      // Don't notify until both are loaded to avoid showing no-role state
+      await _loadUserProfile(notifyOnComplete: false);
       await _loadUserRoles();
       await _saveUserData();
+      
+      // Manually notify after both profile and roles are loaded
+      notifyListeners();
       
       return true;
     } on AuthException catch (e) {
@@ -467,7 +490,7 @@ class AuthProvider with ChangeNotifier {
       _currentUser = null;
       await _clearUserData();
     } catch (e) {
-      _setError('Failed to sign out');
+      _setError('Failed to log out');
     } finally {
       _setLoading(false);
     }
@@ -485,6 +508,105 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
   }
+
+  // ============================================================================
+  // PASSWORD RESET FLOW
+  // ============================================================================
+
+  /// Send OTP for password reset (Step 1)
+  /// 
+  /// Initiates password reset flow by sending OTP to registered phone number
+  /// Returns true if OTP sent successfully
+  Future<bool> sendPasswordResetOtp({
+    required String phoneNumber,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final success = await _authRepository.sendPasswordResetOtp(
+        phoneNumber: phoneNumber,
+      );
+      return success;
+    } on AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to send verification code');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Verify OTP for password reset (Step 2)
+  /// 
+  /// Verifies OTP code and returns true if successful
+  /// User will have active session after verification (but NO profile/roles loaded)
+  Future<bool> verifyPasswordResetOtp({
+    required String phoneNumber,
+    required String otpCode,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final user = await _authRepository.verifyPasswordResetOtp(
+        phoneNumber: phoneNumber,
+        otpCode: otpCode,
+      );
+      
+      // Set current user for password update (but don't load profile/roles)
+      // This is a temporary session just for password reset
+      _currentUser = user;
+      
+      return true;
+    } on AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to verify OTP');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Update password after OTP verification (Step 3)
+  /// 
+  /// Updates user password - must have active session from OTP verification
+  /// Returns true if password updated successfully
+  Future<bool> updatePassword({
+    required String newPassword,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final success = await _authRepository.updatePassword(
+        newPassword: newPassword,
+      );
+
+      if (success) {
+        // Sign out after password reset for security
+        await signOut();
+      }
+
+      return success;
+    } on AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to update password');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
 
   /// Get user ID (helper method for quick access)
   static Future<String?> getUserId() async {
@@ -538,9 +660,13 @@ class AuthProvider with ChangeNotifier {
   /// Manually refresh the user profile and roles (e.g. on pull-to-refresh)
   Future<void> refreshProfile() async {
     if (_currentUser != null) {
-      await _loadUserProfile();
+      // Load both profile and roles before notifying to avoid race condition
+      await _loadUserProfile(notifyOnComplete: false);
       await _loadUserRoles();
       await _saveUserData();
+      
+      // Manually notify after both are loaded
+      notifyListeners();
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../../routing/app_router.dart';
 
 /// Unified bottom navigation bar component
@@ -21,13 +22,22 @@ class AppBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
+        color: isDark ? AppColors.cardDarkElevated : theme.cardTheme.color,
+        border: isDark ? Border(
+          top: BorderSide(
+            color: AppColors.scoutEliteNavy.withOpacity(0.5),
+            width: 1,
+          ),
+        ) : null,
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.1),
+            color: isDark 
+                ? Colors.black.withOpacity(0.3)
+                : theme.shadowColor.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -116,32 +126,41 @@ class AppBottomNavBar extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isActive = currentPage == page;
-    final color = isActive 
-        ? colorScheme.primary 
-        : theme.textTheme.bodySmall?.color?.withOpacity(0.6);
+    
+    final Color activeColor = isDark ? AppColors.goldAccent : theme.colorScheme.primary;
+    final Color inactiveColor = isDark 
+        ? AppColors.sectionHeaderGray 
+        : theme.textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey;
+    
+    final color = isActive ? activeColor : inactiveColor;
 
     return Expanded(
       child: InkWell(
         onTap: isActive ? null : onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: color,
-              size: 28,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isActive ? activeIcon : icon,
                 color: color,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                size: 28,
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

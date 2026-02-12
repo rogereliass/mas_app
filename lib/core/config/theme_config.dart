@@ -165,31 +165,32 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: ColorScheme.dark(
-        primary: AppColors.primaryBlue,
+        primary: AppColors.goldAccent,
         secondary: AppColors.accentBlue,
-        tertiary: AppColors.publicAccessBadge,
-        surface: AppColors.surfaceDark,
+        tertiary: AppColors.goldAccent,
+        surface: AppColors.cardDarkElevated,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: AppColors.textPrimaryDark,
         onError: Colors.white,
       ),
-      scaffoldBackgroundColor: AppColors.backgroundDark,
+      scaffoldBackgroundColor: AppColors.scoutEliteNavy,
       
       // AppBar theme
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: AppColors.scoutEliteNavy,
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
         iconTheme: IconThemeData(color: AppColors.textPrimaryDark),
       ),
       
       // Card theme
       cardTheme: CardThemeData(
-        color: AppColors.cardDark,
-        elevation: 2,
+        color: AppColors.cardDarkElevated,
+        elevation: 4,
+        shadowColor: Colors.black.withOpacity(0.3),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),

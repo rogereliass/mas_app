@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/settings_dialog.dart';
 import '../../offline/offline_storage.dart';
 import '../../offline/download_service.dart';
 import 'file_viewer/pdf_viewer_widget.dart';
@@ -486,16 +487,38 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build app bar with back button and download action
   PreferredSizeWidget _buildAppBar() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pop(context),
+      backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.goldAccent.withOpacity(0.15),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.goldAccent.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back,
+              color: AppColors.goldAccent,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+          ),
+        ),
       ),
       title: Text(
         _file?.title ?? widget.fileName,
         style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -533,6 +556,17 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   : 'Download for Offline Use',
             ),
         ],
+        // Settings icon
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const SettingsDialog(),
+            );
+          },
+          tooltip: 'Settings',
+        ),
       ],
     );
   }
@@ -609,7 +643,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
     final isVideo = fileType == 'video';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         height: isVideo ? null : MediaQuery.of(context).size.height * 0.7, // Dynamic height for videos
         decoration: BoxDecoration(
@@ -754,18 +788,19 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Build file info section
   Widget _buildFileInfo() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final fileSize = _file?.formattedSize ?? _formattedFileSize;
     final showFileSize = fileSize != 'Unknown';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           if (showFileSize) ...[
             Text(
               fileSize,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.brightness == Brightness.dark
+                color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondaryLight,
               ),
@@ -779,10 +814,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 vertical: 6,
               ),
               decoration: BoxDecoration(
-                color: AppColors.publicAccessBadge.withOpacity(0.2),
+                color: AppColors.goldAccent.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: AppColors.publicAccessBadge,
+                  color: AppColors.goldAccent,
                   width: 1.5,
                 ),
               ),
@@ -792,13 +827,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   Icon(
                     Icons.check_circle,
                     size: 16,
-                    color: AppColors.publicAccessBadge,
+                    color: AppColors.goldAccent,
                   ),
                   SizedBox(width: 6),
                   Text(
                     'Available Offline',
                     style: TextStyle(
-                      color: AppColors.publicAccessBadge,
+                      color: AppColors.goldAccent,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -814,9 +849,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Build description section
   Widget _buildDescription() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -825,8 +861,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              color: theme.brightness == Brightness.dark
-                  ? AppColors.textSecondaryDark
+              color: isDark
+                  ? AppColors.sectionHeaderGray
                   : AppColors.textSecondaryLight,
             ),
           ),
@@ -835,7 +871,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
             _file?.description ?? widget.description ?? '',
             style: theme.textTheme.bodyLarge?.copyWith(
               height: 1.6,
-              color: theme.brightness == Brightness.dark
+              color: isDark
                   ? AppColors.textSecondaryDark
                   : AppColors.textPrimaryLight,
             ),
@@ -848,10 +884,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Build tags section
   Widget _buildTags() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final tags = _file?.tags ?? [];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -860,8 +897,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
             style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              color: theme.brightness == Brightness.dark
-                  ? AppColors.textSecondaryDark
+              color: isDark
+                  ? AppColors.sectionHeaderGray
                   : AppColors.textSecondaryLight,
             ),
           ),
@@ -876,19 +913,18 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? AppColors.surfaceDark
-                      : AppColors.surfaceLight,
+                  color: AppColors.goldAccent.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    color: AppColors.goldAccent.withOpacity(0.5),
+                    width: 1,
                   ),
                 ),
                 child: Text(
                   tag,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w500,
+                    color: isDark ? AppColors.goldAccent : const Color(0xFF885A0A),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               );

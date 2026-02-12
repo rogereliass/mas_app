@@ -3,9 +3,15 @@ import 'package:flutter/material.dart';
 /// Centralized color definitions for the app
 /// All colors used throughout the app are defined here
 class AppColors {
-  // Primary colors
-  static const Color primaryBlue = Color(0xFF4169E1);
-  static const Color accentBlue = Color(0xFF5B9AFF);
+  // Scout Elite Design System Colors (Core Palette)
+  static const Color scoutEliteNavy = Color(0xFF0F172A); // Richer navy (Slate 900) - Background
+  static const Color cardDarkElevated = Color(0xFF1E293B); // Slightly lighter navy (Slate 800) - Cards/Surfaces
+  static const Color goldAccent = Color(0xFFC5A059); // Muted, elegant gold - Primary/Accent
+  static const Color sectionHeaderGray = Color(0xFF94A3B8); // Slate 400 - Secondary Text
+  
+  // Primary colors (Mapped to Design System)
+  static const Color primaryBlue =Color.fromARGB(255, 39, 92, 249); 
+  static const Color accentBlue = Color.fromARGB(255, 69, 141, 255); 
   
   // Background colors - Light theme
   static const Color backgroundLight = Color(0xFFFAF7F2); // Light cream
@@ -13,9 +19,9 @@ class AppColors {
   static const Color cardLight = Color(0xFFFFFFFF); // Keep cards white for contrast
   
   // Background colors - Dark theme
-  static const Color backgroundDark = Color(0xFF1A1F2E);
-  static const Color surfaceDark = Color(0xFF252B3D);
-  static const Color cardDark = Color(0xFF2D3548);
+  static const Color backgroundDark = scoutEliteNavy;
+  static const Color surfaceDark = cardDarkElevated;
+  static const Color cardDark = cardDarkElevated;
   
   // Text colors - Light theme
   static const Color textPrimaryLight = Color(0xFF1A1A1A);
@@ -24,8 +30,8 @@ class AppColors {
   
   // Text colors - Dark theme
   static const Color textPrimaryDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryDark = Color(0xFFB0B0B0);
-  static const Color textTertiaryDark = Color(0xFF808080);
+  static const Color textSecondaryDark = Color(0xFFB0B0B0); // Light gray for readability
+  static const Color textTertiaryDark = sectionHeaderGray;
   
   // Status colors
   static const Color success = Color(0xFF4CAF50);
@@ -34,23 +40,23 @@ class AppColors {
   static const Color info = Color(0xFF42A5F5);
   
   // Special colors
-  static const Color publicAccessBadge = Color(0xFFFDB827);
+  static const Color publicAccessBadge = goldAccent; // Unified with gold
   static const Color divider = Color(0xFFE0E0E0);
-  static const Color dividerDark = Color(0xFF3A3A3A);
+  static const Color dividerDark = Color(0xFF334155); // Slate 700
   
   // Button colors
   static const Color buttonPrimary = primaryBlue;
   static const Color buttonSecondaryLight = Color(0xFFFFFFFF);
-  static const Color buttonSecondaryDark = Color(0xFF2D3548);
+  static const Color buttonSecondaryDark = cardDarkElevated;
   
   // Overlay colors
   static const Color overlay = Color(0x66000000);
   static const Color shimmer = Color(0x33FFFFFF);
   
   // Folder colors
-  static const Color folderIconColor = Color(0xFFFDB827);
+  static const Color folderIconColor = goldAccent;
   static const Color folderBackgroundLight = Color(0xFFE8E4D0);
-  static const Color folderBackgroundDark = Color(0xFF4A4A3A);
+  static const Color folderBackgroundDark = Color(0xFF334155); // Slate 700 (Lighter than card)
   
   // File type colors
   static const Color fileTypePdf = Color(0xFFE53E3E);
@@ -58,4 +64,12 @@ class AppColors {
   static const Color fileTypeVideo = Color(0xFF9F7AEA);
   static const Color fileTypeDocument = Color(0xFF4299E1);
   static const Color fileTypeMap = Color(0xFF9F7AEA);
+  
+  // Icon Badge Colors for Folder Types
+  static const Color badgeYellow = goldAccent; // Unified
+  static const Color badgePurple = Color(0xFF9F7AEA); 
+  static const Color badgeBlue = Color(0xFF4299E1); 
+  static const Color badgeOrange = Color(0xFFFF8A3D); 
+  static const Color badgeTeal = Color(0xFF38B2AC); 
+  static const Color badgeGreen = Color(0xFF48BB78); 
 }

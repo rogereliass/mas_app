@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:masapp/core/constants/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../auth/logic/auth_provider.dart';
@@ -8,10 +9,12 @@ import 'components/auth_error_dialog.dart';
 /// OTP Verification Screen
 ///
 /// Allows users to enter the OTP code sent to their phone
+/// Supports both signup and password reset flows
 class OtpVerificationPage extends StatefulWidget {
   final String phoneNumber;
   final String? password;
   final bool isSignUp;
+  final bool isPasswordReset;
   final Map<String, dynamic>? metadata;
 
   const OtpVerificationPage({
@@ -19,6 +22,7 @@ class OtpVerificationPage extends StatefulWidget {
     required this.phoneNumber,
     this.password,
     this.isSignUp = false,
+    this.isPasswordReset = false,
     this.metadata,
   });
 
@@ -36,9 +40,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
   Timer? _resendTimer;
   bool _canResend = false;
   int _attemptCount = 0;
-  static const int _maxAttempts = 3;
   int _resendCount = 0;
-  static const int _maxResends = 3;
+  
+  // Rate limiting: stricter for password reset (2 OTPs) vs signup (3 OTPs)
+  int get _maxAttempts => widget.isPasswordReset ? 3 : 3;
+  int get _maxResends => widget.isPasswordReset ? 2 : 3;
 
   @override
   void initState() {
@@ -84,9 +90,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
     // Check if max resend limit reached
     if (_resendCount >= _maxResends) {
+      final errorMessage = widget.isPasswordReset
+          ? 'Maximum OTP resend limit reached. Please try again later or contact support.'
+          : 'Maximum OTP resend limit reached. Please try registering again later.';
+      
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Maximum OTP resend limit reached. Please try registering again later.',
+        message: errorMessage,
       );
       return;
     }
@@ -109,8 +119,41 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         _attemptCount = 0;
       });
 
-      // Resend OTP using signUpWithPhone
-      if (widget.password != null) {
+      // Resend OTP based on flow type
+      if (widget.isPasswordReset) {
+        // Password reset flow
+        final success = await authProvider.sendPasswordResetOtp(
+          phoneNumber: widget.phoneNumber,
+        );
+
+        if (!mounted) return;
+
+        if (success) {
+          // Increment resend counter
+          setState(() {
+            _resendCount++;
+          });
+
+          final remainingResends = _maxResends - _resendCount;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'OTP resent successfully${remainingResends > 0 
+                    ? '. $remainingResends resend${remainingResends != 1 ? "s" : ""} remaining'
+                    : '. This was your last resend'}',
+              ),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          _startResendTimer();
+        } else {
+          await AuthErrorDialog.showError(
+            context: context,
+            message: authProvider.errorMessage ?? 'Failed to resend OTP',
+          );
+        }
+      } else if (widget.password != null) {
+        // Signup flow
         final success = await authProvider.signUpWithPhone(
           phoneNumber: widget.phoneNumber,
           password: widget.password!,
@@ -133,7 +176,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                     ? '. $remainingResends resend${remainingResends != 1 ? "s" : ""} remaining'
                     : '. This was your last resend'}',
               ),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
           _startResendTimer();
@@ -186,7 +229,49 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Step 1: Verify OTP
+      // Handle password reset flow differently
+      if (widget.isPasswordReset) {
+        // Password reset: verify OTP and navigate to reset password page
+        final otpSuccess = await authProvider.verifyPasswordResetOtp(
+          phoneNumber: widget.phoneNumber,
+          otpCode: otpCode,
+        );
+
+        if (!mounted) return;
+
+        if (!otpSuccess) {
+          // Increment attempt counter
+          setState(() {
+            _attemptCount++;
+            _isLoading = false;
+          });
+
+          // Clear OTP fields for retry
+          for (var controller in _otpControllers) {
+            controller.clear();
+          }
+          _focusNodes[0].requestFocus();
+
+          // Show error with attempt count
+          final remainingAttempts = _maxAttempts - _attemptCount;
+          await AuthErrorDialog.showError(
+            context: context,
+            message: authProvider.errorMessage ?? 'Invalid OTP code${remainingAttempts > 0 
+                    ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} remaining'
+                    : ''}',
+          );
+          return;
+        }
+
+        // Navigate to reset password page
+        Navigator.of(context).pushReplacementNamed(
+          AppRouter.resetPassword,
+          arguments: {'phoneNumber': widget.phoneNumber},
+        );
+        return;
+      }
+
+      // Signup flow: verify OTP
       final otpSuccess = await authProvider.verifySignUpOtp(
         phoneNumber: widget.phoneNumber,
         otpCode: otpCode,
@@ -280,9 +365,51 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Dynamic text based on flow type
+    final String title = widget.isPasswordReset 
+        ? 'Verify Your Identity'
+        : 'Enter Verification Code';
+    
+    final String subtitle = widget.isPasswordReset
+        ? 'We sent a 6-digit verification code to\n${widget.phoneNumber}'
+        : 'We sent a 6-digit code to\n${widget.phoneNumber}';
+    
+    return PopScope(
+      // Prevent accidental back navigation during password reset
+      canPop: !widget.isPasswordReset || !_isLoading,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        
+        // Show confirmation for password reset flow
+        if (widget.isPasswordReset) {
+          final shouldPop = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Cancel Password Reset?'),
+              content: const Text(
+                'If you go back, you\'ll need to start the password reset process again.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Stay'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Go Back'),
+                ),
+              ],
+            ),
+          ) ?? false;
+          
+          if (shouldPop && context.mounted) {
+            Navigator.pop(context);
+          }
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
-        title: const Text('Verify OTP'),
+        title: Text(widget.isPasswordReset ? 'Reset Password' : 'Verify OTP'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -293,13 +420,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
             children: [
               const SizedBox(height: 32),
               Icon(
-                Icons.phone_android,
+                widget.isPasswordReset ? Icons.lock_reset : Icons.phone_android,
                 size: 80,
                 color: Theme.of(context).primaryColor,
               ),
               const SizedBox(height: 24),
               Text(
-                'Enter Verification Code',
+                title,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -307,9 +434,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'We sent a 6-digit code to\n${widget.phoneNumber}',
+                subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -388,7 +515,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                 children: [
                   Text(
                     "Didn't receive code? ",
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
                   ),
                   if (_canResend && !_isLoading)
                     TextButton(
@@ -399,7 +526,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                     Text(
                       'Resend in ${_resendCountdown}s',
                       style: TextStyle(
-                        color: Colors.grey[400],
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -409,6 +536,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           ),
         ),
       ),
+    ),
     );
   }
 }

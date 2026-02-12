@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/admin_scope_banner.dart';
@@ -841,7 +843,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           ),
         ),
         const SizedBox(height: 12),
-        if (provider.isLoadingRoles)
+        if (!provider.isRolesReady)
           const Center(
             child: Padding(
               padding: EdgeInsets.all(16.0),
@@ -849,17 +851,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             ),
           )
         else if (provider.assignableRoles.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'No roles available for assignment. Please contact system administrator.',
-              style: TextStyle(color: colorScheme.onErrorContainer),
-            ),
-          )
+          _buildNoRolesWidget(context, colorScheme)
         else
           Container(
             decoration: BoxDecoration(
@@ -941,6 +933,116 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           ),
       ],
     );
+  }
+
+  /// Build friendly no roles available widget
+  Widget _buildNoRolesWidget(BuildContext context, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 64,
+            color: colorScheme.primary.withOpacity(0.7),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Roles Available',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Your account currently has no roles assigned that can be used to assign roles to other users.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try refreshing the app to reload your permissions, or contact support if the issue persists.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  // Refresh the provider
+                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                  adminProvider.loadRoles();
+                },
+                icon: const Icon(Icons.refresh, size: 20),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () => _contactSupport(),
+                icon: const Icon(Icons.email_outlined, size: 20),
+                label: const Text('Contact Support'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open email client to contact support
+  Future<void> _contactSupport() async {
+    final emailAddress = dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support@example.com';
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUserProfile;
+    
+    final uri = Uri(
+      scheme: 'mailto',
+      path: emailAddress,
+      query: 'subject=MAS App - No Roles Available&body=Hello,%0A%0AI am unable to see assignable roles in the User Acceptance page.%0A%0AUser: ${user?.fullName ?? 'Unknown'}%0AEmail: ${user?.email ?? 'Not set'}%0A%0APlease help me resolve this issue.%0A%0AThank you.',
+    );
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open email client. Please email: $emailAddress'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error launching email: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening email. Please contact: $emailAddress'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildCommentsInput(ThemeData theme) {

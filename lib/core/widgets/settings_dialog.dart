@@ -17,6 +17,7 @@ class SettingsDialog extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -87,38 +88,40 @@ class SettingsDialog extends StatelessWidget {
                     const SizedBox(height: 24),
                     
                     // Account Section
-                    _SettingsSection(
-                      title: 'Account',
-                      icon: Icons.person_outline,
-                      children: [
-                        _SettingItem(
-                          icon: Icons.edit_outlined,
-                          title: 'Edit Profile',
-                          subtitle: 'Update your personal information',
-                          onTap: () {
-                            // TODO: Navigate to profile edit
-                            Navigator.pop(context);
-                          },
-                        ),
-                        _SettingItem(
-                          icon: Icons.lock_outline,
-                          title: 'Change Password',
-                          subtitle: 'Update your account password',
-                          onTap: () {
-                            // TODO: Navigate to change password
-                            Navigator.pop(context);
-                          },
-                        ),
-                        _SettingItem(
-                          icon: Icons.logout,
-                          title: 'Sign Out',
-                          subtitle: 'Log out of your account',
-                          onTap: () => _showLogoutConfirmation(context),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 24),
+                    if (authProvider.isAuthenticated) ...[
+                      _SettingsSection(
+                        title: 'Account',
+                        icon: Icons.person_outline,
+                        children: [
+                          _SettingItem(
+                            icon: Icons.edit_outlined,
+                            title: 'Edit Profile',
+                            subtitle: 'Update your personal information',
+                            onTap: () {
+                              // TODO: Navigate to profile edit
+                              Navigator.pop(context);
+                            },
+                          ),
+                          _SettingItem(
+                            icon: Icons.lock_outline,
+                            title: 'Change Password',
+                            subtitle: 'Update your account password',
+                            onTap: () {
+                              // TODO: Navigate to change password
+                              Navigator.pop(context);
+                            },
+                          ),
+                          _SettingItem(
+                            icon: Icons.logout,
+                            title: 'Log Out',
+                            subtitle: 'Log out of your account',
+                            onTap: () => _showLogoutConfirmation(context),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 24),
+                    ],
                     
                     // Storage Section
                     _SettingsSection(
@@ -222,8 +225,8 @@ class SettingsDialog extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        title: const Text('Log Out'),
+        content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -231,7 +234,7 @@ class SettingsDialog extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () async {
-              // Get the navigator before closing dialogs
+              // Get the navigator and auth provider before closing dialogs
               final navigator = Navigator.of(context);
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               
@@ -239,19 +242,20 @@ class SettingsDialog extends StatelessWidget {
               Navigator.pop(dialogContext); // Close confirmation dialog
               Navigator.pop(context); // Close settings dialog
               
-              // Sign out
-              await authProvider.signOut();
-              
-              // Navigate to startup page, clearing all previous routes
+              // CRITICAL: Navigate BEFORE signing out to prevent flashing no-role widget
+              // The auth state listener will handle clearing user data when sign out completes
               navigator.pushNamedAndRemoveUntil(
                 AppRouter.startup,
                 (route) => false,
               );
+              
+              // Sign out after navigation
+              await authProvider.signOut();
             },
             style: FilledButton.styleFrom(
               backgroundColor: theme.colorScheme.error,
             ),
-            child: const Text('Sign Out'),
+            child: const Text('Log Out'),
           ),
         ],
       ),

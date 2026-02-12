@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../auth/logic/auth_provider.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
+import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
@@ -80,42 +82,45 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   /// Build custom app bar with back button
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
     return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.pop(context),
+      backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
+      elevation: 0,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.goldAccent,
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
       ),
       title: Text(
         widget.folderName,
-        style: const TextStyle(fontWeight: FontWeight.bold),
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          fontSize: 22,
+        ),
       ),
       actions: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: theme.colorScheme.primary.withOpacity(0.3),
-                width: 2,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.all(4),
-            child: Image.asset(
-              'assets/images/mas_logo.png',
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.image,
-                  color: theme.colorScheme.primary,
-                );
-              },
-            ),
-          ),
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const SettingsDialog(),
+            );
+          },
+          tooltip: 'Settings',
         ),
+        const SizedBox(width: 4),
       ],
     );
   }
@@ -187,17 +192,19 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   /// Build breadcrumb navigation
   Widget _buildBreadcrumbs() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final breadcrumbs = widget.breadcrumbs ?? ['Library'];
     
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           for (int i = 0; i < breadcrumbs.length; i++) ...[
             _BreadcrumbChip(
               label: breadcrumbs[i],
               isActive: i == breadcrumbs.length - 1,
+              isDark: isDark,
               onTap: () {
                 // TODO: Navigate to breadcrumb level
               },
@@ -208,7 +215,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                 child: Icon(
                   Icons.chevron_right,
                   size: 16,
-                  color: theme.textTheme.bodySmall?.color,
+                  color: isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodySmall?.color,
                 ),
               ),
           ],
@@ -217,12 +224,13 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
             child: Icon(
               Icons.chevron_right,
               size: 16,
-              color: theme.textTheme.bodySmall?.color,
+              color: isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodySmall?.color,
             ),
           ),
           _BreadcrumbChip(
             label: widget.folderName,
             isActive: true,
+            isDark: isDark,
             onTap: null,
           ),
         ],
@@ -233,6 +241,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   /// Build subfolders section
   Widget _buildSubfoldersSection() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final subfolders = provider.currentSubfolders;
     
@@ -240,58 +249,62 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Subfolders',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                'SUBFOLDERS',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                '${subfolders.length} Folders',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  fontSize: 13,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 160,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: subfolders.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final folder = subfolders[index];
-              return SizedBox(
-                width: 180,
-                child: FolderCard(
-                  folderId: folder.id,
-                  folderName: folder.name,
-                  itemCount: folder.itemCount,
-                  onTap: () async {
-                    // Navigate to nested folder
-                    final newBreadcrumbs = [
-                      ...(widget.breadcrumbs ?? ['Library']),
-                      widget.folderName,
-                    ];
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => FolderDetailPage(
-                          folderId: folder.id,
-                          folderName: folder.name,
-                          breadcrumbs: newBreadcrumbs,
-                        ),
-                      ),
-                    );
-                    // Reload folder contents when returning from subfolder
-                    _loadFolderContents();
-                  },
-                ),
-              );
-            },
-          ),
+        const SizedBox(height: 16),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: subfolders.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final folder = subfolders[index];
+            return FolderCard(
+              folderId: folder.id,
+              folderName: folder.name,              description: folder.description,              itemCount: folder.itemCount,
+              onTap: () async {
+                // Navigate to nested folder
+                final newBreadcrumbs = [
+                  ...(widget.breadcrumbs ?? ['Library']),
+                  widget.folderName,
+                ];
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FolderDetailPage(
+                      folderId: folder.id,
+                      folderName: folder.name,
+                      breadcrumbs: newBreadcrumbs,
+                    ),
+                  ),
+                );
+                // Reload folder contents when returning from subfolder
+                _loadFolderContents();
+              },
+            );
+          },
         ),
       ],
     );
@@ -300,6 +313,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   /// Build files section
   Widget _buildFilesSection() {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final files = provider.currentFiles;
     
@@ -307,14 +321,17 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Files',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                'FILES',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
               Row(
@@ -340,6 +357,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
             ],
           ),
         ),
+        const SizedBox(height: 16),
         if (files.isEmpty)
           Center(
             child: Padding(
@@ -354,6 +372,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: files.length,
             itemBuilder: (context, index) {
               final file = files[index];
@@ -408,11 +427,13 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
 class _BreadcrumbChip extends StatelessWidget {
   final String label;
   final bool isActive;
+  final bool isDark;
   final VoidCallback? onTap;
 
   const _BreadcrumbChip({
     required this.label,
     required this.isActive,
+    required this.isDark,
     this.onTap,
   });
 
@@ -426,16 +447,19 @@ class _BreadcrumbChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? theme.colorScheme.primary
+              ? (isDark ? AppColors.goldAccent.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.1))
               : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
+          border: isActive
+              ? Border.all(color: AppColors.goldAccent, width: 1)
+              : null,
         ),
         child: Text(
           label,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: isActive
-                ? Colors.white
-                : theme.textTheme.bodyMedium?.color,
+                ? AppColors.goldAccent
+                : (isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodyMedium?.color),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
