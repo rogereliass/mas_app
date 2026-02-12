@@ -397,14 +397,10 @@ class AuthRepository {
       debugPrint('User ID: $userId');
       debugPrint('Profile data keys: ${profileData.keys.toList()}');
 
-      // Remove fields that don't belong in profiles table
-      final cleanedData = Map<String, dynamic>.from(profileData);
-      cleanedData.remove('signup_completed'); // App-level field, not DB column
-      
       // Prepare data for upsert
       final profileRecord = {
         'user_id': userId, // Foreign key to auth.users
-        ...cleanedData,
+        ...profileData,
         'updated_at': DateTime.now().toIso8601String(),
       };
 

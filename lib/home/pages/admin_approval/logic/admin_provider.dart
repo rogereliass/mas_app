@@ -115,6 +115,7 @@ class AdminProvider with ChangeNotifier {
   PendingProfile? _selectedProfile;
   List<ProfileApproval> _selectedProfileApprovals = [];
   List<Role> _selectedProfileRoles = [];
+  String? _selectedProfileTroopContext;
 
   // Loading states
   bool _isLoadingPending = false;
@@ -161,6 +162,7 @@ class AdminProvider with ChangeNotifier {
   PendingProfile? get selectedProfile => _selectedProfile;
   List<ProfileApproval> get selectedProfileApprovals => _selectedProfileApprovals;
   List<Role> get selectedProfileRoles => _selectedProfileRoles;
+  String? get selectedProfileTroopContext => _selectedProfileTroopContext;
 
   bool get isLoadingPending => _isLoadingPending;
   bool get isLoadingProfile => _isLoadingProfile;
@@ -186,6 +188,9 @@ class AdminProvider with ChangeNotifier {
   
   /// Check if current user has system-wide access
   bool get isSystemWideAccess => _authProvider.currentUserProfile?.hasSystemWideAccess ?? false;
+
+  /// Check if effective role context has system-wide access
+  bool get isEffectiveSystemWideAccess => _effectiveUserProfile?.hasSystemWideAccess ?? false;
 
   // ==================== PUBLIC METHODS ====================
 
@@ -252,10 +257,14 @@ class AdminProvider with ChangeNotifier {
       _selectedProfile = profile;
       _selectedProfileApprovals = await _service.fetchProfileApprovals(profileId);
       _selectedProfileRoles = await _roleRepository.getProfileRoles(profileId);
+      _selectedProfileTroopContext = await _roleRepository.getTroopContextForProfile(profileId);
 
       debugPrint('✅ Loaded profile: ${profile.fullName}');
       debugPrint('📋 Approval history: ${_selectedProfileApprovals.length} records');
       debugPrint('🎭 Current roles: ${_selectedProfileRoles.length} roles assigned');
+      if (_selectedProfileTroopContext != null) {
+        debugPrint('🏕️ Troop context loaded: $_selectedProfileTroopContext');
+      }
     } catch (e) {
       _error = 'Unable to load profile details. Please try again.';
       debugPrint('❌ Error loading profile: $e');
@@ -270,6 +279,7 @@ class AdminProvider with ChangeNotifier {
     _selectedProfile = null;
     _selectedProfileApprovals = [];
     _selectedProfileRoles = [];
+    _selectedProfileTroopContext = null;
     _error = null;
     notifyListeners();
   }
@@ -288,6 +298,7 @@ class AdminProvider with ChangeNotifier {
     required List<String> roleIds,
     required String generation,
     String? comments,
+    String? troopContextId,
   }) async {
     // Validation
     if (roleIds.isEmpty) {
@@ -315,6 +326,7 @@ class AdminProvider with ChangeNotifier {
         roleIds: roleIds,
         generation: generation,
         comments: comments,
+        troopContextId: troopContextId,
         currentUser: currentUser, // Pass for security validation
       );
 

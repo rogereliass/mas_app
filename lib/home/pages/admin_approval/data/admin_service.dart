@@ -200,6 +200,7 @@ class AdminService with ScopedServiceMixin {
     required List<String> roleIds,
     required String generation,
     String? comments,
+    String? troopContextId,
     UserProfile? currentUser,
   }) async {
     // Input validation
@@ -222,6 +223,19 @@ class AdminService with ScopedServiceMixin {
         throw Exception('Profile not found: $profileId');
       }
       final signupTroopId = profile.signupTroopId;
+      final effectiveTroopContext = troopContextId ?? signupTroopId;
+      
+      debugPrint('🏕️ Troop context resolution:');
+      debugPrint('   troopContextId (from UI): $troopContextId');
+      debugPrint('   signupTroopId (from profile): $signupTroopId');
+      debugPrint('   effectiveTroopContext (final): $effectiveTroopContext');
+
+      // SECURITY: Non-system users cannot assign a different troop context
+      if (currentUser != null && !currentUser.hasSystemWideAccess) {
+        if (troopContextId != null && troopContextId != signupTroopId) {
+          throw Exception('Access Denied: Cannot assign a different troop context');
+        }
+      }
       
       debugPrint('🔍 Fetching role ranks for ${roleIds.length} roles');
       
@@ -248,10 +262,10 @@ class AdminService with ScopedServiceMixin {
         final rank = roleRanks[roleId] ?? 0;
         final isTroopScoped = rank == 60 || rank == 70;
         
-        if (isTroopScoped && signupTroopId == null) {
+        if (isTroopScoped && effectiveTroopContext == null) {
           throw ArgumentError(
             'Cannot assign troop-scoped role (rank $rank) without a troop assignment. '
-            'User must select their troop during registration.'
+            'Please select a troop before accepting.'
           );
         }
       }
@@ -264,8 +278,8 @@ class AdminService with ScopedServiceMixin {
         // CRITICAL: Set troop_context for troop-scoped roles
         return {
           'role_id': roleId,
-          'troop_context': (isTroopScoped && signupTroopId != null) 
-              ? signupTroopId 
+          'troop_context': (isTroopScoped && effectiveTroopContext != null) 
+              ? effectiveTroopContext 
               : 'null', // Use string 'null' for JSONB handling
         };
       }).toList();

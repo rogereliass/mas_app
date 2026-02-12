@@ -218,6 +218,46 @@ class RoleRepository {
     }
   }
 
+  /// Get troop context for a profile's troop-scoped roles (rank 60 or 70)
+  ///
+  /// Returns the first non-null troop_context found, or null if none
+  Future<String?> getTroopContextForProfile(String profileId) async {
+    try {
+      final response = await _supabase
+          .from('profile_roles')
+          .select('troop_context, roles!inner(role_rank)')
+          .eq('profile_id', profileId)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw const RoleException(
+              'Request timed out while fetching troop context',
+              statusCode: '408',
+            ),
+          );
+
+      for (final entry in response as List) {
+        final rank = (entry['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+        if (rank == 60 || rank == 70) {
+          final troopContext = entry['troop_context'] as String?;
+          if (troopContext != null) {
+            return troopContext;
+          }
+        }
+      }
+
+      return null;
+    } on PostgrestException catch (e) {
+      throw RoleException(
+        'Database error: ${e.message}',
+        statusCode: e.code,
+      );
+    } on RoleException {
+      rethrow;
+    } catch (e) {
+      throw RoleException('Failed to fetch troop context: $e');
+    }
+  }
+
   /// Get the role rank for a specific user
   ///
   /// Returns 0 (public) if user has no profile or role

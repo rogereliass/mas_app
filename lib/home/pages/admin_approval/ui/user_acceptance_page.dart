@@ -419,19 +419,28 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   final _generationController = TextEditingController();
   final _commentsController = TextEditingController();
   final List<Role> _selectedRoles = [];
+  final List<Map<String, dynamic>> _troops = [];
   bool _showApprovalHistory = false;
   bool _rolesInitialized = false;
   bool _commentInitialized = false;
+  bool _troopContextInitialized = false;
+  bool _isLoadingTroops = false;
+  String? _selectedTroopId;
 
   @override
   void initState() {
     super.initState();
     _generationController.text = widget.profile.generation ?? '';
+    _selectedTroopId = widget.profile.signupTroopId;
     
     // Load profile details
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<AdminProvider>().selectProfile(widget.profile.id);
+      if (!mounted) return;
+      context.read<AdminProvider>().selectProfile(widget.profile.id);
+
+      final adminProvider = context.read<AdminProvider>();
+      if (adminProvider.isEffectiveSystemWideAccess) {
+        _loadTroops();
       }
     });
   }
@@ -523,6 +532,18 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                     });
                   }
 
+                  // Initialize troop context from existing role assignments (only once)
+                  if (!_troopContextInitialized && provider.selectedProfileTroopContext != null) {
+                    _troopContextInitialized = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _selectedTroopId = provider.selectedProfileTroopContext;
+                        });
+                      }
+                    });
+                  }
+
                   // Initialize comment field with existing comment if any
                   // Since each profile has only ONE approval record, just get the first one
                   if (!_commentInitialized && provider.selectedProfileApprovals.isNotEmpty) {
@@ -602,6 +623,11 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
                         // Role selection (REQUIRED)
                         _buildRoleDropdown(theme, provider),
+
+                        if (provider.isEffectiveSystemWideAccess) ...[
+                          const SizedBox(height: 20),
+                          _buildTroopAssignmentDropdown(theme),
+                        ],
 
                         const SizedBox(height: 20),
 
@@ -935,6 +961,83 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
   }
 
+  Widget _buildTroopAssignmentDropdown(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+    final requiresTroopContext = _selectedRoles.any(
+      (role) => role.rank == 60 || role.rank == 70,
+    );
+    final initialTroopId = _troops.any((troop) => troop['id'] == _selectedTroopId)
+        ? _selectedTroopId
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Assign Troop Context',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (requiresTroopContext) ...[
+              const SizedBox(width: 8),
+              Text(
+                '*',
+                style: TextStyle(
+                  color: colorScheme.error,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          requiresTroopContext
+              ? 'Required for Troop Head/Leader roles'
+              : 'Optional - Set troop context for troop-scoped roles (rank 60/70)',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: requiresTroopContext ? colorScheme.error : colorScheme.onSurface.withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_isLoadingTroops)
+          const Center(child: CircularProgressIndicator())
+        else
+          DropdownButtonFormField<String>(
+            value: initialTroopId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Troop',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            items: _troops.map((troop) {
+              return DropdownMenuItem<String>(
+                value: troop['id'] as String,
+                child: Text(
+                  troop['name'] as String,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (String? newValue) {
+              setState(() {
+                _selectedTroopId = newValue;
+                debugPrint('🏕️ Troop dropdown changed to: $newValue');
+              });
+            },
+            validator: (value) =>
+                requiresTroopContext && value == null ? 'Please select a troop' : null,
+          ),
+      ],
+    );
+  }
+
   /// Build friendly no roles available widget
   Widget _buildNoRolesWidget(BuildContext context, ColorScheme colorScheme) {
     return Container(
@@ -1140,12 +1243,29 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       return;
     }
 
+    final adminProvider = context.read<AdminProvider>();
+    final requiresTroopContext = _selectedRoles.any(
+      (role) => role.rank == 60 || role.rank == 70,
+    );
+    if (adminProvider.isEffectiveSystemWideAccess && requiresTroopContext && _selectedTroopId == null) {
+      _showErrorDialog('Please select a troop for Troop Head/Leader roles');
+      return;
+    }
+
     // Validate generation
     final generation = _generationController.text.trim();
     if (generation.isEmpty) {
       _showErrorDialog('Please enter a generation before accepting the profile');
       return;
     }
+
+    final selectedTroopName = _selectedTroopId == null
+        ? null
+        : _troops
+            .firstWhere(
+              (troop) => troop['id'] == _selectedTroopId,
+              orElse: () => const {'name': 'Selected Troop'},
+            )['name'] as String?;
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -1156,6 +1276,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           'Are you sure you want to accept ${widget.profile.fullName}\'s registration?\n\n'
           'Roles (${_selectedRoles.length}): ${_selectedRoles.map((r) => r.name).join(', ')}\n'
           'Generation: $generation'
+          '${selectedTroopName != null ? '\nTroop Context: $selectedTroopName' : ''}'
         ),
         actions: [
           TextButton(
@@ -1173,7 +1294,6 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     if (confirmed != true) return;
 
     final authProvider = context.read<AuthProvider>();
-    final adminProvider = context.read<AdminProvider>();
 
     final adminProfile = authProvider.currentUserProfile;
     debugPrint('🔍 Accept - Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}');
@@ -1187,6 +1307,11 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       return;
     }
 
+    final troopContextToSend = adminProvider.isEffectiveSystemWideAccess ? _selectedTroopId : null;
+    debugPrint('🏕️ Sending troopContextId to acceptProfile: $troopContextToSend');
+    debugPrint('   isEffectiveSystemWideAccess: ${adminProvider.isEffectiveSystemWideAccess}');
+    debugPrint('   _selectedTroopId: $_selectedTroopId');
+    
     final success = await adminProvider.acceptProfile(
       profileId: widget.profile.id,
       approvedBy: adminProfileId,
@@ -1195,6 +1320,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       comments: _commentsController.text.trim().isEmpty
           ? null
           : _commentsController.text.trim(),
+      troopContextId: troopContextToSend,
     );
 
     if (!mounted) return;
@@ -1290,6 +1416,51 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       debugPrint('❌ Comment failed: ${adminProvider.error}');
       _showErrorDialog(
         adminProvider.error ?? 'Failed to add comment. Please try again.'
+      );
+    }
+  }
+
+  Future<void> _loadTroops() async {
+    if (_isLoadingTroops) return;
+    setState(() {
+      _isLoadingTroops = true;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final troops = await authProvider.getTroops();
+
+      if (!mounted) return;
+      setState(() {
+        _troops
+          ..clear()
+          ..addAll(troops);
+        if (_selectedTroopId != null && _troops.every((troop) => troop['id'] != _selectedTroopId)) {
+          _selectedTroopId = null;
+        }
+        _isLoadingTroops = false;
+      });
+
+      if (troops.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('No troops available to select.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingTroops = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading troops: ${e.toString()}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
+        ),
       );
     }
   }
