@@ -29,10 +29,22 @@ class _AboutPageState extends State<AboutPage> {
         ),
         centerTitle: true,
       ),
-      body: const AboutContent(),
-      bottomNavigationBar: AppBottomNavBar(
-        currentPage: 'about',
-        isAuthenticated: authProvider.isAuthenticated,
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            const AboutContent(),
+            // Floating Navbar at Bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: AppBottomNavBar(
+                currentPage: 'about',
+                isAuthenticated: authProvider.isAuthenticated,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

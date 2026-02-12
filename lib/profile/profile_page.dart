@@ -51,55 +51,68 @@ class ProfilePage extends StatelessWidget {
           ),
         ],
       ),
-      body: profile == null
-          ? _buildLoadingOrError(context, profileLoading, profileLoadError, authProvider)
-          : RefreshIndicator(
-              onRefresh: () => authProvider.refreshProfile(),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Header with Avatar
-                    _buildProfileHeader(context, profile, authProvider),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Content Cards
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            profile == null
+                ? _buildLoadingOrError(context, profileLoading, profileLoadError, authProvider)
+                : RefreshIndicator(
+                    onRefresh: () => authProvider.refreshProfile(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 100),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Personal Information
-                          _buildSectionTitle(context, 'Personal Information'),
-                          const SizedBox(height: 12),
-                          _buildPersonalInfoCard(context, profile),
+                          // Header with Avatar
+                          _buildProfileHeader(context, profile, authProvider),
                           
                           const SizedBox(height: 24),
                           
-                          // Role & Access
-                          _buildSectionTitle(context, 'Role & Access'),
-                          const SizedBox(height: 12),
-                          _buildRoleCard(context, profile, authProvider),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Account Details
-                          _buildSectionTitle(context, 'Account Details'),
-                          const SizedBox(height: 12),
-                          _buildAccountCard(context, profile),
-                          
-                          const SizedBox(height: 24),
+                          // Content Cards
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Personal Information
+                                _buildSectionTitle(context, 'Personal Information'),
+                                const SizedBox(height: 12),
+                                _buildPersonalInfoCard(context, profile),
+                                
+                                const SizedBox(height: 24),
+                                
+                                // Role & Access
+                                _buildSectionTitle(context, 'Role & Access'),
+                                const SizedBox(height: 12),
+                                _buildRoleCard(context, profile, authProvider),
+                                
+                                const SizedBox(height: 24),
+                                
+                                // Account Details
+                                _buildSectionTitle(context, 'Account Details'),
+                                const SizedBox(height: 12),
+                                _buildAccountCard(context, profile),
+                                
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+            // Floating Navbar at Bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: const AppBottomNavBar(
+                currentPage: 'profile',
+                isAuthenticated: true,
               ),
             ),
-      bottomNavigationBar: const AppBottomNavBar(
-        currentPage: 'profile',
-        isAuthenticated: true,
+          ],
+        ),
       ),
     );
   }

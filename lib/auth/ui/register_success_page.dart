@@ -50,59 +50,69 @@ class RegisterSuccessPage extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(),
 
-              // Success icon with glow effect
-              _buildSuccessIcon(context),
+                  // Success icon with glow effect
+                  _buildSuccessIcon(context),
 
-              const SizedBox(height: 48),
+                  const SizedBox(height: 48),
 
-              // Title
-              Text(
-                'Submitted!',
-                style: theme.textTheme.displayLarge,
+                  // Title
+                  Text(
+                    'Submitted!',
+                    style: theme.textTheme.displayLarge,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Message
+                  Text(
+                    'Thank you for your contribution. Your\nsubmission has been sent to a Unit\nLeader for approval.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.textTheme.bodySmall?.color,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Action button
+                  PrimaryButton(
+                    text: 'Go to Public Library',
+                    onPressed: () {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRouter.library,
+                        (route) => false,
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+                ],
               ),
-
-              const SizedBox(height: 16),
-
-              // Message
-              Text(
-                'Thank you for your contribution. Your\nsubmission has been sent to a Unit\nLeader for approval.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.textTheme.bodySmall?.color,
-                  height: 1.5,
-                ),
-              ),
-
-              const Spacer(),
-
-              // Action button
-              PrimaryButton(
-                text: 'Go to Public Library',
-                onPressed: () {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    AppRouter.library,
-                    (route) => false,
-                  );
-                },
-              ),
-
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
-        ),
-      ),
-      bottomNavigationBar: const AppBottomNavBar(
-        currentPage: 'library',
-        isAuthenticated: true,
+          // Floating Navbar at Bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: const AppBottomNavBar(
+              currentPage: 'library',
+              isAuthenticated: true,
+            ),
+          ),
+        ],
       ),
     );
   }

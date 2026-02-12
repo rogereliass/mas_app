@@ -24,34 +24,32 @@ class AppBottomNavBar extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
+    // Return the navbar as a floating widget that doesn't take layout space
+    // This is designed to be placed at the bottom via Scaffold configuration
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDarkElevated : theme.cardTheme.color,
-        border: isDark ? Border(
-          top: BorderSide(
-            color: AppColors.scoutEliteNavy.withOpacity(0.5),
-            width: 1,
-          ),
-        ) : null,
+        color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
+        borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? Colors.black.withOpacity(0.3)
-                : theme.shadowColor.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+                ? Colors.black.withOpacity(0.4)
+                : theme.shadowColor.withOpacity(0.15),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+            spreadRadius: 2,
           ),
         ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: isAuthenticated 
-                ? _buildAuthenticatedNavItems(context)
-                : _buildPublicNavItems(context),
-          ),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisSize: MainAxisSize.min,
+          children: isAuthenticated 
+              ? _buildAuthenticatedNavItems(context)
+              : _buildPublicNavItems(context),
         ),
       ),
     );
@@ -136,31 +134,43 @@ class AppBottomNavBar extends StatelessWidget {
     
     final color = isActive ? activeColor : inactiveColor;
 
-    return Expanded(
-      child: InkWell(
-        onTap: isActive ? null : onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isActive ? activeIcon : icon,
+    return GestureDetector(
+      onTap: isActive ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isActive ? activeIcon : icon,
+              color: color,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: color,
-                size: 28,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                fontSize: 10,
+                letterSpacing: 0.5,
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                  fontSize: 11,
+            ),
+            // Active indicator line
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  width: 40,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

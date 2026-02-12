@@ -45,10 +45,22 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: _buildLibraryContent(),
-      bottomNavigationBar: AppBottomNavBar(
-        currentPage: 'library',
-        isAuthenticated: authProvider.isAuthenticated,
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            _buildLibraryContent(),
+            // Floating Navbar at Bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: AppBottomNavBar(
+                currentPage: 'library',
+                isAuthenticated: authProvider.isAuthenticated,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

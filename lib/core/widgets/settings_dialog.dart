@@ -195,6 +195,15 @@ class SettingsDialog extends StatelessWidget {
                           subtitle: '1.0.0',
                           onTap: null, // Non-interactive
                         ),
+                        _SettingItem(
+                          icon: Icons.info_rounded,
+                          title: 'About App',
+                          subtitle: 'Learn more about this app',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.pushNamed(context, AppRouter.about);
+                          },
+                        ),
                       ],
                     ),
                   ],

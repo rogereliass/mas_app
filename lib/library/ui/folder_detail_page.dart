@@ -71,10 +71,22 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: _buildFolderContent(),
-      bottomNavigationBar: AppBottomNavBar(
-        currentPage: 'library',
-        isAuthenticated: Provider.of<AuthProvider>(context, listen: false).isAuthenticated,
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            _buildFolderContent(),
+            // Floating Navbar at Bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: AppBottomNavBar(
+                currentPage: 'library',
+                isAuthenticated: Provider.of<AuthProvider>(context, listen: false).isAuthenticated,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

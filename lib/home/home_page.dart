@@ -206,43 +206,53 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      // 2. Main Content Area
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refreshData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Welcome Header
-                _buildWelcomeHeader(context, authProvider),
-                const SizedBox(height: 24),
+      // 2. Main Content Area with Floating Navbar
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _refreshData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 100),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Welcome Header
+                      _buildWelcomeHeader(context, authProvider),
+                      const SizedBox(height: 24),
 
-                // Quick Actions
-                _buildQuickActions(context),
-                const SizedBox(height: 32),
+                      // Quick Actions
+                      _buildQuickActions(context),
+                      const SizedBox(height: 32),
 
-                // Summary / Stats
-                _buildSummaryStats(context),
-                const SizedBox(height: 32),
+                      // Summary / Stats
+                      _buildSummaryStats(context),
+                      const SizedBox(height: 32),
 
-                // // Recent Activity
-                // _buildRecentActivity(context),
-                
-                // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
-                const SizedBox(height: 24),
-              ],
+                  // // Recent Activity
+                  // _buildRecentActivity(context),
+                  
+                  // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
+                  const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+            // Floating Navbar at Bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: const AppBottomNavBar(
+                currentPage: 'home',
+                isAuthenticated: true,
+              ),
+            ),
+          ],
         ),
-      ),
-
-      // 3. Bottom Navigation Bar
-      bottomNavigationBar: const AppBottomNavBar(
-        currentPage: 'home',
-        isAuthenticated: true,
       ),
     );
   }
