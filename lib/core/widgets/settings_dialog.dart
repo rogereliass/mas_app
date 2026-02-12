@@ -107,8 +107,8 @@ class SettingsDialog extends StatelessWidget {
                             title: 'Change Password',
                             subtitle: 'Update your account password',
                             onTap: () {
-                              // TODO: Navigate to change password
-                              Navigator.pop(context);
+                              Navigator.pop(context); // Close settings dialog
+                              Navigator.pushNamed(context, AppRouter.forgotPassword);
                             },
                           ),
                           _SettingItem(
