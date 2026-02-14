@@ -36,6 +36,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Database artifacts
+database/
+
 # Symbolication related
 app.*.symbols
 
