@@ -44,7 +44,7 @@ class DownloadService {
       }
 
       if (fileSizeBytes != null && fileSizeBytes > maxSizeBytes) {
-        _logDebug('⛔ File too large for offline cache (${fileSizeBytes} bytes)');
+        _logDebug('⛔ File too large for offline cache ($fileSizeBytes bytes)');
         return null;
       }
 

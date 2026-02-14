@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
-import '../../core/config/theme_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
-import 'components/custom_search_bar.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
 
