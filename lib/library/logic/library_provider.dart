@@ -38,6 +38,14 @@ class LibraryProvider with ChangeNotifier {
   final Map<String, LibraryFolder> _folderCache = {};
   final Map<String, LibraryFile> _fileCache = {};
 
+  bool _hasCheckedRls = false;
+
+  // Pagination for files in folder
+  static const int _defaultFilePageSize = 50;
+  int _fileOffset = 0;
+  bool _hasMoreFiles = true;
+  bool _isLoadingMoreFiles = false;
+
   // ==================== GETTERS ====================
 
   List<LibraryFolder> get rootFolders => _rootFolders;
@@ -49,6 +57,8 @@ class LibraryProvider with ChangeNotifier {
 
   bool get isLoadingRoot => _isLoadingRoot;
   bool get isLoadingFolder => _isLoadingFolder;
+  bool get isLoadingMoreFiles => _isLoadingMoreFiles;
+  bool get hasMoreFiles => _hasMoreFiles;
   bool get hasError => _error != null;
   String? get error => _error;
 
@@ -115,6 +125,17 @@ class LibraryProvider with ChangeNotifier {
 
       _isLoadingRoot = false;
       _error = null;
+
+      if (kDebugMode && !_hasCheckedRls) {
+        _hasCheckedRls = true;
+        final roleRank = _authProvider?.currentUserRoleRank ?? 0;
+        final hasLeak = await _service.hasRlsLeakForRole(roleRank);
+        if (hasLeak) {
+          debugPrint('⚠️ RLS may be disabled: higher-rank files were visible to current user');
+        } else {
+          debugPrint('✅ RLS check passed or no higher-rank files found');
+        }
+      }
     } catch (e) {
       _error = _formatError(e);
       _isLoadingRoot = false;
@@ -137,6 +158,8 @@ class LibraryProvider with ChangeNotifier {
 
     _isLoadingFolder = true;
     _error = null;
+    _fileOffset = 0;
+    _hasMoreFiles = true;
     notifyListeners();
 
     try {
@@ -151,13 +174,18 @@ class LibraryProvider with ChangeNotifier {
       _currentFolder = _folderCache[folderId];
 
       // Load folder contents
-      final result = await _service.fetchFolderContents(folderId);
+      final result = await _service.fetchFolderContents(
+        folderId,
+        fileLimit: _defaultFilePageSize,
+        fileOffset: _fileOffset,
+      );
       
       _currentSubfolders = result.subfolders;
       
       // Filter files based on user role BEFORE setting state
       final allFiles = result.files;
       _currentFiles = _filterFilesByRole(allFiles);
+      _hasMoreFiles = allFiles.length == _defaultFilePageSize;
 
       // Cache subfolders
       for (final folder in _currentSubfolders) {
@@ -179,6 +207,41 @@ class LibraryProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Load next page of files in the current folder
+  Future<void> loadMoreFiles() async {
+    if (_isLoadingMoreFiles || !_hasMoreFiles || _currentFolder == null) {
+      return;
+    }
+
+    _isLoadingMoreFiles = true;
+    notifyListeners();
+
+    try {
+      _fileOffset += _defaultFilePageSize;
+      final nextFiles = await _service.fetchFilesInFolder(
+        _currentFolder!.id,
+        limit: _defaultFilePageSize,
+        offset: _fileOffset,
+      );
+
+      _hasMoreFiles = nextFiles.length == _defaultFilePageSize;
+
+      // Cache ALL files (even filtered ones) for direct access
+      for (final file in nextFiles) {
+        _fileCache[file.id] = file;
+      }
+
+      // Append filtered files to current list
+      final filteredNextFiles = _filterFilesByRole(nextFiles);
+      _currentFiles = [..._currentFiles, ...filteredNextFiles];
+    } catch (e) {
+      _logError('loadMoreFiles', e);
+    } finally {
+      _isLoadingMoreFiles = false;
+      notifyListeners();
+    }
+  }
+
   /// Refresh current folder contents
   Future<void> refreshFolderContents() async {
     if (_currentFolder != null) {
@@ -192,6 +255,8 @@ class LibraryProvider with ChangeNotifier {
     _currentFolder = null;
     _currentSubfolders = [];
     _currentFiles = [];
+    _fileOffset = 0;
+    _hasMoreFiles = true;
     notifyListeners();
   }
 

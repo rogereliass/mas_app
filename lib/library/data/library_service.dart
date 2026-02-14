@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'library_models.dart';
@@ -16,6 +17,12 @@ class LibraryService {
   final SupabaseClient _supabase;
 
   LibraryService(this._supabase);
+
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
 
   /// Factory constructor using singleton Supabase instance
   factory LibraryService.instance() {
@@ -95,13 +102,25 @@ class LibraryService {
 
   /// Fetch files in a specific folder
   /// Returns files sorted by created_at DESC (newest first)
-  Future<List<LibraryFile>> fetchFilesInFolder(String folderId) async {
+  Future<List<LibraryFile>> fetchFilesInFolder(
+    String folderId, {
+    int? limit,
+    int? offset,
+  }) async {
     try {
-      final response = await _supabase
+      var query = _supabase
           .from(_filesTable)
           .select()
           .eq('folder_id', folderId)
           .order('created_at', ascending: false);
+
+      if (limit != null) {
+        final start = offset ?? 0;
+        final end = start + limit - 1;
+        query = query.range(start, end);
+      }
+
+      final response = await query;
 
       return (response as List)
           .map((json) => LibraryFile.fromJson(json))
@@ -165,15 +184,44 @@ class LibraryService {
   /// Fetch both subfolders and files for a specific folder
   /// Returns combined data for folder detail page
   Future<({List<LibraryFolder> subfolders, List<LibraryFile> files})>
-      fetchFolderContents(String folderId) async {
+      fetchFolderContents(
+    String folderId, {
+    int? fileLimit,
+    int? fileOffset,
+  }) async {
     try {
       final subfolders = await fetchSubfolders(folderId);
-      final files = await fetchFilesInFolder(folderId);
+      final files = await fetchFilesInFolder(
+        folderId,
+        limit: fileLimit,
+        offset: fileOffset,
+      );
 
       return (subfolders: subfolders, files: files);
     } catch (e) {
       _logError('fetchFolderContents', e);
       rethrow;
+    }
+  }
+
+  // ==================== RLS CHECKS ====================
+
+  /// Debug-only check to detect missing RLS enforcement on files.
+  /// Returns true if the query leaks any higher-rank files for the current user.
+  Future<bool> hasRlsLeakForRole(int userRoleRank) async {
+    if (!kDebugMode) return false;
+
+    try {
+      final response = await _supabase
+          .from(_filesTable)
+          .select('id,min_role_rank')
+          .gt('min_role_rank', userRoleRank)
+          .limit(1);
+
+      return (response as List).isNotEmpty;
+    } catch (e) {
+      _logError('hasRlsLeakForRole', e);
+      return false;
     }
   }
 
@@ -191,12 +239,12 @@ class LibraryService {
       }
 
       if (file.storagePath == null || file.storagePath!.isEmpty) {
-        print('⚠️ Storage path is null or empty');
+        _logDebug('⚠️ Storage path is null or empty');
         return file.iconUrl; // Fallback to iconUrl
       }
 
       final path = file.storagePath!;
-      print('🔍 Attempting to get signed URL for path: $path');
+      _logDebug('🔍 Attempting to get signed URL');
 
       try {
         // Try exact path first
@@ -204,35 +252,35 @@ class LibraryService {
             .from(_storageBucket)
             .createSignedUrl(path, 3600); // Valid for 1 hour
 
-        print('✅ Successfully generated signed URL');
+        _logDebug('✅ Successfully generated signed URL');
         return signedUrl;
       } catch (storageError) {
-        print('⚠️ Storage file not found at: $path');
+        _logDebug('⚠️ Storage file not found at provided path');
         
         // Try with spaces replaced by underscores (common storage naming convention)
         if (path.contains(' ')) {
           final normalizedPath = path.replaceAll(' ', '_');
-          print('🔄 Trying normalized path: $normalizedPath');
+          _logDebug('🔄 Trying normalized path');
           
           try {
             final signedUrl = await _supabase.storage
                 .from(_storageBucket)
                 .createSignedUrl(normalizedPath, 3600);
             
-            print('✅ Successfully generated signed URL with normalized path');
+            _logDebug('✅ Successfully generated signed URL with normalized path');
             return signedUrl;
           } catch (e) {
-            print('⚠️ Normalized path also not found');
+            _logDebug('⚠️ Normalized path also not found');
           }
         }
         
         // If storage file not found, try using iconUrl as fallback
         if (file.iconUrl != null && file.iconUrl!.isNotEmpty) {
-          print('✅ Using iconUrl as fallback: ${file.iconUrl}');
+          _logDebug('✅ Using iconUrl as fallback');
           return file.iconUrl;
         }
         
-        print('❌ No iconUrl fallback available');
+        _logDebug('❌ No iconUrl fallback available');
         rethrow;
       }
     } catch (e) {
@@ -269,7 +317,7 @@ class LibraryService {
         throw Exception('Storage path is null or empty');
       }
 
-      print('📄 Loading text file from storage: ${file.storagePath}');
+      _logDebug('📄 Loading text file from storage');
       
       final bytes = await _supabase.storage
           .from(_storageBucket)
@@ -277,7 +325,7 @@ class LibraryService {
 
       // Use UTF-8 decoding to properly handle Arabic and other Unicode characters
       final content = utf8.decode(bytes, allowMalformed: true);
-      print('✅ Loaded ${content.length} characters from text file');
+      _logDebug('✅ Loaded ${content.length} characters from text file');
       
       return content;
     } catch (e) {
@@ -300,7 +348,7 @@ class LibraryService {
       //   'user_id': userId,
       //   'viewed_at': DateTime.now().toIso8601String(),
       // });
-      print('ℹ️ File view tracking disabled (table schema issue)');
+      _logDebug('ℹ️ File view tracking disabled (table schema issue)');
     } catch (e) {
       // Don't throw - tracking failures should not break the app
       _logError('recordFileView', e);
@@ -320,7 +368,7 @@ class LibraryService {
       //   'user_id': userId,
       //   'downloaded_at': DateTime.now().toIso8601String(),
       // });
-      print('ℹ️ File download tracking disabled (table schema issue)');
+      _logDebug('ℹ️ File download tracking disabled (table schema issue)');
     } catch (e) {
       // Don't throw - tracking failures should not break the app
       _logError('recordFileDownload', e);
@@ -331,14 +379,12 @@ class LibraryService {
 
   /// Log errors with context
   void _logError(String operation, Object error) {
-    // ignore: avoid_print
-    print('❌ LibraryService.$operation ERROR: $error');
-    
-    if (error is PostgrestException) {
-      // ignore: avoid_print
-      print('   Supabase Error Details: ${error.message}');
-      // ignore: avoid_print
-      print('   Code: ${error.code}, Hint: ${error.hint}');
+    if (kDebugMode) {
+      debugPrint('❌ LibraryService.$operation ERROR: $error');
+      if (error is PostgrestException) {
+        debugPrint('   Supabase Error Details: ${error.message}');
+        debugPrint('   Code: ${error.code}, Hint: ${error.hint}');
+      }
     }
   }
 

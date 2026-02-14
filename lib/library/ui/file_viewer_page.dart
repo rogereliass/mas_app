@@ -228,6 +228,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         storagePath: _file!.storagePath!,
         fileType: widget.fileType,
         serverVersion: serverVersion,
+        fileSizeBytes: _file!.sizeBytes,
         iconUrl: _file!.iconUrl,
       );
 
@@ -326,6 +327,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         storagePath: _file!.storagePath!,
         fileType: widget.fileType,
         serverVersion: _file!.serverVersion ?? 1,
+        fileSizeBytes: _file!.sizeBytes,
         iconUrl: _file!.iconUrl,
         onProgress: (progress) {
           if (mounted) {

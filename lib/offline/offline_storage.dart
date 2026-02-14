@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -13,6 +14,12 @@ class OfflineStorageService {
   static const int _defaultExpiryDays = 180;
   
   static Box<OfflineFileMetadata>? _box;
+
+  static void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
 
   /// Initialize Hive box for offline files
   static Future<void> initialize() async {
@@ -75,7 +82,7 @@ class OfflineStorageService {
     
     await box.put(fileId, metadata);
     
-    print('💾 Saved file offline: $fileName (version: $serverVersion, expires: ${metadata.expiresAt})');
+    _logDebug('💾 Saved file offline (version: $serverVersion, expires: ${metadata.expiresAt})');
     
     return filePath;
   }
@@ -99,10 +106,10 @@ class OfflineStorageService {
         await box.put(fileId, updated);
       }
       
-      print('🖼️ Saved icon offline: $iconPath');
+      _logDebug('🖼️ Saved icon offline');
       return iconPath;
     } catch (e) {
-      print('❌ Error saving icon: $e');
+      _logDebug('❌ Error saving icon: $e');
       return null;
     }
   }
@@ -126,7 +133,7 @@ class OfflineStorageService {
       
       return true;
     } catch (e) {
-      print('❌ Error checking offline availability: $e');
+      _logDebug('❌ Error checking offline availability: $e');
       return false;
     }
   }
@@ -157,7 +164,7 @@ class OfflineStorageService {
       
       return metadata.filePath;
     } catch (e) {
-      print('❌ Error getting file path: $e');
+      _logDebug('❌ Error getting file path: $e');
       return null;
     }
   }
@@ -206,7 +213,7 @@ class OfflineStorageService {
           await file.delete();
         }
       } catch (e) {
-        print('⚠️ Error deleting file: $e');
+        _logDebug('⚠️ Error deleting file: $e');
       }
       
       // Delete icon if exists
@@ -217,16 +224,16 @@ class OfflineStorageService {
             await iconFile.delete();
           }
         } catch (e) {
-          print('⚠️ Error deleting icon: $e');
+          _logDebug('⚠️ Error deleting icon: $e');
         }
       }
       
       // Remove metadata
       await box.delete(fileId);
       
-      print('🗑️ Deleted offline file: ${metadata.fileName}');
+      _logDebug('🗑️ Deleted offline file');
     } catch (e) {
-      print('❌ Error in deleteFile: $e');
+      _logDebug('❌ Error in deleteFile: $e');
     }
   }
 
@@ -243,7 +250,7 @@ class OfflineStorageService {
             expiredKeys.add(key);
           }
         } catch (e) {
-          print('⚠️ Error checking expiry for key $key: $e');
+          _logDebug('⚠️ Error checking expiry for key $key: $e');
         }
       }
       
@@ -252,10 +259,10 @@ class OfflineStorageService {
       }
       
       if (expiredKeys.isNotEmpty) {
-        print('🧹 Cleaned up ${expiredKeys.length} expired files');
+        _logDebug('🧹 Cleaned up ${expiredKeys.length} expired files');
       }
     } catch (e) {
-      print('❌ Error in cleanupExpiredFiles: $e');
+      _logDebug('❌ Error in cleanupExpiredFiles: $e');
     }
   }
 

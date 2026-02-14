@@ -381,38 +381,58 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
             ),
           )
         else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: files.length,
-            itemBuilder: (context, index) {
-              final file = files[index];
-              return FileTile(
-                fileId: file.id,
-                fileName: file.title,
-                fileType: file.fileType?.toUpperCase() ?? 'UNKNOWN',
-                fileSize: file.formattedSize,
-                lastModified: _formatDate(file.createdAt),
-                onTap: () async {
-                  // Record view and navigate to file viewer
-                  await provider.recordFileView(file.id);
-                  
-                  if (!mounted) return;
-                  AppRouter.goToFileViewer(
-                    context,
+          Column(
+            children: [
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: files.length,
+                itemBuilder: (context, index) {
+                  final file = files[index];
+                  return FileTile(
                     fileId: file.id,
                     fileName: file.title,
-                    fileType: file.fileType ?? 'unknown',
-                    fileSizeBytes: file.sizeBytes,
-                    description: file.description,
+                    fileType: file.fileType?.toUpperCase() ?? 'UNKNOWN',
+                    fileSize: file.formattedSize,
+                    lastModified: _formatDate(file.createdAt),
+                    onTap: () async {
+                      // Record view and navigate to file viewer
+                      await provider.recordFileView(file.id);
+                      
+                      if (!mounted) return;
+                      AppRouter.goToFileViewer(
+                        context,
+                        fileId: file.id,
+                        fileName: file.title,
+                        fileType: file.fileType ?? 'unknown',
+                        fileSizeBytes: file.sizeBytes,
+                        description: file.description,
+                      );
+                    },
+                    onMorePressed: () {
+                      // TODO: Show file options
+                    },
                   );
                 },
-                onMorePressed: () {
-                  // TODO: Show file options
-                },
-              );
-            },
+              ),
+              if (provider.hasMoreFiles)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: TextButton(
+                    onPressed: provider.isLoadingMoreFiles
+                        ? null
+                        : () => provider.loadMoreFiles(),
+                    child: provider.isLoadingMoreFiles
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Load more'),
+                  ),
+                ),
+            ],
           ),
       ],
     );

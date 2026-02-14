@@ -75,7 +75,7 @@ class AdminProvider with ChangeNotifier {
     // Get selected role's rank
     final selectedRole = _authProvider.getRoleByName(_selectedRoleName!);
     if (selectedRole == null) {
-      debugPrint('⚠️ Selected role "${_selectedRoleName}" not found in user roles');
+      debugPrint('⚠️ Selected role "$_selectedRoleName" not found in user roles');
       return baseProfile;
     }
     

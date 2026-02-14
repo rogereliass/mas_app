@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'offline_storage.dart';
 
@@ -6,6 +7,13 @@ import 'offline_storage.dart';
 /// Handles downloading files from Supabase and caching them locally
 class DownloadService {
   final _supabase = Supabase.instance.client;
+  static const int _defaultMaxDownloadBytes = 50 * 1024 * 1024;
+
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
 
   /// Download a file and save it to local storage
   Future<String?> downloadAndCache({
@@ -14,22 +22,29 @@ class DownloadService {
     required String storagePath,
     required String fileType,
     required int serverVersion,
+    int? fileSizeBytes,
     String? iconUrl,
     int expiryDays = 180,
+    int maxSizeBytes = _defaultMaxDownloadBytes,
     Function(double)? onProgress,
   }) async {
     try {
-      print('📥 Starting download: $fileName (v$serverVersion)');
+      _logDebug('📥 Starting download (v$serverVersion)');
       
       // Don't cache video files (YouTube URLs)
       if (fileType.toLowerCase() == 'video') {
-        print('⏩ Skipping video file (YouTube URL)');
+        _logDebug('⏩ Skipping video file (YouTube URL)');
         return null;
       }
 
       // Validate storagePath
       if (storagePath.isEmpty) {
-        print('❌ Storage path is empty');
+        _logDebug('❌ Storage path is empty');
+        return null;
+      }
+
+      if (fileSizeBytes != null && fileSizeBytes > maxSizeBytes) {
+        _logDebug('⛔ File too large for offline cache (${fileSizeBytes} bytes)');
         return null;
       }
 
@@ -39,11 +54,11 @@ class DownloadService {
           .download(storagePath);
 
       if (bytes.isEmpty) {
-        print('❌ Downloaded file is empty');
+        _logDebug('❌ Downloaded file is empty');
         return null;
       }
 
-      print('✅ Downloaded ${bytes.length} bytes');
+      _logDebug('✅ Downloaded ${bytes.length} bytes');
 
       // Save to local storage
       final filePath = await OfflineStorageService.saveFile(
@@ -58,7 +73,7 @@ class DownloadService {
       // Download icon if available
       if (iconUrl != null && iconUrl.isNotEmpty) {
         try {
-          print('🖼️ Downloading icon from: $iconUrl');
+          _logDebug('🖼️ Downloading icon');
           // Note: iconUrl is expected to be a full URL, not a storage path
           // You might need to adjust this based on your Supabase setup
           
@@ -76,15 +91,15 @@ class DownloadService {
             }
           }
         } catch (e) {
-          print('⚠️ Failed to download icon: $e');
+          _logDebug('⚠️ Failed to download icon: $e');
           // Continue even if icon fails
         }
       }
 
-      print('💾 File cached successfully: $filePath');
+      _logDebug('💾 File cached successfully');
       return filePath;
     } catch (e) {
-      print('❌ Error downloading file: $e');
+      _logDebug('❌ Error downloading file: $e');
       return null;
     }
   }
@@ -96,16 +111,18 @@ class DownloadService {
     required String storagePath,
     required String fileType,
     required int serverVersion,
+    int? fileSizeBytes,
     String? iconUrl,
     int expiryDays = 180,
+    int maxSizeBytes = _defaultMaxDownloadBytes,
   }) async {
     // Check if we need to update
     if (!OfflineStorageService.needsUpdate(fileId, serverVersion)) {
-      print('✅ File is up to date (v$serverVersion)');
+      _logDebug('✅ File is up to date (v$serverVersion)');
       return false;
     }
 
-    print('🔄 Updating file from v${OfflineStorageService.getMetadata(fileId)?.serverVersion ?? 0} to v$serverVersion');
+    _logDebug('🔄 Updating file to v$serverVersion');
 
     // Download new version
     final filePath = await downloadAndCache(
@@ -114,8 +131,10 @@ class DownloadService {
       storagePath: storagePath,
       fileType: fileType,
       serverVersion: serverVersion,
+      fileSizeBytes: fileSizeBytes,
       iconUrl: iconUrl,
       expiryDays: expiryDays,
+      maxSizeBytes: maxSizeBytes,
     );
 
     return filePath != null;

@@ -27,7 +27,7 @@ class LibraryHomePage extends StatefulWidget {
 }
 
 class _LibraryHomePageState extends State<LibraryHomePage> {
-  String _selectedCategory = 'All';
+  final String _selectedCategory = 'All';
 
   @override
   void initState() {

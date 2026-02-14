@@ -7,19 +7,24 @@ import 'package:flutter/foundation.dart';
 class AuthRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
+
   /// Test Supabase connection
   Future<bool> testConnection() async {
     try {
-      debugPrint('=== TESTING SUPABASE CONNECTION ===');
-      debugPrint('Supabase URL: ${String.fromEnvironment('SUPABASE_URL')}');
+      _logDebug('=== TESTING SUPABASE CONNECTION ===');
       
       // Simple auth status check
       final session = _supabase.auth.currentSession;
-      debugPrint('Current session: ${session != null ? "exists" : "none"}');
+      _logDebug('Current session: ${session != null ? "exists" : "none"}');
       
       return true;
     } catch (e) {
-      debugPrint('Connection test failed: $e');
+      _logDebug('Connection test failed: $e');
       return false;
     }
   }
@@ -73,11 +78,7 @@ class AuthRepository {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
       
-      debugPrint('=== SIGNUP REQUEST ===');
-      debugPrint('Raw phone: $phoneNumber');
-      debugPrint('Formatted phone: $formattedPhone');
-      debugPrint('Has password: ${password.isNotEmpty}');
-      debugPrint('Metadata fields: ${metadata?.keys.toList()}');
+      _logDebug('=== SIGNUP REQUEST ===');
 
       // Sign up with phone - Supabase will send OTP
       // Pass metadata to Supabase auth for redundancy (also available immediately on currentUser)
@@ -91,33 +92,27 @@ class AuthRepository {
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
-              debugPrint('TIMEOUT: Request took longer than 60 seconds');
+              _logDebug('TIMEOUT: Request took longer than 60 seconds');
               throw AuthException(
                 'Request timed out. Please check your internet connection.',
               );
             },
           );
 
-      debugPrint('=== METADATA SENT TO AUTH ===');
-      debugPrint('Data keys: ${metadata?.keys.toList()}');
-
-      debugPrint('=== SIGNUP RESPONSE ===');
-      debugPrint('User ID: ${response.user?.id}');
-      debugPrint('Phone: ${response.user?.phone}');
-      debugPrint('Session: ${response.session != null}');
-      debugPrint('User confirmed: ${response.user?.confirmedAt}');
+      _logDebug('=== SIGNUP RESPONSE ===');
+      _logDebug('Session: ${response.session != null}');
       
       // Return true to indicate OTP was sent
       return true;
     } on AuthException catch (e) {
-      debugPrint('=== AUTH EXCEPTION ===');
-      debugPrint('Message: ${e.message}');
-      debugPrint('Status code: ${e.statusCode}');
+      _logDebug('=== AUTH EXCEPTION ===');
+      _logDebug('Message: ${e.message}');
+      _logDebug('Status code: ${e.statusCode}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
-      debugPrint('=== UNEXPECTED ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== UNEXPECTED ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Failed to send OTP: ${e.toString()}');
     }
   }
@@ -133,9 +128,7 @@ class AuthRepository {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
       
-      debugPrint('=== OTP VERIFICATION REQUEST ===');
-      debugPrint('Phone: $formattedPhone');
-      debugPrint('OTP Code: $otpCode');
+      _logDebug('=== OTP VERIFICATION REQUEST ===');
 
       final response = await _supabase.auth
           .verifyOTP(
@@ -146,33 +139,31 @@ class AuthRepository {
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
-              debugPrint('TIMEOUT: OTP verification took longer than 60 seconds');
+              _logDebug('TIMEOUT: OTP verification took longer than 60 seconds');
               throw AuthException(
                 'Request timed out. Please check your internet connection.',
               );
             },
           );
 
-      debugPrint('=== OTP VERIFICATION RESPONSE ===');
-      debugPrint('User ID: ${response.user?.id}');
-      debugPrint('Phone: ${response.user?.phone}');
-      debugPrint('Session exists: ${response.session != null}');
+      _logDebug('=== OTP VERIFICATION RESPONSE ===');
+      _logDebug('Session exists: ${response.session != null}');
 
       if (response.user == null) {
-        debugPrint('ERROR: No user returned after OTP verification');
+        _logDebug('ERROR: No user returned after OTP verification');
         throw AuthException('Verification failed: No user returned');
       }
 
       return response.user!;
     } on AuthException catch (e) {
-      debugPrint('=== AUTH EXCEPTION ===');
-      debugPrint('Message: ${e.message}');
-      debugPrint('Status code: ${e.statusCode}');
+      _logDebug('=== AUTH EXCEPTION ===');
+      _logDebug('Message: ${e.message}');
+      _logDebug('Status code: ${e.statusCode}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
-      debugPrint('=== UNEXPECTED ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== UNEXPECTED ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Verification failed: ${e.toString()}');
     }
   }
@@ -203,13 +194,13 @@ class AuthRepository {
     }
 
     try {
-      debugPrint('Rolling back auth user: ${user.id}');
+      _logDebug('Rolling back auth user');
       // Sign out to clear session (in free tier, we can't delete users via API)
       // In production, you'd use admin API to delete the user
       await _supabase.auth.signOut();
-      debugPrint('✓ User signed out (rollback complete)');
+      _logDebug('✓ User signed out (rollback complete)');
     } catch (e) {
-      debugPrint('Error during rollback: $e');
+      _logDebug('Error during rollback: $e');
       throw AuthException('Failed to rollback user: ${e.toString()}');
     }
   }
@@ -229,8 +220,7 @@ class AuthRepository {
     try {
       final formattedPhone = _formatPhoneNumber(phoneNumber);
       
-      debugPrint('=== PASSWORD RESET OTP REQUEST ===');
-      debugPrint('Phone: $formattedPhone');
+      _logDebug('=== PASSWORD RESET OTP REQUEST ===');
 
       // Use Supabase's signInWithOtp for existing users (password reset flow)
       await _supabase.auth
@@ -247,16 +237,16 @@ class AuthRepository {
             },
           );
 
-      debugPrint('✓ Password reset OTP sent successfully');
+      _logDebug('✓ Password reset OTP sent successfully');
       return true;
     } on AuthException catch (e) {
-      debugPrint('=== AUTH EXCEPTION ===');
-      debugPrint('Message: ${e.message}');
+      _logDebug('=== AUTH EXCEPTION ===');
+      _logDebug('Message: ${e.message}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
-      debugPrint('=== UNEXPECTED ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== UNEXPECTED ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Failed to send OTP: ${e.toString()}');
     }
   }
@@ -272,9 +262,7 @@ class AuthRepository {
     try {
       final formattedPhone = _formatPhoneNumber(phoneNumber);
       
-      debugPrint('=== PASSWORD RESET OTP VERIFICATION ===');
-      debugPrint('Phone: $formattedPhone');
-      debugPrint('OTP Code: $otpCode');
+      _logDebug('=== PASSWORD RESET OTP VERIFICATION ===');
 
       final response = await _supabase.auth
           .verifyOTP(
@@ -291,8 +279,7 @@ class AuthRepository {
             },
           );
 
-      debugPrint('✓ OTP verified successfully');
-      debugPrint('User ID: ${response.user?.id}');
+          _logDebug('✓ OTP verified successfully');
 
       if (response.user == null) {
         throw AuthException('Verification failed: No user returned');
@@ -300,13 +287,13 @@ class AuthRepository {
 
       return response.user!;
     } on AuthException catch (e) {
-      debugPrint('=== AUTH EXCEPTION ===');
-      debugPrint('Message: ${e.message}');
+      _logDebug('=== AUTH EXCEPTION ===');
+      _logDebug('Message: ${e.message}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
-      debugPrint('=== UNEXPECTED ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== UNEXPECTED ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Verification failed: ${e.toString()}');
     }
   }
@@ -325,8 +312,7 @@ class AuthRepository {
         throw AuthException('No active session. Please verify OTP first.');
       }
 
-      debugPrint('=== UPDATE PASSWORD ===');
-      debugPrint('User ID: ${user.id}');
+      _logDebug('=== UPDATE PASSWORD ===');
 
       final response = await _supabase.auth
           .updateUser(
@@ -343,18 +329,17 @@ class AuthRepository {
             },
           );
 
-      debugPrint('✓ Password updated successfully');
-      debugPrint('User ID: ${response.user?.id}');
+      _logDebug('✓ Password updated successfully');
 
       return response.user != null;
     } on AuthException catch (e) {
-      debugPrint('=== AUTH EXCEPTION ===');
-      debugPrint('Message: ${e.message}');
+      _logDebug('=== AUTH EXCEPTION ===');
+      _logDebug('Message: ${e.message}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
-      debugPrint('=== UNEXPECTED ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== UNEXPECTED ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Failed to update password: ${e.toString()}');
     }
   }
@@ -393,9 +378,7 @@ class AuthRepository {
     required Map<String, dynamic> profileData,
   }) async {
     try {
-      debugPrint('=== CREATE/UPDATE PROFILE ===');
-      debugPrint('User ID: $userId');
-      debugPrint('Profile data keys: ${profileData.keys.toList()}');
+      _logDebug('=== CREATE/UPDATE PROFILE ===');
 
       // Prepare data for upsert
       final profileRecord = {
@@ -404,7 +387,7 @@ class AuthRepository {
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      debugPrint('Profile record: ${profileRecord.keys.toList()}');
+      _logDebug('Profile record prepared');
 
       // Use upsert with phone as the conflict resolution column
       // Phone has UNIQUE constraint (profiles_phone_key)
@@ -415,11 +398,11 @@ class AuthRepository {
             onConflict: 'phone',
           );
 
-      debugPrint('✓ Profile upserted successfully using phone conflict resolution!');
+      _logDebug('✓ Profile upserted successfully');
     } catch (e, stackTrace) {
-      debugPrint('=== PROFILE CREATION ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      _logDebug('=== PROFILE CREATION ERROR ===');
+      _logDebug('Error: $e');
+      _logDebug('Stack trace: $stackTrace');
       throw AuthException('Failed to save profile: ${e.toString()}');
     }
   }
@@ -440,7 +423,7 @@ class AuthRepository {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      debugPrint('Failed to fetch troops: $e');
+      _logDebug('Failed to fetch troops: $e');
       return [];
     }
   }
@@ -490,8 +473,8 @@ class AuthRepository {
   AuthException _handleAuthException(AuthException e) {
     String message;
 
-    debugPrint('Handling auth exception: ${e.message}');
-    debugPrint('Status code: ${e.statusCode}');
+    _logDebug('Handling auth exception: ${e.message}');
+    _logDebug('Status code: ${e.statusCode}');
 
     switch (e.message.toLowerCase()) {
       case String msg when msg.contains('invalid login credentials'):

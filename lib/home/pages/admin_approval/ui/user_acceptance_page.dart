@@ -1008,7 +1008,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           const Center(child: CircularProgressIndicator())
         else
           DropdownButtonFormField<String>(
-            value: initialTroopId,
+            initialValue: initialTroopId,
             isExpanded: true,
             decoration: InputDecoration(
               labelText: 'Troop',
