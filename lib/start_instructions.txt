@@ -26,13 +26,15 @@ I now want you to act as an expert senior software engineer to review all the im
 ---------------------------------------------------------
 Homepage components:
 Admin:
--✅User Acceptance (after login) module 
+-✅User Acceptance (after login) module
+-✅User Management (tweaks)
 -Stats (later)
--Library Management (upload,delete,update visibilty) for files and Folders
+-Library Management (CRUD) for files and Folders
 
 Troop Head/Leader:
 -✅User Acceptance (after login) module [filtered by their troop]
--User Management (assign to patrols,& roles)
+-✅User Management (assign to patrols,& roles)
+-Patrols View (manage patrol members/leaders ,filter by,)
 -Meeting Manager (CRUD for meetings of their troop).
 
 

@@ -105,8 +105,8 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   
   @override
   void dispose() {
-    // Clear role context when leaving page
-    context.read<AdminProvider>().clearRoleContext();
+    // Don't call clearRoleContext() here - it triggers notifyListeners() during dispose
+    // The role context will be cleared when needed (e.g., when navigating to the page again)
     super.dispose();
   }
 
@@ -448,12 +448,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   void dispose() {
     _generationController.dispose();
     _commentsController.dispose();
-    // Clear selection when dialog closes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<AdminProvider>().clearSelection();
-      }
-    });
+    // Don't call clearSelection() here - it will be cleared when needed
+    // Calling provider methods in dispose() causes lifecycle errors
     super.dispose();
   }
 

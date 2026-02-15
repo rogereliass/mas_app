@@ -13,6 +13,11 @@ class UserManagementProvider with ChangeNotifier {
   final RoleRepository _roleRepository = RoleRepository();
 
   String? _selectedRoleName;
+  
+  // Search and filter state
+  String _searchQuery = '';
+  String? _selectedRoleFilter;
+  String? _selectedTroopFilter;
 
   UserManagementProvider({
     UserManagementService? service,
@@ -80,6 +85,12 @@ class UserManagementProvider with ChangeNotifier {
   bool _isProcessing = false;
   String? _error;
 
+  // Filter cache for performance optimization
+  List<ManagedUserProfile>? _cachedFilteredUsers;
+  String? _cachedSearchQuery;
+  String? _cachedRoleFilter;
+  String? _cachedTroopFilter;
+
   List<ManagedUserProfile> get users => _users;
   List<Role> get roles => _roles;
   bool get isLoadingUsers => _isLoadingUsers;
@@ -87,9 +98,114 @@ class UserManagementProvider with ChangeNotifier {
   bool get isProcessing => _isProcessing;
   bool get hasError => _error != null;
   String? get error => _error;
+  
+  // Search and filter getters
+  String get searchQuery => _searchQuery;
+  String? get selectedRoleFilter => _selectedRoleFilter;
+  String? get selectedTroopFilter => _selectedTroopFilter;
 
   bool get isRolesReady =>
       !_isLoadingRoles && !_authProvider.profileLoading && _effectiveUserProfile != null;
+
+  /// Get filtered list of users based on search query and selected filters
+  List<ManagedUserProfile> get filteredUsers {
+    // Return cached result if filters haven't changed
+    if (_cachedFilteredUsers != null &&
+        _cachedSearchQuery == _searchQuery &&
+        _cachedRoleFilter == _selectedRoleFilter &&
+        _cachedTroopFilter == _selectedTroopFilter) {
+      return _cachedFilteredUsers!;
+    }
+
+    var filtered = _users;
+    
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((user) {
+        final name = user.fullName.toLowerCase();
+        final email = user.email?.toLowerCase() ?? '';
+        final scoutCode = user.scoutCode?.toLowerCase() ?? '';
+        return name.contains(query) || 
+               email.contains(query) || 
+               scoutCode.contains(query);
+      }).toList();
+    }
+    
+    // Apply role filter
+    if (_selectedRoleFilter != null) {
+      filtered = filtered.where((user) {
+        return user.roles.any((role) => role.id == _selectedRoleFilter);
+      }).toList();
+    }
+    
+    // Apply troop filter
+    if (_selectedTroopFilter != null) {
+      filtered = filtered.where((user) {
+        return user.signupTroopId == _selectedTroopFilter;
+      }).toList();
+    }
+    
+    // Cache the result
+    _cachedFilteredUsers = filtered;
+    _cachedSearchQuery = _searchQuery;
+    _cachedRoleFilter = _selectedRoleFilter;
+    _cachedTroopFilter = _selectedTroopFilter;
+    
+    return filtered;
+  }
+  
+  /// Get list of available troops from loaded users
+  List<Map<String, String>> get availableTroops {
+    final troopMap = <String, String>{};
+    for (var user in _users) {
+      if (user.signupTroopId != null && user.signupTroopName != null) {
+        troopMap[user.signupTroopId!] = user.signupTroopName!;
+      }
+    }
+    return troopMap.entries
+        .map((e) => {'id': e.key, 'name': e.value})
+        .toList()
+      ..sort((a, b) => a['name']!.compareTo(b['name']!));
+  }
+  
+  /// Clear filter cache when data or filters change
+  void _clearFilterCache() {
+    _cachedFilteredUsers = null;
+    _cachedSearchQuery = null;
+    _cachedRoleFilter = null;
+    _cachedTroopFilter = null;
+  }
+
+  /// Update search query
+  void setSearchQuery(String query) {
+    _searchQuery = query;
+    _clearFilterCache();
+    notifyListeners();
+  }
+  
+  /// Update role filter
+  void setRoleFilter(String? roleId) {
+    _selectedRoleFilter = roleId;
+    _clearFilterCache();
+    notifyListeners();
+  }
+  
+  /// Update troop filter
+  void setTroopFilter(String? troopId) {
+    _selectedTroopFilter = troopId;
+    _clearFilterCache();
+    notifyListeners();
+  }
+  
+  /// Clear all filters
+  void clearFilters() {
+    _searchQuery = '';
+    _selectedRoleFilter = null;
+    _selectedTroopFilter = null;
+    _clearFilterCache();
+    notifyListeners();
+  }
 
   List<Role> get assignableRoles {
     final effectiveUser = _effectiveUserProfile;
@@ -136,6 +252,7 @@ class UserManagementProvider with ChangeNotifier {
       }
 
       _users = await _service.fetchUsers(currentUser: currentUser);
+      _clearFilterCache();
     } catch (e) {
       _error = 'Unable to load users. Please check your connection and try again.';
       debugPrint('❌ Error loading users: $e');
@@ -172,17 +289,20 @@ class UserManagementProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      // Validate current user authentication and authorization
       final currentUser = _effectiveUserProfile;
       if (currentUser == null) {
         throw Exception('No authenticated user');
       }
 
+      // Update basic profile fields (name, email, address, etc.)
       await _service.updateProfile(
         profileId: profile.id,
         updates: updates,
         currentUser: currentUser,
       );
 
+      // Handle role updates if requested
       List<Role>? updatedRoles;
       final canEditRoles = canEditRolesForProfile(profile);
       final currentRoleIds = profile.roles.map((role) => role.id).toSet();
@@ -191,17 +311,23 @@ class UserManagementProvider with ChangeNotifier {
           requestedRoleIds != null && !setEquals(currentRoleIds, requestedRoleIds);
 
       if (shouldUpdateRoles) {
+        // Permission check: Verify current user can modify target user's roles
+        // (also enforced by server-side RLS policies)
         if (!canEditRoles) {
           throw Exception('You do not have permission to change this user\'s roles');
         }
 
+        // Validate all requested roles are assignable by current user
         final assignableRoleIds = assignableRoles.map((role) => role.id).toSet();
         if (!requestedRoleIds.every(assignableRoleIds.contains)) {
           throw Exception('One or more selected roles are not assignable');
         }
 
+        // Determine troop context for role assignment
+        // Use profile's signup troop or current user's managed troop
         final troopContextId = profile.signupTroopId ?? currentUser.managedTroopId;
 
+        // Update role assignments in database
         await _service.updateProfileRoles(
           profileId: profile.id,
           roleIds: requestedRoleIds.toList(),
@@ -211,13 +337,20 @@ class UserManagementProvider with ChangeNotifier {
           roleTroopContextMap: roleTroopContextMap,
         );
 
+        // Sync updated roles to local state
         if (_roles.isNotEmpty) {
           updatedRoles = _roles
+              .where((role) => requestedRoleIds.contains(role.id))
+              .toList();
+        } else {
+          // Keep existing roles if we don't have role definitions loaded
+          updatedRoles = profile.roles
               .where((role) => requestedRoleIds.contains(role.id))
               .toList();
         }
       }
 
+      // Create updated profile with new data
       final updatedProfile = profile.copyWith(
         firstName: updates['first_name'] as String?,
         middleName: updates['middle_name'] as String?,
@@ -236,9 +369,12 @@ class UserManagementProvider with ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
+      // Update local users list with modified profile
       final index = _users.indexWhere((user) => user.id == profile.id);
       if (index != -1) {
         _users[index] = updatedProfile;
+        // Clear filter cache to force recomputation with updated data
+        _clearFilterCache();
       }
 
       return true;
@@ -252,6 +388,8 @@ class UserManagementProvider with ChangeNotifier {
     }
   }
 
+  /// Fetches roles for a specific profile (utility method for direct role queries)
+  /// Note: This does not update provider state. Use loadRoles() for provider state updates.
   Future<List<Role>> getProfileRoles(String profileId) async {
     try {
       return await _roleRepository.getProfileRoles(profileId);
