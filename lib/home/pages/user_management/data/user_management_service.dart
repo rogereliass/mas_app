@@ -52,6 +52,8 @@ class UserManagementService with ScopedServiceMixin {
             troops:signup_troop(name),
             profile_roles!profile_roles_profile_id_fkey(
               role_id,
+              troop_context,
+              troops:troop_context(name),
               roles:roles(
                 id,
                 name,
@@ -105,6 +107,8 @@ class UserManagementService with ScopedServiceMixin {
             troops:signup_troop(name),
             profile_roles!profile_roles_profile_id_fkey(
               role_id,
+              troop_context,
+              troops:troop_context(name),
               roles:roles(
                 id,
                 name,
@@ -161,6 +165,7 @@ class UserManagementService with ScopedServiceMixin {
     required String assignedBy,
     required UserProfile currentUser,
     String? troopContextId,
+    Map<String, String?>? roleTroopContextMap,
   }) async {
     if (roleIds.isEmpty) {
       throw ArgumentError('At least one role must be selected');
@@ -188,8 +193,13 @@ class UserManagementService with ScopedServiceMixin {
         if (currentUser.isTroopScoped && rank > 40) {
           throw Exception('Troop-scoped roles can only assign ranks 1-40');
         }
-        if ((rank == 60 || rank == 70) && troopContextId == null) {
-          throw Exception('Troop context is required for troop-scoped roles');
+        
+        // Check troop context requirement using per-role map or fallback
+        if (rank == 60 || rank == 70) {
+          final contextForRole = roleTroopContextMap?[roleId] ?? troopContextId;
+          if (contextForRole == null) {
+            throw Exception('Troop context is required for troop-scoped roles');
+          }
         }
       }
 
@@ -201,11 +211,14 @@ class UserManagementService with ScopedServiceMixin {
       final roleRecords = roleIds
           .map((roleId) {
             final rank = roleRanks[roleId] ?? 0;
+            final contextForRole = roleTroopContextMap?[roleId] ?? troopContextId;
+            
             return {
               'profile_id': profileId,
               'role_id': roleId,
               'assigned_by': assignedBy,
-              if (rank == 60 || rank == 70) 'troop_context': troopContextId,
+              if ((rank == 60 || rank == 70) && contextForRole != null) 
+                'troop_context': contextForRole,
             };
           })
           .toList();

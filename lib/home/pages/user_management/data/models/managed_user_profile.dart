@@ -1,5 +1,18 @@
 import '../../../../../auth/models/role.dart';
 
+/// Represents a role assignment with troop context
+class RoleAssignment {
+  final Role role;
+  final String? troopContextId;
+  final String? troopContextName;
+
+  const RoleAssignment({
+    required this.role,
+    this.troopContextId,
+    this.troopContextName,
+  });
+}
+
 /// Model representing a managed user profile
 ///
 /// Includes profile fields plus assigned roles for admin editing
@@ -23,6 +36,7 @@ class ManagedUserProfile {
   final String? signupTroopId;
   final String? signupTroopName;
   final List<Role> roles;
+  final List<RoleAssignment> roleAssignments;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -46,6 +60,7 @@ class ManagedUserProfile {
     this.signupTroopId,
     this.signupTroopName,
     this.roles = const [],
+    this.roleAssignments = const [],
     required this.createdAt,
     this.updatedAt,
   });
@@ -64,11 +79,34 @@ class ManagedUserProfile {
 
   factory ManagedUserProfile.fromJson(Map<String, dynamic> json) {
     final rolesJson = json['profile_roles'] as List<dynamic>? ?? [];
-    final parsedRoles = rolesJson
-        .map((entry) => entry['roles'] as Map<String, dynamic>?)
-        .where((role) => role != null)
-        .map((role) => Role.fromJson(role!))
-        .toList();
+    
+    // Parse role assignments with troop context
+    final List<RoleAssignment> assignments = [];
+    final List<Role> parsedRoles = [];
+    
+    for (var entry in rolesJson) {
+      final roleData = entry['roles'] as Map<String, dynamic>?;
+      if (roleData != null) {
+        final role = Role.fromJson(roleData);
+        parsedRoles.add(role);
+        
+        // Get troop context from profile_roles junction table
+        final troopContextId = entry['troop_context'] as String?;
+        String? troopContextName;
+        
+        // Check if troop context data is available
+        if (troopContextId != null && entry['troops'] != null) {
+          final troopData = entry['troops'] as Map<String, dynamic>?;
+          troopContextName = troopData?['name'] as String?;
+        }
+        
+        assignments.add(RoleAssignment(
+          role: role,
+          troopContextId: troopContextId,
+          troopContextName: troopContextName,
+        ));
+      }
+    }
 
     return ManagedUserProfile(
       id: json['id'] as String,
@@ -94,6 +132,7 @@ class ManagedUserProfile {
           ? json['troops']['name'] as String?
           : null,
       roles: parsedRoles,
+      roleAssignments: assignments,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -114,6 +153,7 @@ class ManagedUserProfile {
     String? medicalNotes,
     String? allergies,
     List<Role>? roles,
+    List<RoleAssignment>? roleAssignments,
     DateTime? updatedAt,
   }) {
     return ManagedUserProfile(
@@ -136,6 +176,7 @@ class ManagedUserProfile {
       signupTroopId: signupTroopId,
       signupTroopName: signupTroopName,
       roles: roles ?? this.roles,
+      roleAssignments: roleAssignments ?? this.roleAssignments,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -165,6 +165,7 @@ class UserManagementProvider with ChangeNotifier {
     required ManagedUserProfile profile,
     required Map<String, dynamic> updates,
     List<String>? roleIds,
+    Map<String, String?>? roleTroopContextMap,
   }) async {
     _isProcessing = true;
     _error = null;
@@ -207,6 +208,7 @@ class UserManagementProvider with ChangeNotifier {
           assignedBy: currentUser.id,
           currentUser: currentUser,
           troopContextId: troopContextId,
+          roleTroopContextMap: roleTroopContextMap,
         );
 
         if (_roles.isNotEmpty) {
