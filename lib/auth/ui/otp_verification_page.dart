@@ -126,7 +126,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           phoneNumber: widget.phoneNumber,
         );
 
-        if (!mounted) return;
+        if (!context.mounted) return;
 
         if (success) {
           // Increment resend counter
@@ -160,7 +160,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           metadata: widget.metadata,
         );
 
-        if (!mounted) return;
+        if (!context.mounted) return;
 
         if (success) {
           // Increment resend counter
@@ -237,7 +237,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           otpCode: otpCode,
         );
 
-        if (!mounted) return;
+        if (!context.mounted) return;
 
         if (!otpSuccess) {
           // Increment attempt counter
@@ -277,7 +277,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         otpCode: otpCode,
       );
 
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       if (!otpSuccess) {
         // Increment attempt counter
@@ -316,7 +316,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           profileData: widget.metadata!,
         );
 
-        if (!mounted) return;
+        if (!context.mounted) return;
 
         if (!profileSuccess) {
           debugPrint('⚠️ Profile creation failed!');
@@ -326,7 +326,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           // Either both auth user AND profile exist, or neither
           await authProvider.deleteCurrentUser();
           
-          if (!mounted) return;
+          if (!context.mounted) return;
           
           await AuthErrorDialog.showError(
             context: context,
@@ -334,6 +334,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           );
           
           // Navigate back to registration page
+          if (!context.mounted) return;
           Navigator.of(context).pop();
           return;
         }
@@ -343,12 +344,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         debugPrint('⚠️ No metadata provided, skipping profile creation');
       }
 
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       // Step 3: Navigate to success page
       Navigator.of(context).pushReplacementNamed(AppRouter.registerSuccess);
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       await AuthErrorDialog.showError(
         context: context,
@@ -377,7 +378,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     return PopScope(
       // Prevent accidental back navigation during password reset
       canPop: !widget.isPasswordReset || !_isLoading,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         
         // Show confirmation for password reset flow

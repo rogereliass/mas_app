@@ -34,7 +34,7 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
     }
 
     final isLocal = _isLocalFile(widget.url);
-    print('📄 PDFViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    debugPrint('📄 PDFViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
     // Use appropriate constructor based on source type
     return isLocal
@@ -46,7 +46,7 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             canShowScrollHead: true,
             canShowScrollStatus: true,
             onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-              print('❌ PDF load failed (local): ${details.error} - ${details.description}');
+              debugPrint('❌ PDF load failed (local): ${details.error} - ${details.description}');
             },
           )
         : SfPdfViewer.network(
@@ -57,7 +57,7 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             canShowScrollHead: true,
             canShowScrollStatus: true,
             onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-              print('❌ PDF load failed (network): ${details.error} - ${details.description}');
+              debugPrint('❌ PDF load failed (network): ${details.error} - ${details.description}');
             },
           );
   }
@@ -81,7 +81,7 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -114,3 +114,4 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
     );
   }
 }
+

@@ -83,7 +83,7 @@ class FileTile extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: fileIcon.color.withOpacity(0.1),
+          color: fileIcon.color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
@@ -105,7 +105,7 @@ class FileTile extends StatelessWidget {
         child: Text(
           '${fileType.toUpperCase()}  •  $fileSize  •  $lastModified',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
           ),
         ),
       ),
@@ -134,13 +134,13 @@ class FileTile extends StatelessWidget {
         color: cardColor,
         borderRadius: BorderRadius.circular(24), // Match image rounded look
         border: isDark 
-            ? Border.all(color: Colors.white.withOpacity(0.05))
-            : Border.all(color: Colors.black.withOpacity(0.03)), // Subtle border in light mode
+            ? Border.all(color: Colors.white.withValues(alpha: 0.05))
+            : Border.all(color: Colors.black.withValues(alpha: 0.03)), // Subtle border in light mode
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? Colors.black.withOpacity(0.2)
-                : Colors.black.withOpacity(0.05), // Lighter shadow in light mode
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.05), // Lighter shadow in light mode
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -162,7 +162,7 @@ class FileTile extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: fileIcon.color.withOpacity(0.2), // Semi-transparent bg
+                    color: fileIcon.color.withValues(alpha: 0.2), // Semi-transparent bg
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -207,3 +207,4 @@ class FileTile extends StatelessWidget {
     );
   }
 }
+

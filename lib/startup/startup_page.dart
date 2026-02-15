@@ -215,8 +215,8 @@ class _HeroImageSection extends StatelessWidget {
               BoxShadow(
                 // Use theme-aware shadow color
                 color: theme.brightness == Brightness.dark
-                    ? Colors.black.withOpacity(0.4)
-                    : Colors.black.withOpacity(0.2),
+                    ? Colors.black.withValues(alpha: 0.4)
+                    : Colors.black.withValues(alpha: 0.2),
                 blurRadius: _shadowBlurRadius,
                 offset: _shadowOffset,
               ),
@@ -235,7 +235,7 @@ class _HeroImageSection extends StatelessWidget {
                     child: Icon(
                       Icons.image,
                       size: 64,
-                      color: theme.iconTheme.color?.withOpacity(0.5),
+                      color: theme.iconTheme.color?.withValues(alpha: 0.5),
                     ),
                   ),
                 );
@@ -269,10 +269,10 @@ class _PublicAccessBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         // Semi-transparent background for overlay effect
-        color: Colors.black.withOpacity(0.6),
+        color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(_badgeBorderRadius),
         border: Border.all(
-          color: AppColors.publicAccessBadge.withOpacity(0.5),
+          color: AppColors.publicAccessBadge.withValues(alpha: 0.5),
           width: 1,
         ),
       ),
@@ -457,8 +457,9 @@ class _FooterSection extends StatelessWidget {
       textAlign: TextAlign.center,
       style: theme.textTheme.bodySmall?.copyWith(
         // Slightly transparent for subtle appearance
-        color: theme.textTheme.bodySmall?.color?.withOpacity(0.9),
+        color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.9),
       ),
     );
   }
 }
+

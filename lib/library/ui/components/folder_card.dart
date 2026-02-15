@@ -115,7 +115,7 @@ class FolderCard extends StatelessWidget {
                   gradient: LinearGradient(
                     colors: [
                       _getBadgeColor(),
-                      _getBadgeColor().withOpacity(0.7),
+                      _getBadgeColor().withValues(alpha: 0.7),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -123,7 +123,7 @@ class FolderCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: _getBadgeColor().withOpacity(0.25),
+                      color: _getBadgeColor().withValues(alpha: 0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -170,7 +170,7 @@ class FolderCard extends StatelessWidget {
               Icon(
                 Icons.chevron_right,
                 color: isDark 
-                    ? Colors.white.withOpacity(0.3) // Subtler chevron
+                    ? Colors.white.withValues(alpha: 0.3) // Subtler chevron
                     : theme.textTheme.bodySmall?.color,
                 size: 24,
               ),
@@ -181,3 +181,4 @@ class FolderCard extends StatelessWidget {
     );
   }
 }
+

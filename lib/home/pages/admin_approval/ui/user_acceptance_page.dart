@@ -189,7 +189,7 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
             Icon(
               Icons.check_circle_outline,
               size: 80,
-              color: colorScheme.primary.withOpacity(0.5),
+              color: colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -254,9 +254,8 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
     );
     
     // Refresh the pending profiles list after dialog closes
-    if (mounted) {
-      context.read<AdminProvider>().loadPendingProfiles();
-    }
+    if (!context.mounted) return;
+    context.read<AdminProvider>().loadPendingProfiles();
   }
 }
 
@@ -326,7 +325,7 @@ class _ProfileCard extends StatelessWidget {
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: colorScheme.onSurface.withOpacity(0.5),
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ],
               ),
@@ -679,7 +678,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                     color: colorScheme.surface,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, -2),
                       ),
@@ -881,7 +880,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         else
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -912,7 +911,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                         Text(
                           role.description!,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.7),
+                            color: colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       if (wasAlreadyAssigned) ...[
@@ -1000,7 +999,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               ? 'Required for Troop Head/Leader roles'
               : 'Optional - Set troop context for troop-scoped roles (rank 60/70)',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: requiresTroopContext ? colorScheme.error : colorScheme.onSurface.withOpacity(0.7),
+            color: requiresTroopContext ? colorScheme.error : colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 8),
@@ -1045,14 +1044,14 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
           Icon(
             Icons.info_outline_rounded,
             size: 64,
-            color: colorScheme.primary.withOpacity(0.7),
+            color: colorScheme.primary.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 16),
           Text(
@@ -1067,7 +1066,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             'Your account currently has no roles assigned that can be used to assign roles to other users.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.8),
+              color: colorScheme.onSurface.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(height: 8),
@@ -1075,7 +1074,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             'Try refreshing the app to reload your permissions, or contact support if the issue persists.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 20),
@@ -1162,7 +1161,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         Text(
           'Optional - Add notes about this profile review',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 8),
@@ -1186,16 +1185,16 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: approvals.length,
-        separatorBuilder: (_, __) => Divider(
+        separatorBuilder: (_, index) => Divider(
           height: 1, 
-          color: colorScheme.outline.withOpacity(0.3),
+          color: colorScheme.outline.withValues(alpha: 0.3),
         ),
         itemBuilder: (context, index) {
           final approval = approvals[index];
@@ -1293,6 +1292,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
     if (confirmed != true) return;
 
+    if (!context.mounted) return;
+
     final authProvider = context.read<AuthProvider>();
 
     final adminProfile = authProvider.currentUserProfile;
@@ -1301,9 +1302,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final adminProfileId = adminProfile?.id;
     if (adminProfileId == null || adminProfileId.isEmpty) {
       debugPrint('❌ Admin profile ID is null or empty');
-      if (mounted) {
-        _showErrorDialog('Error: Admin user profile not properly loaded');
-      }
+      if (!context.mounted) return;
+      _showErrorDialog('Error: Admin user profile not properly loaded');
       return;
     }
 
@@ -1323,7 +1323,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       troopContextId: troopContextToSend,
     );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (success) {
       Navigator.pop(context);
@@ -1377,6 +1377,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       return;
     }
 
+    if (!context.mounted) return;
+
     debugPrint('🔄 Proceeding with add comment...'); 
     final authProvider = context.read<AuthProvider>();
     final adminProvider = context.read<AdminProvider>();
@@ -1387,9 +1389,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final adminProfileId = adminProfile?.id;
     if (adminProfileId == null || adminProfileId.isEmpty) {
       debugPrint('❌ Admin profile ID is null or empty');
-      if (mounted) {
-        _showErrorDialog('Error: Admin user profile not properly loaded');
-      }
+      if (!context.mounted) return;
+      _showErrorDialog('Error: Admin user profile not properly loaded');
       return;
     }
 
@@ -1402,11 +1403,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
 
     debugPrint('📥 Add comment completed: success=$success');
-    
-    if (!mounted) {
-      debugPrint('⚠️ Widget no longer mounted, aborting');
-      return;
-    }
+
+    if (!context.mounted) return;
 
     if (success) {
       debugPrint('✅ Comment added successfully');
@@ -1430,7 +1428,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       final authProvider = context.read<AuthProvider>();
       final troops = await authProvider.getTroops();
 
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() {
         _troops
           ..clear()
@@ -1451,7 +1449,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         );
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() {
         _isLoadingTroops = false;
       });
@@ -1505,3 +1503,4 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
   }
 }
+

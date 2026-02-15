@@ -29,7 +29,7 @@ class CustomBottomNavBar extends StatelessWidget {
         onTap: onTap,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: theme.iconTheme.color?.withOpacity(0.6),
+        unselectedItemColor: theme.iconTheme.color?.withValues(alpha: 0.6),
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         items: const [
           BottomNavigationBarItem(
@@ -45,3 +45,4 @@ class CustomBottomNavBar extends StatelessWidget {
     );
   }
 }
+

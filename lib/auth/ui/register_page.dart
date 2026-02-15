@@ -426,7 +426,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           'Gender',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -448,7 +448,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: _selectedGender == 'Male'
-                                        ? AppColors.primaryBlue.withOpacity(0.1)
+                                        ? AppColors.primaryBlue.withValues(alpha: 0.1)
                                         : theme.brightness == Brightness.dark
                                             ? AppColors.cardDark
                                             : AppColors.cardLight,
@@ -507,7 +507,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: _selectedGender == 'Female'
-                                        ? AppColors.primaryBlue.withOpacity(0.1)
+                                        ? AppColors.primaryBlue.withValues(alpha: 0.1)
                                         : theme.brightness == Brightness.dark
                                             ? AppColors.cardDark
                                             : AppColors.cardLight,
@@ -747,3 +747,4 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
+

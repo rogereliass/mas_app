@@ -1,11 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:encrypt/encrypt.dart' as encrypt;
 import '../data/auth_repository.dart';
 import '../data/role_repository.dart';
 import '../models/user_profile.dart';
@@ -20,9 +16,6 @@ class AuthProvider with ChangeNotifier {
   final RoleRepository _roleRepository = RoleRepository();
   StreamSubscription<AuthState>? _authSubscription;
   static SharedPreferences? _cachedPrefs;
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
-  static final Random _secureRandom = Random.secure();
-  static const String _prefsEncryptionKey = 'prefs_enc_key_v1';
 
   void _logDebug(String message) {
     if (kDebugMode) {
@@ -30,82 +23,78 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  static void _logDebugStatic(String message) {
-    if (kDebugMode) {
-      debugPrint(message);
-    }
-  }
-
-  static Future<encrypt.Key> _getOrCreateEncryptionKey() async {
-    final existing = await _secureStorage.read(key: _prefsEncryptionKey);
-    if (existing != null && existing.isNotEmpty) {
-      return encrypt.Key.fromBase64(existing);
-    }
-
-    final keyBytes = List<int>.generate(32, (_) => _secureRandom.nextInt(256));
-    final key = encrypt.Key(Uint8List.fromList(keyBytes));
-    await _secureStorage.write(key: _prefsEncryptionKey, value: key.base64);
-    return key;
-  }
-
-  static Future<String?> _encryptString(String value) async {
-    try {
-      final key = await _getOrCreateEncryptionKey();
-      final iv = encrypt.IV.fromSecureRandom(16);
-      final encrypter = encrypt.Encrypter(
-        encrypt.AES(key, mode: encrypt.AESMode.cbc),
-      );
-      final encrypted = encrypter.encrypt(value, iv: iv);
-      final payload = {
-        'iv': iv.base64,
-        'data': encrypted.base64,
-      };
-      return base64Encode(utf8.encode(jsonEncode(payload)));
-    } catch (e) {
-      _logDebugStatic('Encryption failed: $e');
-      return null;
-    }
-  }
-
-  static Future<String?> _decryptString(String encoded) async {
-    try {
-      final decoded = utf8.decode(base64Decode(encoded));
-      final payload = jsonDecode(decoded) as Map<String, dynamic>;
-      final iv = encrypt.IV.fromBase64(payload['iv'] as String);
-      final data = payload['data'] as String;
-      final key = await _getOrCreateEncryptionKey();
-      final encrypter = encrypt.Encrypter(
-        encrypt.AES(key, mode: encrypt.AESMode.cbc),
-      );
-      return encrypter.decrypt64(data, iv: iv);
-    } catch (e) {
-      _logDebugStatic('Decryption failed (returning raw): $e');
-      return encoded;
-    }
-  }
-
-  static Future<void> _setEncryptedString(
-    SharedPreferences prefs,
-    String key,
-    String value,
-  ) async {
-    final encrypted = await _encryptString(value);
-    if (encrypted != null) {
-      await prefs.setString(key, encrypted);
-    }
-  }
-
-  static Future<String?> _getEncryptedString(String key) async {
-    final prefs = await _prefs;
-    final raw = prefs.getString(key);
-    if (raw == null || raw.isEmpty) return null;
-    return _decryptString(raw);
-  }
-
   // Cached SharedPreferences getter for performance
   static Future<SharedPreferences> get _prefs async {
     _cachedPrefs ??= await SharedPreferences.getInstance();
     return _cachedPrefs!;
+  }
+
+  /// Migrate from old encrypted storage to plain storage
+  /// Detects if data is encrypted (base64 encoded with iv/data payload) and clears it
+  Future<void> _migrateFromEncryptedStorage() async {
+    try {
+      final prefs = await _prefs;
+      
+      // Check if we have the migration marker
+      final migrated = prefs.getBool('_storage_migrated_v1') ?? false;
+      if (migrated) {
+        _logDebug('✅ Storage already migrated');
+        return;
+      }
+
+      _logDebug('🔄 Migrating from encrypted storage to plain storage...');
+      
+      // List of keys that were previously encrypted
+      final encryptedKeys = [
+        'user_phone',
+        'user_email',
+        'user_first_name',
+        'user_middle_name',
+        'user_last_name',
+        'user_full_name',
+        'user_name_ar',
+        'user_address',
+        'user_birthdate',
+        'user_gender',
+        'user_signup_troop',
+        'user_generation',
+      ];
+
+      // Check if any value looks encrypted (contains base64 payload with iv/data)
+      bool hasEncryptedData = false;
+      for (final key in encryptedKeys) {
+        final value = prefs.getString(key);
+        if (value != null && _looksLikeEncryptedData(value)) {
+          hasEncryptedData = true;
+          break;
+        }
+      }
+
+      if (hasEncryptedData) {
+        _logDebug('⚠️ Detected old encrypted data, clearing all user data...');
+        // Clear all user data to reset to clean state
+        await _clearUserData();
+      }
+
+      // Mark migration as complete
+      await prefs.setBool('_storage_migrated_v1', true);
+      _logDebug('✅ Storage migration complete');
+    } catch (e) {
+      _logDebug('⚠️ Migration error (non-fatal): $e');
+      // Non-fatal - continue anyway
+    }
+  }
+
+  /// Check if a string looks like encrypted data (base64 with JSON payload)
+  bool _looksLikeEncryptedData(String value) {
+    // Encrypted data is base64 encoded JSON with 'iv' and 'data' keys
+    // Pattern: long base64 string (>50 chars) without spaces
+    if (value.length < 50) return false;
+    if (value.contains(' ')) return false;
+    
+    // Try to detect base64 pattern
+    final base64Pattern = RegExp(r'^[A-Za-z0-9+/]+=*$');
+    return base64Pattern.hasMatch(value);
   }
 
   User? _currentUser;
@@ -184,9 +173,15 @@ class AuthProvider with ChangeNotifier {
     _currentUser = _authRepository.getCurrentUser();
     _logDebug('🚀 AuthProvider Initialize');
 
+    // Migrate from old encrypted storage if needed
+    _migrateFromEncryptedStorage().then((_) {
+      _logDebug('✅ Migration check complete, continuing initialization');
+    }).catchError((e) {
+      _logDebug('⚠️ Migration failed (non-fatal): $e');
+    });
+
     // Listen to auth state changes and store subscription for cleanup
     _authSubscription = _authRepository.authStateChanges.listen((AuthState data) async {
-      final previousUser = _currentUser;
       _currentUser = data.session?.user;
       
       _logDebug('🔔 Auth state changed');
@@ -247,6 +242,8 @@ class AuthProvider with ChangeNotifier {
       return;
     }
 
+    _logDebug('🔄 Loading user profile for user ID: ${_currentUser!.id}');
+
     // Only set loading flag if we're managing it ourselves (notifyOnComplete = true)
     if (notifyOnComplete) {
       _profileLoading = true;
@@ -254,11 +251,16 @@ class AuthProvider with ChangeNotifier {
     }
 
     try {
-      _logDebug('🔄 Loading user profile');
       _currentUserProfile = await _roleRepository.getUserProfile(_currentUser!.id);
       
+      _logDebug('📊 Profile fetch result: ${_currentUserProfile != null ? "SUCCESS" : "NULL"}');
+      
       if (_currentUserProfile != null) {
-        _logDebug('✅ Loaded user profile');
+        _logDebug('✅ Loaded user profile: ${_currentUserProfile!.fullName}');
+        _logDebug('   First Name: ${_currentUserProfile!.firstName}');
+        _logDebug('   Middle Name: ${_currentUserProfile!.middleName}');
+        _logDebug('   Last Name: ${_currentUserProfile!.lastName}');
+        _logDebug('   Role Rank: ${_currentUserProfile!.roleRank}');
 
         // Check if name fields are missing
         if (_currentUserProfile!.firstName == null ||
@@ -269,15 +271,13 @@ class AuthProvider with ChangeNotifier {
           _profileLoadError = null;
         }
       } else {
-        _logDebug('⚠️ No profile found for current user');
+        _logDebug('❌ No profile found for current user');
         _currentUserProfile = null;
         _profileLoadError = 'User profile not found in database. Please contact support or re-register.';
       }
     } catch (e, stackTrace) {
       _logDebug('❌ Failed to load user profile: $e');
       _logDebug('   StackTrace: $stackTrace');
-      // Set profile to null and store error message
-      _currentUserProfile = null;
       // Set profile to null and store error message
       _currentUserProfile = null;
       _profileLoadError = 'Failed to load profile: ${e.toString()}. Please check your internet connection or contact support.';
@@ -329,57 +329,56 @@ class AuthProvider with ChangeNotifier {
         prefs.setBool('is_authenticated', true),
       ];
 
-      // Save basic user data (encrypted)
+      // Save basic user data
       if (_currentUser!.phone != null) {
-        saveTasks.add(_setEncryptedString(prefs, 'user_phone', _currentUser!.phone!));
+        saveTasks.add(prefs.setString('user_phone', _currentUser!.phone!));
       }
       if (_currentUser!.email != null) {
-        saveTasks.add(_setEncryptedString(prefs, 'user_email', _currentUser!.email!));
+        saveTasks.add(prefs.setString('user_email', _currentUser!.email!));
       }
 
-      // Save all profile data if available (encrypted)
+      // Save all profile data if available
       if (_currentUserProfile != null) {
         final profile = _currentUserProfile!;
 
         if (profile.firstName != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_first_name', profile.firstName!));
+          saveTasks.add(prefs.setString('user_first_name', profile.firstName!));
         }
         if (profile.middleName != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_middle_name', profile.middleName!));
+          saveTasks.add(prefs.setString('user_middle_name', profile.middleName!));
         }
         if (profile.lastName != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_last_name', profile.lastName!));
+          saveTasks.add(prefs.setString('user_last_name', profile.lastName!));
         }
         if (profile.fullName != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_full_name', profile.fullName!));
+          saveTasks.add(prefs.setString('user_full_name', profile.fullName!));
         }
         if (profile.nameAr != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_name_ar', profile.nameAr!));
+          saveTasks.add(prefs.setString('user_name_ar', profile.nameAr!));
         }
         if (profile.email != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_email', profile.email!));
+          saveTasks.add(prefs.setString('user_email', profile.email!));
         }
         if (profile.phone != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_phone', profile.phone!));
+          saveTasks.add(prefs.setString('user_phone', profile.phone!));
         }
         if (profile.address != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_address', profile.address!));
+          saveTasks.add(prefs.setString('user_address', profile.address!));
         }
         if (profile.birthdate != null) {
-          saveTasks.add(_setEncryptedString(
-            prefs,
+          saveTasks.add(prefs.setString(
             'user_birthdate',
             profile.birthdate!.toIso8601String(),
           ));
         }
         if (profile.gender != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_gender', profile.gender!));
+          saveTasks.add(prefs.setString('user_gender', profile.gender!));
         }
         if (profile.signupTroopId != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_signup_troop', profile.signupTroopId!));
+          saveTasks.add(prefs.setString('user_signup_troop', profile.signupTroopId!));
         }
         if (profile.generation != null) {
-          saveTasks.add(_setEncryptedString(prefs, 'user_generation', profile.generation!));
+          saveTasks.add(prefs.setString('user_generation', profile.generation!));
         }
 
         saveTasks.add(prefs.setInt('user_role_rank', profile.roleRank));
@@ -690,7 +689,8 @@ class AuthProvider with ChangeNotifier {
   /// Get user full name (helper method for quick access)
   static Future<String?> getUserFullName() async {
     try {
-      return _getEncryptedString('user_full_name');
+      final prefs = await _prefs;
+      return prefs.getString('user_full_name');
     } catch (e) {
       return null;
     }
@@ -699,7 +699,8 @@ class AuthProvider with ChangeNotifier {
   /// Get user phone (helper method for quick access)
   static Future<String?> getUserPhone() async {
     try {
-      return _getEncryptedString('user_phone');
+      final prefs = await _prefs;
+      return prefs.getString('user_phone');
     } catch (e) {
       return null;
     }

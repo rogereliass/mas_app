@@ -73,7 +73,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
       await _audioPlayer.stop();
 
       final isLocal = _isLocalFile(widget.url);
-      print('🎵 Initializing audio from ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+      debugPrint('🎵 Initializing audio from ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
       // Listen to player state changes
       _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
@@ -125,9 +125,9 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
         });
       }
 
-      print('✅ Audio initialized successfully');
+      debugPrint('✅ Audio initialized successfully');
     } catch (e) {
-      print('❌ Error initializing audio: $e');
+      debugPrint('❌ Error initializing audio: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -158,7 +158,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
         await _audioPlayer.resume();
       }
     } catch (e) {
-      print('❌ Error toggling play/pause: $e');
+      debugPrint('❌ Error toggling play/pause: $e');
     }
   }
 
@@ -166,7 +166,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
     try {
       await _audioPlayer.seek(position);
     } catch (e) {
-      print('❌ Error seeking: $e');
+      debugPrint('❌ Error seeking: $e');
     }
   }
 
@@ -244,7 +244,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -298,7 +298,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
                               ? Colors.grey.shade700
                               : Colors.grey.shade300,
                           thumbColor: AppColors.primaryBlue,
-                          overlayColor: AppColors.primaryBlue.withOpacity(0.2),
+                          overlayColor: AppColors.primaryBlue.withValues(alpha: 0.2),
                         ),
                         child: Slider(
                           value: _position.inSeconds.toDouble(),
@@ -351,7 +351,7 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
                           color: AppColors.primaryBlue,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primaryBlue.withOpacity(0.3),
+                              color: AppColors.primaryBlue.withValues(alpha: 0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -432,3 +432,4 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
     );
   }
 }
+

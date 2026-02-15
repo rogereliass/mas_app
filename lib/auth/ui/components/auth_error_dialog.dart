@@ -111,8 +111,8 @@ class AuthErrorDialog extends StatelessWidget {
       height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: colorScheme.error.withOpacity(0.1),
-        border: Border.all(color: colorScheme.error.withOpacity(0.3), width: 2),
+        color: colorScheme.error.withValues(alpha: 0.1),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.3), width: 2),
       ),
       child: Icon(Icons.error_outline, size: 40, color: colorScheme.error),
     );
@@ -227,9 +227,9 @@ class AuthSuccessDialog extends StatelessWidget {
       height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: colorScheme.tertiary.withOpacity(0.1),
+        color: colorScheme.tertiary.withValues(alpha: 0.1),
         border: Border.all(
-          color: colorScheme.tertiary.withOpacity(0.3),
+          color: colorScheme.tertiary.withValues(alpha: 0.3),
           width: 2,
         ),
       ),
@@ -241,3 +241,4 @@ class AuthSuccessDialog extends StatelessWidget {
     );
   }
 }
+

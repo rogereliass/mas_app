@@ -14,6 +14,7 @@ import '../library/ui/all_folders_page.dart';
 import '../library/ui/about_page.dart';
 import '../profile/profile_page.dart';
 import '../home/pages/admin_approval/ui/user_acceptance_page.dart';
+import '../home/pages/user_management/ui/user_management_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -69,6 +70,9 @@ class AppRouter {
   
   /// User acceptance page route (admin only)
   static const String userAcceptance = '/user-acceptance';
+
+  /// User management page route (admin and troop roles)
+  static const String userManagement = '/user-management';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -130,6 +134,15 @@ class AppRouter {
       final selectedRole = args?['selectedRole'] as String?;
       return MaterialPageRoute(
         builder: (context) => UserAcceptancePage(selectedRole: selectedRole),
+      );
+    }
+
+    // Handle User Management with role context
+    if (settings.name == userManagement) {
+      final args = settings.arguments as Map<String, dynamic>?;
+      final selectedRole = args?['selectedRole'] as String?;
+      return MaterialPageRoute(
+        builder: (context) => UserManagementPage(selectedRole: selectedRole),
       );
     }
     

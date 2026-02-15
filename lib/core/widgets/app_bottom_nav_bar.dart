@@ -33,8 +33,8 @@ class AppBottomNavBar extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isDark 
-                ? Colors.black.withOpacity(0.4)
-                : theme.shadowColor.withOpacity(0.15),
+                ? Colors.black.withValues(alpha: 0.4)
+                : theme.shadowColor.withValues(alpha: 0.15),
             blurRadius: 15,
             offset: const Offset(0, 4),
             spreadRadius: 2,
@@ -130,7 +130,7 @@ class AppBottomNavBar extends StatelessWidget {
     final Color activeColor = isDark ? AppColors.goldAccent : theme.colorScheme.primary;
     final Color inactiveColor = isDark 
         ? AppColors.sectionHeaderGray 
-        : theme.textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey;
+        : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6) ?? Colors.grey;
     
     final color = isActive ? activeColor : inactiveColor;
 
@@ -214,3 +214,4 @@ class AppBottomNavBar extends StatelessWidget {
     );
   }
 }
+

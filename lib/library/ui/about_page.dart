@@ -71,7 +71,7 @@ class AboutContent extends StatelessWidget {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(24),
               ),
               padding: const EdgeInsets.all(20),
@@ -135,7 +135,7 @@ class AboutContent extends StatelessWidget {
             Text(
               '© 2025 Scout Organization',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -144,3 +144,4 @@ class AboutContent extends StatelessWidget {
     );
   }
 }
+

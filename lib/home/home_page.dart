@@ -169,31 +169,29 @@ class _HomePageState extends State<HomePage> {
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
               // Show loading
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Reloading profile...'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Reloading profile...'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
 
               await authProvider.refreshProfile();
+
+              if (!context.mounted) return;
 
               debugPrint('✅ Manual reload complete');
               debugPrint('   Full Name after reload: ${authProvider.fullName}');
               debugPrint('   Profile: ${authProvider.currentUserProfile}');
 
-              if (mounted) {
-                final name = authProvider.fullName ?? 'No name loaded';
-                final roleCount = authProvider.userRoles.length;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Profile: $name\nRoles: $roleCount'),
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
+              final name = authProvider.fullName ?? 'No name loaded';
+              final roleCount = authProvider.userRoles.length;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Profile: $name\nRoles: $roleCount'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
             },
           ),
           // Settings Action
@@ -275,7 +273,6 @@ class _HomePageState extends State<HomePage> {
 
     final userName = authProvider.fullName ?? 'User';
     final currentRole = _selectedRole ?? 'No Role';
-    final roleRank = authProvider.currentUserRoleRank;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,12 +374,12 @@ class _HomePageState extends State<HomePage> {
     
     // Show role-specific components based on selected role
     if (_selectedRole == 'System Admin') {
-      return const SystemAdminStats();
+      return SystemAdminStats(selectedRole: _selectedRole ?? 'System Admin');
     }
     
     // Show troop head/leader management dashboard for troop-scoped roles
     if (_selectedRole == 'Troop Head' || _selectedRole == 'Troop Leader') {
-      return const TroopHeadStats();
+      return TroopHeadStats(selectedRole: _selectedRole ?? 'Troop Head');
     }
     
     // Default stats for other roles

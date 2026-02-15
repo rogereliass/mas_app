@@ -127,7 +127,7 @@ class RegisterSuccessPage extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: colorScheme.tertiary.withOpacity(0.4),
+            color: colorScheme.tertiary.withValues(alpha: 0.4),
             blurRadius: 60,
             spreadRadius: 20,
           ),
@@ -142,8 +142,8 @@ class RegisterSuccessPage extends StatelessWidget {
           ),
           gradient: RadialGradient(
             colors: [
-              colorScheme.tertiary.withOpacity(0.2),
-              colorScheme.surface.withOpacity(0),
+              colorScheme.tertiary.withValues(alpha: 0.2),
+              colorScheme.surface.withValues(alpha: 0),
             ],
           ),
         ),
@@ -156,3 +156,4 @@ class RegisterSuccessPage extends StatelessWidget {
     );
   }
 }
+

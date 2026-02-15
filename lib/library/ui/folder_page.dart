@@ -25,8 +25,6 @@ class LibraryHomePage extends StatefulWidget {
 }
 
 class _LibraryHomePageState extends State<LibraryHomePage> {
-  final String _selectedCategory = 'All';
-
   @override
   void initState() {
     super.initState();
@@ -336,7 +334,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.goldAccent.withOpacity(0.5)),
+                  border: Border.all(color: AppColors.goldAccent.withValues(alpha: 0.5)),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -394,7 +392,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                     // Record view and navigate to file viewer
                     await provider.recordFileView(file.id);
                     
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     AppRouter.goToFileViewer(
                       context,
                       fileId: file.id,
@@ -428,4 +426,5 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     }
   }
 }
+
 

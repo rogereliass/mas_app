@@ -152,7 +152,7 @@ class ProfilePage extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -193,7 +193,7 @@ class ProfilePage extends StatelessWidget {
                 Text(
                   profile.nameAr!,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+                    color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                     fontFamily: 'Arial', // Better Arabic support
                   ),
                   textAlign: TextAlign.center,
@@ -210,13 +210,13 @@ class ProfilePage extends StatelessWidget {
                     Icon(
                       Icons.email_outlined,
                       size: 16,
-                      color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                      color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       profile.email!,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                        color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -432,7 +432,7 @@ class ProfilePage extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.05),
+            color: colorScheme.shadow.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -596,3 +596,4 @@ class ProfilePage extends StatelessWidget {
     );
   }
 }
+

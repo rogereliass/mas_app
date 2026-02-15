@@ -50,7 +50,7 @@ class PendingApprovalPage extends StatelessWidget {
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.3),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -186,7 +186,6 @@ class PendingApprovalPage extends StatelessWidget {
               // Refresh button
               TextButton.icon(
                 onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
                   await authProvider.refreshProfile();
                   
                   if (context.mounted) {
@@ -225,7 +224,7 @@ class PendingApprovalPage extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.2),
+            color: colorScheme.primary.withValues(alpha: 0.2),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -249,3 +248,4 @@ class PendingApprovalPage extends StatelessWidget {
     );
   }
 }
+

@@ -65,7 +65,7 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
               Icons.search,
               color: _isFocused 
                   ? (isDark ? AppColors.goldAccent : theme.colorScheme.primary)
-                  : (isDark ? AppColors.sectionHeaderGray : theme.iconTheme.color?.withOpacity(0.6)),
+                  : (isDark ? AppColors.sectionHeaderGray : theme.iconTheme.color?.withValues(alpha: 0.6)),
               size: 24,
             ),
             border: InputBorder.none,
@@ -79,3 +79,4 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
     );
   }
 }
+

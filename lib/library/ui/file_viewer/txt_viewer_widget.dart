@@ -127,14 +127,14 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
           Icon(
             Icons.description_outlined,
             size: 64,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
             'Empty text file',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.withOpacity(0.7),
+              color: Colors.grey.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -142,3 +142,4 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
     );
   }
 }
+

@@ -117,7 +117,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                                   Icons.grid_view,
                                   color: _isGridView 
                                       ? theme.colorScheme.primary 
-                                      : theme.iconTheme.color?.withOpacity(0.6),
+                                      : theme.iconTheme.color?.withValues(alpha: 0.6),
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -130,7 +130,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                                   Icons.view_list,
                                   color: !_isGridView 
                                       ? theme.colorScheme.primary 
-                                      : theme.iconTheme.color?.withOpacity(0.6),
+                                      : theme.iconTheme.color?.withValues(alpha: 0.6),
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -281,7 +281,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
               size: 64,
               color: theme.brightness == Brightness.dark
                   ? AppColors.sectionHeaderGray
-                  : theme.iconTheme.color?.withOpacity(0.4),
+                  : theme.iconTheme.color?.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 16),
             Text(
@@ -298,3 +298,4 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
     );
   }
 }
+

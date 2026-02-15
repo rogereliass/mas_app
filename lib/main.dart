@@ -9,14 +9,15 @@ import 'core/config/theme_provider.dart';
 import 'library/logic/library_provider.dart';
 import 'auth/logic/auth_provider.dart';
 import 'home/pages/admin_approval/logic/admin_provider.dart';
+import 'home/pages/user_management/logic/user_management_provider.dart';
 import 'offline/offline_storage.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables from .env file
-  await dotenv.load(fileName: ".env");
+  // Load environment variables from .env asset file
+  await dotenv.load(fileName: '.env');
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -50,6 +51,15 @@ void main() async {
           ),
           update: (context, auth, previous) =>
             previous ?? AdminProvider(authProvider: auth),
+        ),
+        
+        // UserManagementProvider depends on AuthProvider for role-based scoping
+        ChangeNotifierProxyProvider<AuthProvider, UserManagementProvider>(
+          create: (context) => UserManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+            previous ?? UserManagementProvider(authProvider: auth),
         ),
         
         // LibraryProvider depends on AuthProvider for role-based filtering

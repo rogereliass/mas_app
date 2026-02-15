@@ -9,7 +9,9 @@ import '../../routing/app_router.dart';
 /// - Storage usage
 /// - Recent activity count
 class SystemAdminStats extends StatelessWidget {
-  const SystemAdminStats({super.key});
+  final String selectedRole;
+
+  const SystemAdminStats({super.key, required this.selectedRole});
 
   @override
   Widget build(BuildContext context) {
@@ -145,9 +147,9 @@ class SystemAdminStats extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pushNamed(
-                    context, 
+                    context,
                     AppRouter.userAcceptance,
-                    arguments: {'selectedRole': 'System Admin'},
+                    arguments: {'selectedRole': selectedRole},
                   );
                 },
                 icon: const Icon(Icons.how_to_reg),
@@ -167,6 +169,36 @@ class SystemAdminStats extends StatelessWidget {
             
             Text(
               'Review and approve pending user registrations',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRouter.userManagement,
+                    arguments: {'selectedRole': selectedRole},
+                  );
+                },
+                icon: const Icon(Icons.manage_accounts_outlined),
+                label: const Text('User Management'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.secondary,
+                  foregroundColor: colorScheme.onSecondary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Edit user profiles and role assignments',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

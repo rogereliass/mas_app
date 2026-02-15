@@ -11,8 +11,6 @@ class LibraryService {
   static const String _storageBucket = 'library';
   static const String _foldersTable = 'folders';
   static const String _filesTable = 'files';
-  static const String _fileViewsTable = 'file_views';
-  static const String _fileDownloadsTable = 'file_downloads';
 
   final SupabaseClient _supabase;
 

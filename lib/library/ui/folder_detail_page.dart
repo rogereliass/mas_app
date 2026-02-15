@@ -400,7 +400,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                       // Record view and navigate to file viewer
                       await provider.recordFileView(file.id);
                       
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       AppRouter.goToFileViewer(
                         context,
                         fileId: file.id,
@@ -479,7 +479,7 @@ class _BreadcrumbChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? (isDark ? AppColors.goldAccent.withOpacity(0.2) : theme.colorScheme.primary.withOpacity(0.1))
+              ? (isDark ? AppColors.goldAccent.withValues(alpha: 0.2) : theme.colorScheme.primary.withValues(alpha: 0.1))
               : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: isActive
@@ -499,3 +499,4 @@ class _BreadcrumbChip extends StatelessWidget {
     );
   }
 }
+

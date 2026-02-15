@@ -399,7 +399,7 @@ class LibraryProvider with ChangeNotifier {
   /// Log errors
   void _logError(String operation, Object error) {
     if (kDebugMode) {
-      print('❌ LibraryProvider.$operation ERROR: $error');
+      debugPrint('❌ LibraryProvider.$operation ERROR: $error');
     }
   }
 

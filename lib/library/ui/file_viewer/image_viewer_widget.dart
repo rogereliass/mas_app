@@ -40,7 +40,7 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
     }
 
     final isLocal = _isLocalFile(widget.url);
-    print('🖼️ ImageViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    debugPrint('🖼️ ImageViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
 
     return InteractiveViewer(
       transformationController: _transformationController,
@@ -52,7 +52,7 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
                 File(widget.url),
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  print('❌ Error loading local image: $error');
+                  debugPrint('❌ Error loading local image: $error');
                   return _buildErrorWidget();
                 },
               )
@@ -79,7 +79,7 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  print('❌ Error loading network image: $error');
+                  debugPrint('❌ Error loading network image: $error');
                   return _buildErrorWidget();
                 },
               ),
@@ -95,14 +95,14 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
           Icon(
             Icons.broken_image,
             size: 64,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
             'Failed to load image',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.withOpacity(0.7),
+              color: Colors.grey.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -129,7 +129,7 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -162,3 +162,4 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
     );
   }
 }
+

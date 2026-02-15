@@ -286,7 +286,7 @@ class OfflineStorageService {
     for (var key in keys) {
       await deleteFile(key);
     }
-    print('🧹 Cleared all offline files');
+    debugPrint('🧹 Cleared all offline files');
   }
 }
 

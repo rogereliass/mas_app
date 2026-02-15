@@ -1,6 +1,7 @@
 open in terminal
 cd D:\Apps\Sdk\emulator
 emulator -avd Pixel_6 -gpu swiftshader_indirect
+
 emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
 
 
@@ -20,7 +21,7 @@ flutter run
 
 ---------------------------------------------------------
 
-I now want you to act down as an expert senior software engineer to review all the implementation of this feature making sure it works correctly as planned with no problems or production risks as well as abiding by the app rules and conventions, have modern UI that matched the app and has no security issues. if you find any errors please fix them immediatley in a bulletproof solution
+I now want you to act as an expert senior software engineer to review all the implementation of this feature making sure it works correctly as planned with no problems or production risks as well as abiding by the app rules and conventions, have modern UI that matched the app and has no security issues. if you find any errors please fix them immediatley in a bulletproof solution and make sure you've followed the best practices
 
 ---------------------------------------------------------
 Homepage components:

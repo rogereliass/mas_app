@@ -67,9 +67,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
     
     try {
       final file = await provider.getFile(widget.fileId);
-      print('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
-      print('📁 Storage path: ${file?.storagePath}');
-      print('🔗 Icon URL: ${file?.iconUrl}');
+      debugPrint('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
+      debugPrint('📁 Storage path: ${file?.storagePath}');
+      debugPrint('🔗 Icon URL: ${file?.iconUrl}');
       
       if (file != null) {
         _file = file;
@@ -87,7 +87,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         
         if (isVideo) {
           // For video files, use storagePath directly (YouTube URL)
-          print('🎥 Video file - using storagePath: ${file.storagePath}');
+          debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
           
           if (mounted) {
             setState(() {
@@ -97,7 +97,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         } else if (hasOffline) {
           // Use offline cached file for PDFs, images, and audio
-          print('💾 Using offline cached file: $offlinePath');
+          debugPrint('💾 Using offline cached file: $offlinePath');
           
           if (mounted) {
             setState(() {
@@ -108,9 +108,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         } else if (isAudio) {
           // For audio files, get signed URL from Supabase storage
-          print('🎵 Audio file - getting signed URL');
+          debugPrint('🎵 Audio file - getting signed URL');
           final url = await provider.getFileUrl(widget.fileId);
-          print('🔗 Generated signed URL for audio: $url');
+          debugPrint('🔗 Generated signed URL for audio: $url');
           
           if (mounted) {
             setState(() {
@@ -121,7 +121,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         } else if (!file.isTextFile) {
           // Get signed URL for non-video, non-text files
           final url = await provider.getFileUrl(widget.fileId);
-          print('🔗 Generated signed URL: $url');
+          debugPrint('🔗 Generated signed URL: $url');
           
           if (mounted) {
             setState(() {
@@ -132,7 +132,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         } else {
           // For text files, load content from storage if text_content is empty
           final textContent = await provider.getTextFileContent(widget.fileId);
-          print('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
+          debugPrint('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
           
           if (mounted) {
             setState(() {
@@ -162,7 +162,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         }
       } else {
-        print('❌ File not found');
+        debugPrint('❌ File not found');
         if (mounted) {
           setState(() {
             _isLoadingFile = false;
@@ -170,7 +170,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         }
       }
     } catch (e) {
-      print('❌ Error loading file: $e');
+      debugPrint('❌ Error loading file: $e');
       if (mounted) {
         setState(() {
           _isLoadingFile = false;
@@ -211,11 +211,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
     // Validate storage path before updating
     if (_file!.storagePath == null || _file!.storagePath!.isEmpty) {
-      print('⚠️ Cannot auto-update: Storage path not available');
+      debugPrint('⚠️ Cannot auto-update: Storage path not available');
       return;
     }
 
-    print('🔄 New version available, auto-updating...');
+    debugPrint('🔄 New version available, auto-updating...');
     
     setState(() {
       _isCheckingUpdate = true;
@@ -265,7 +265,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         await _loadFileData();
       }
     } catch (e) {
-      print('❌ Error checking for updates: $e');
+      debugPrint('❌ Error checking for updates: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -498,10 +498,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
         padding: const EdgeInsets.all(8.0),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.goldAccent.withOpacity(0.15),
+            color: AppColors.goldAccent.withValues(alpha: 0.15),
             shape: BoxShape.circle,
             border: Border.all(
-              color: AppColors.goldAccent.withOpacity(0.3),
+              color: AppColors.goldAccent.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -655,7 +655,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -679,7 +679,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -707,7 +707,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   ),
                   child: LinearProgressIndicator(
                     value: _downloadProgress,
-                    backgroundColor: Colors.grey.withOpacity(0.2),
+                    backgroundColor: Colors.grey.withValues(alpha: 0.2),
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       AppColors.publicAccessBadge,
                     ),
@@ -723,11 +723,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build appropriate file viewer based on file type
   Widget _buildFileViewer(String fileType) {
-    print('🎬 Building viewer for type: $fileType');
+    debugPrint('🎬 Building viewer for type: $fileType');
     
     // For text files, pass the text content directly
     if (fileType == 'text' || fileType == 'txt') {
-      print('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
+      debugPrint('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
       return TxtViewerWidget(
         url: '',
         textContent: _file?.textContent,
@@ -737,7 +737,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
     // For other files, use the signed URL
     final streamUrl = _fileUrl ?? widget.fileUrl ?? '';
-    print('🔗 Using URL for viewer: $streamUrl');
+    debugPrint('🔗 Using URL for viewer: $streamUrl');
 
     switch (fileType.toLowerCase()) {
       case 'pdf':
@@ -772,14 +772,14 @@ class _FileViewerPageState extends State<FileViewerPage> {
           Icon(
             Icons.insert_drive_file,
             size: 80,
-            color: Colors.grey.withOpacity(0.5),
+            color: Colors.grey.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
             'Unsupported file type',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey.withOpacity(0.7),
+              color: Colors.grey.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -816,7 +816,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 vertical: 6,
               ),
               decoration: BoxDecoration(
-                color: AppColors.goldAccent.withOpacity(0.2),
+                color: AppColors.goldAccent.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: AppColors.goldAccent,
@@ -915,10 +915,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.goldAccent.withOpacity(0.3),
+                  color: AppColors.goldAccent.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: AppColors.goldAccent.withOpacity(0.5),
+                    color: AppColors.goldAccent.withValues(alpha: 0.5),
                     width: 1,
                   ),
                 ),
@@ -937,3 +937,4 @@ class _FileViewerPageState extends State<FileViewerPage> {
     );
   }
 }
+

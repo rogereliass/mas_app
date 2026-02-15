@@ -59,8 +59,17 @@ class RoleRepository {
             ),
           );
 
+      debugPrint('📊 Profile query result: ${profileResponse != null ? "FOUND" : "NULL"}');
+      if (profileResponse != null) {
+        debugPrint('   Raw response keys: ${profileResponse.keys.toList()}');
+        debugPrint('   first_name: ${profileResponse['first_name']}');
+        debugPrint('   middle_name: ${profileResponse['middle_name']}');
+        debugPrint('   last_name: ${profileResponse['last_name']}');
+        debugPrint('   email: ${profileResponse['email']}');
+      }
+
       if (profileResponse == null) {
-        debugPrint('⚠️ No profile found for user: $userId');
+        debugPrint('❌ No profile found for user: $userId');
         return null;
       }
 
