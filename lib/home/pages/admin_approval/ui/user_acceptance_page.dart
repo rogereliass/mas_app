@@ -33,14 +33,19 @@ class UserAcceptancePage extends StatefulWidget {
 }
 
 class _UserAcceptancePageState extends State<UserAcceptancePage> {
+  final ScrollController _scrollController = ScrollController();
+  AdminProvider? _adminProvider;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       
       final authProvider = context.read<AuthProvider>();
       final adminProvider = context.read<AdminProvider>();
+      _adminProvider = adminProvider;
       
       // Get selected role from widget or navigation arguments
       String? roleContext = widget.selectedRole;
@@ -100,11 +105,40 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
       debugPrint('✅ User authorized for User Acceptance (effective rank $effectiveRank)');
       adminProvider.loadPendingProfiles();
       adminProvider.loadRoles();
+
+      // Error listener
+      adminProvider.addListener(_errorHandler);
     });
+  }
+
+  void _errorHandler() {
+    if (!mounted || _adminProvider == null) return;
+    
+    if (_adminProvider!.hasError && _adminProvider!.pendingProfiles.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_adminProvider!.error!),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _adminProvider!.loadMorePendingProfiles(),
+            textColor: Colors.white,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      context.read<AdminProvider>().loadMorePendingProfiles();
+    }
   }
   
   @override
   void dispose() {
+    _adminProvider?.removeListener(_errorHandler);
+    _scrollController.dispose();
     // Don't call clearRoleContext() here - it triggers notifyListeners() during dispose
     // The role context will be cleared when needed (e.g., when navigating to the page again)
     super.dispose();
@@ -226,9 +260,19 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
         // Profiles list
         Expanded(
           child: ListView.builder(
+            controller: _scrollController,
             padding: const EdgeInsets.all(16),
-            itemCount: provider.pendingProfiles.length,
+            itemCount: provider.pendingProfiles.length + (provider.hasMorePending ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index == provider.pendingProfiles.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
               final profile = provider.pendingProfiles[index];
               return _ProfileCard(
                 profile: profile,

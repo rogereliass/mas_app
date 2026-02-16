@@ -129,9 +129,13 @@ class AdminProvider with ChangeNotifier {
 
   // Loading states
   bool _isLoadingPending = false;
+  bool _isLoadingMorePending = false;
+  bool _hasMorePending = true;
   bool _isLoadingProfile = false;
   bool _isLoadingRoles = false;
   bool _isProcessing = false;
+  
+  static const int _pageSize = 20;
 
   // Error states
   String? _error;
@@ -175,6 +179,8 @@ class AdminProvider with ChangeNotifier {
   String? get selectedProfileTroopContext => _selectedProfileTroopContext;
 
   bool get isLoadingPending => _isLoadingPending;
+  bool get isLoadingMorePending => _isLoadingMorePending;
+  bool get hasMorePending => _hasMorePending;
   bool get isLoadingProfile => _isLoadingProfile;
   bool get isLoadingRoles => _isLoadingRoles;
   bool get isProcessing => _isProcessing;
@@ -239,6 +245,7 @@ class AdminProvider with ChangeNotifier {
   /// Automatically filtered by user's role and troop context
   Future<void> loadPendingProfiles({bool forceRefresh = false}) async {
     _isLoadingPending = true;
+    _hasMorePending = true;
     _error = null;
     notifyListeners();
     
@@ -259,6 +266,7 @@ class AdminProvider with ChangeNotifier {
       final cachedProfiles = _pendingProfilesCache.get(cacheKey);
       if (cachedProfiles != null) {
         _pendingProfiles = cachedProfiles;
+        _hasMorePending = _pendingProfiles.length >= _pageSize;
         _isLoadingPending = false;
         debugPrint('📦 Using cached pending profiles (${_pendingProfiles.length} items)');
         notifyListeners();
@@ -272,7 +280,10 @@ class AdminProvider with ChangeNotifier {
       // Pass effective user profile to service for automatic scoping
       _pendingProfiles = await _service.fetchPendingProfiles(
         currentUser: currentUser,
+        limit: _pageSize,
+        offset: 0,
       );
+      _hasMorePending = _pendingProfiles.length >= _pageSize;
       _pendingProfilesCache.set(cacheKey, _pendingProfiles, _pendingProfilesCacheTtl);
       debugPrint('✅ Loaded ${_pendingProfiles.length} pending profiles (scoped, cached for ${_pendingProfilesCacheTtl.inSeconds}sec)');
     } catch (e) {
@@ -280,6 +291,46 @@ class AdminProvider with ChangeNotifier {
       debugPrint('❌ Error loading pending profiles: $e');
     } finally {
       _isLoadingPending = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load more pending profiles
+  Future<void> loadMorePendingProfiles() async {
+    if (_isLoadingMorePending || !_hasMorePending || _isLoadingPending) return;
+
+    _isLoadingMorePending = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final currentUser = _effectiveUserProfile;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      final moreProfiles = await _service.fetchPendingProfiles(
+        currentUser: currentUser,
+        limit: _pageSize,
+        offset: _pendingProfiles.length,
+      );
+
+      if (moreProfiles.isEmpty) {
+        _hasMorePending = false;
+      } else {
+        _pendingProfiles.addAll(moreProfiles);
+        _hasMorePending = moreProfiles.length >= _pageSize;
+        
+        // Update cache with the full list
+        final troopId = currentUser.managedTroopId ?? 'all';
+        final cacheKey = '${currentUser.roleRank}:$troopId';
+        _pendingProfilesCache.set(cacheKey, _pendingProfiles, _pendingProfilesCacheTtl);
+      }
+    } catch (e) {
+      _error = 'Unable to load more pending profiles. Please try again.';
+      debugPrint('❌ Error loading more pending profiles: $e');
+    } finally {
+      _isLoadingMorePending = false;
       notifyListeners();
     }
   }

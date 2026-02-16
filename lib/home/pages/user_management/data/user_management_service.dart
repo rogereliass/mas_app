@@ -24,6 +24,11 @@ class UserManagementService with ScopedServiceMixin {
 
   Future<List<ManagedUserProfile>> fetchUsers({
     required UserProfile currentUser,
+    int? limit,
+    int? offset,
+    String? searchQuery,
+    String? roleFilter,
+    String? troopFilter,
   }) async {
     try {
       var query = _supabase
@@ -66,9 +71,39 @@ class UserManagementService with ScopedServiceMixin {
           ''')
           .eq('approved', true);
 
+      // Apply scope filter (system vs troop level)
       query = applyScopeFilter(query, currentUser, 'signup_troop');
 
-      final response = await query.order('last_name', ascending: true);
+      // Apply troop filter if provided (only for system admins who can see all)
+      if (troopFilter != null) {
+        query = query.eq('signup_troop', troopFilter);
+      }
+
+      // Apply role filter if provided
+      if (roleFilter != null) {
+        // We use a subquery/filter on the joined profile_roles
+        // In Supabase/Postgrest, filtering by a joined table can be done via '.inner' or just referencing the column if using the correct syntax
+        // However, a simpler way for roles is to filter profiles that have a specific role_id in their profile_roles
+        query = query.filter('profile_roles.role_id', 'eq', roleFilter);
+      }
+
+      // Apply search query
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+        final q = '%${searchQuery.trim()}%';
+        query = query.or('first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q');
+      }
+
+      // Sort by last name
+      var sortedQuery = query.order('last_name', ascending: true);
+      
+      // Apply pagination if provided
+      if (limit != null) {
+        final start = offset ?? 0;
+        final end = start + limit - 1;
+        sortedQuery = sortedQuery.range(start, end);
+      }
+
+      final response = await sortedQuery;
 
       return (response as List)
           .map((json) => ManagedUserProfile.fromJson(json))

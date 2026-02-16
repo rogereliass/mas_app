@@ -28,6 +28,7 @@ class UserManagementPage extends StatefulWidget {
 class _UserManagementPageState extends State<UserManagementPage> {
   UserManagementProvider? _userProvider;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _debounceTimer;
   String? _roleContext;
   int? _effectiveRank;
@@ -35,6 +36,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -89,12 +91,40 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
       userProvider.loadUsers();
       userProvider.loadRoles();
+
+      // Error listener for paging/refresh errors
+      userProvider.addListener(_errorHandler);
     });
+  }
+
+  void _errorHandler() {
+    if (!mounted || _userProvider == null) return;
+    
+    if (_userProvider!.hasError && _userProvider!.users.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_userProvider!.error!),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _userProvider!.loadMoreUsers(),
+            textColor: Colors.white,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      context.read<UserManagementProvider>().loadMoreUsers();
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     _debounceTimer?.cancel();
     // Don't call clearRoleContext() here - it triggers notifyListeners() during dispose
     // The role context will be cleared when needed (e.g., when navigating to the page again)
@@ -161,9 +191,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     _buildUserCountBadge(provider.filteredUsers.length, provider.users.length, theme),
                     Expanded(
                       child: ListView.builder(
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: filteredUsers.length,
+                        itemCount: filteredUsers.length + (provider.hasMoreUsers ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index == filteredUsers.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          
                           final user = filteredUsers[index];
                           return UserCard(
                             key: ValueKey(user.id),

@@ -41,6 +41,8 @@ class AdminService with ScopedServiceMixin {
   /// Returns profiles sorted by creation date (oldest first)
   Future<List<PendingProfile>> fetchPendingProfiles({
     required UserProfile currentUser,
+    int? limit,
+    int? offset,
   }) async {
     try {
       debugPrint('🔍 Fetching pending profiles for user (rank ${currentUser.roleRank})');
@@ -57,8 +59,17 @@ class AdminService with ScopedServiceMixin {
       // Apply automatic scope filtering BEFORE order/transformations
       query = applyScopeFilter(query, currentUser, 'signup_troop');
       
-      // Apply ordering last (chain directly since order returns a different type)
-      final response = await query.order('created_at', ascending: true);
+      // Apply ordering
+      var sortedQuery = query.order('created_at', ascending: true);
+
+      // Apply pagination if provided
+      if (limit != null) {
+        final start = offset ?? 0;
+        final end = start + limit - 1;
+        sortedQuery = sortedQuery.range(start, end);
+      }
+      
+      final response = await sortedQuery;
 
       final profiles = (response as List)
           .map((json) => PendingProfile.fromJson(json))

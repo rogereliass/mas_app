@@ -16,6 +16,7 @@ The User Management module provides administrative capabilities for managing use
 - **Role Assignment**: Assign multiple roles with troop context when applicable
 - **Access Control**: Automatic scoping based on administrator permissions
 - **Real-time Updates**: Changes sync immediately with Supabase backend
+- **Performance Optimization**: Short-term TTL caching for user and role lists (done with Antigravity)
 - **Unsaved Changes Protection**: Warns users before discarding edits
 
 ---
@@ -100,6 +101,7 @@ user_management/
 - **Automatic Scoping**: 
   - Troop leaders see only their troop's users
   - System admins see all users
+- **Pagination**: Lazy loading with 20 users per page for optimal performance (done with Antigravity)
 - **Responsive Grid**: Adapts layout for different screen sizes
 
 ### 2. User Profile Editing
@@ -594,16 +596,11 @@ Container(
 
 ### Current Limitations
 
-1. **Pagination**
-   - Currently loads all users at once
-   - May cause performance issues with large user bases (>1000 users)
-   - **Future**: Implement pagination with lazy loading
-
-2. **Audit Trail**
+1. **Audit Trail**
    - No tracking of who made what changes when
    - **Future**: Add audit log table and UI to view change history
 
-3. **Bulk Operations**
+2. **Bulk Operations**
    - Can only edit one user at a time
    - **Future**: Add bulk role assignment, bulk profile updates
 

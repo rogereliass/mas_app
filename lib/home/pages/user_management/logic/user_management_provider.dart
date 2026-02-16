@@ -27,6 +27,11 @@ class UserManagementProvider with ChangeNotifier {
   String? _selectedRoleFilter;
   String? _selectedTroopFilter;
 
+  // Pagination state
+  static const int _pageSize = 20;
+  bool _hasMoreUsers = true;
+  bool _isLoadingMore = false;
+
   UserManagementProvider({
     UserManagementService? service,
     required AuthProvider authProvider,
@@ -95,16 +100,12 @@ class UserManagementProvider with ChangeNotifier {
   bool _isProcessing = false;
   String? _error;
 
-  // Filter cache for performance optimization
-  List<ManagedUserProfile>? _cachedFilteredUsers;
-  String? _cachedSearchQuery;
-  String? _cachedRoleFilter;
-  String? _cachedTroopFilter;
-
   List<ManagedUserProfile> get users => _users;
   List<Role> get roles => _roles;
   bool get isLoadingUsers => _isLoadingUsers;
   bool get isLoadingRoles => _isLoadingRoles;
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMoreUsers => _hasMoreUsers;
   bool get isProcessing => _isProcessing;
   bool get hasError => _error != null;
   String? get error => _error;
@@ -117,53 +118,7 @@ class UserManagementProvider with ChangeNotifier {
   bool get isRolesReady =>
       !_isLoadingRoles && !_authProvider.profileLoading && _effectiveUserProfile != null;
 
-  /// Get filtered list of users based on search query and selected filters
-  List<ManagedUserProfile> get filteredUsers {
-    // Return cached result if filters haven't changed
-    if (_cachedFilteredUsers != null &&
-        _cachedSearchQuery == _searchQuery &&
-        _cachedRoleFilter == _selectedRoleFilter &&
-        _cachedTroopFilter == _selectedTroopFilter) {
-      return _cachedFilteredUsers!;
-    }
-
-    var filtered = _users;
-    
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((user) {
-        final name = user.fullName.toLowerCase();
-         final phone = user.phone?.toLowerCase() ?? '';
-        final scoutCode = user.scoutCode?.toLowerCase() ?? '';
-        return name.contains(query) || 
-           phone.contains(query) || 
-               scoutCode.contains(query);
-      }).toList();
-    }
-    
-    // Apply role filter
-    if (_selectedRoleFilter != null) {
-      filtered = filtered.where((user) {
-        return user.roles.any((role) => role.id == _selectedRoleFilter);
-      }).toList();
-    }
-    
-    // Apply troop filter
-    if (_selectedTroopFilter != null) {
-      filtered = filtered.where((user) {
-        return user.signupTroopId == _selectedTroopFilter;
-      }).toList();
-    }
-    
-    // Cache the result
-    _cachedFilteredUsers = filtered;
-    _cachedSearchQuery = _searchQuery;
-    _cachedRoleFilter = _selectedRoleFilter;
-    _cachedTroopFilter = _selectedTroopFilter;
-    
-    return filtered;
-  }
+  List<ManagedUserProfile> get filteredUsers => _users;
   
   /// Get list of available troops from loaded users
   List<Map<String, String>> get availableTroops {
@@ -179,33 +134,23 @@ class UserManagementProvider with ChangeNotifier {
       ..sort((a, b) => a['name']!.compareTo(b['name']!));
   }
   
-  /// Clear filter cache when data or filters change
-  void _clearFilterCache() {
-    _cachedFilteredUsers = null;
-    _cachedSearchQuery = null;
-    _cachedRoleFilter = null;
-    _cachedTroopFilter = null;
-  }
-
   /// Update search query
   void setSearchQuery(String query) {
+    if (_searchQuery == query) return;
     _searchQuery = query;
-    _clearFilterCache();
-    notifyListeners();
+    loadUsers(forceRefresh: true);
   }
-  
-  /// Update role filter
-  void setRoleFilter(String? roleId) {
-    _selectedRoleFilter = roleId;
-    _clearFilterCache();
-    notifyListeners();
+
+  void setRoleFilter(String? roleName) {
+    if (_selectedRoleFilter == roleName) return;
+    _selectedRoleFilter = roleName;
+    loadUsers(forceRefresh: true);
   }
-  
-  /// Update troop filter
+
   void setTroopFilter(String? troopId) {
+    if (_selectedTroopFilter == troopId) return;
     _selectedTroopFilter = troopId;
-    _clearFilterCache();
-    notifyListeners();
+    loadUsers(forceRefresh: true);
   }
   
   /// Clear all filters
@@ -213,8 +158,7 @@ class UserManagementProvider with ChangeNotifier {
     _searchQuery = '';
     _selectedRoleFilter = null;
     _selectedTroopFilter = null;
-    _clearFilterCache();
-    notifyListeners();
+    loadUsers(forceRefresh: true);
   }
 
   List<Role> get assignableRoles {
@@ -252,6 +196,7 @@ class UserManagementProvider with ChangeNotifier {
 
   Future<void> loadUsers({bool forceRefresh = false}) async {
     _isLoadingUsers = true;
+    _hasMoreUsers = true;
     _error = null;
     notifyListeners();
 
@@ -262,26 +207,78 @@ class UserManagementProvider with ChangeNotifier {
       }
 
       final cacheKey =
-          '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}';
+          '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:${_searchQuery}:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
+      
+      // Only use cache if not forcing refresh and we're loading the first page
       if (!forceRefresh) {
         final cachedUsers = _usersCache.get(cacheKey);
         if (cachedUsers != null && cachedUsers.isNotEmpty) {
           _users = cachedUsers;
-          _clearFilterCache();
+          _hasMoreUsers = _users.length >= _pageSize; 
           _isLoadingUsers = false;
           notifyListeners();
           return;
         }
       }
 
-      _users = await _service.fetchUsers(currentUser: currentUser);
+      _users = await _service.fetchUsers(
+        currentUser: currentUser,
+        limit: _pageSize,
+        offset: 0,
+        searchQuery: _searchQuery,
+        roleFilter: _selectedRoleFilter,
+        troopFilter: _selectedTroopFilter,
+      );
+      
+      _hasMoreUsers = _users.length >= _pageSize;
       _usersCache.set(cacheKey, _users, _usersCacheTtl);
-      _clearFilterCache();
     } catch (e) {
       _error = 'Unable to load users. Please check your connection and try again.';
       debugPrint('❌ Error loading users: $e');
     } finally {
       _isLoadingUsers = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadMoreUsers() async {
+    if (_isLoadingMore || !_hasMoreUsers || _isLoadingUsers) return;
+
+    _isLoadingMore = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final currentUser = _effectiveUserProfile;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      final moreUsers = await _service.fetchUsers(
+        currentUser: currentUser,
+        limit: _pageSize,
+        offset: _users.length,
+        searchQuery: _searchQuery,
+        roleFilter: _selectedRoleFilter,
+        troopFilter: _selectedTroopFilter,
+      );
+
+      if (moreUsers.isEmpty) {
+        _hasMoreUsers = false;
+      } else {
+        _users.addAll(moreUsers);
+        _hasMoreUsers = moreUsers.length >= _pageSize;
+        
+        // Update cache with the full list
+        final cacheKey =
+            '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:${_searchQuery}:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
+        _usersCache.set(cacheKey, _users, _usersCacheTtl);
+      }
+    } catch (e) {
+      _error = 'Unable to load more users. Please try again.';
+      debugPrint('❌ Error loading more users: $e');
+    } finally {
+      _isLoadingMore = false;
       notifyListeners();
     }
   }
@@ -341,7 +338,7 @@ class UserManagementProvider with ChangeNotifier {
       List<Role>? updatedRoles;
       final canEditRoles = canEditRolesForProfile(profile);
       final currentRoleIds = profile.roles.map((role) => role.id).toSet();
-        final requestedRoleIds = roleIds?.toSet();
+      final requestedRoleIds = roleIds?.toSet();
       final shouldUpdateRoles =
           requestedRoleIds != null && !setEquals(currentRoleIds, requestedRoleIds);
 
@@ -408,8 +405,6 @@ class UserManagementProvider with ChangeNotifier {
       final index = _users.indexWhere((user) => user.id == profile.id);
       if (index != -1) {
         _users[index] = updatedProfile;
-        // Clear filter cache to force recomputation with updated data
-        _clearFilterCache();
       }
 
       return true;
