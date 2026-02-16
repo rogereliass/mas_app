@@ -236,29 +236,36 @@ Every `DropdownButtonFormField` MUST follow these rules:
 DropdownButtonFormField<String?>(
   value: selectedValue,
   isExpanded: true,  // ✅ REQUIRED - prevents overflow crashes
+  // For rich/multi-line items, always use selectedItemBuilder
+  selectedItemBuilder: (context) {
+    return items.map((e) => Align(
+      alignment: Alignment.centerLeft,
+      child: Text(e.name, style: TextStyle(fontWeight: FontWeight.bold)),
+    )).toList();
+  },
+  itemHeight: 60, // ✅ REQUIRED if children are multi-line/rich
   decoration: InputDecoration(
     labelText: 'Label',
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    // ... other decoration
   ),
   items: items.map((item) {
     return DropdownMenuItem<String>(
       value: item.id,
-      child: Text(
-        item.name,
-        overflow: TextOverflow.ellipsis,  // ✅ REQUIRED - truncates long text
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(item.name, style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(item.subtitle, style: theme.textTheme.labelSmall),
+        ],
       ),
     );
   }).toList(),
-  hint: Text(
-    'Hint text...',
-    overflow: TextOverflow.ellipsis,  // ✅ REQUIRED - even for hints
-  ),
   onChanged: (value) => handleChange(value),
 );
 ```
 
-**Why**: Without `isExpanded: true` and `TextOverflow.ellipsis`, dropdowns with long text will crash the app with `RenderFlex overflowed` errors on small screens.
+**Why**: Without `isExpanded: true` and `selectedItemBuilder` for rich content, dropdowns will crash with `RenderFlex overflowed` errors. `itemHeight` must be sufficiently large to contain the custom item UI.
 
 ### 2. **Responsive Layout Requirements**
 Use `LayoutBuilder` or `MediaQuery` for responsive layouts:
@@ -290,6 +297,12 @@ final padding = isNarrow ? 8.0 : 16.0;
 - Large phones (400-500px)
 - Tablets (600-1000px)
 - Desktops (1024px+)
+
+### 2.1 **Dialog & Modal Stability**
+To prevent overflows in Dialogs (especially with keyboards open):
+- **Always** wrap Dialog content in `SingleChildScrollView`.
+- Use `Dialog` widget with a constrained `BoxConstraints(maxWidth: ...)` instead of `AlertDialog` for more premium/custom control.
+- Avoid hardcoded heights inside flex parents; use `mainAxisSize: MainAxisSize.min` for vertical columns.
 
 ### 3. **Text Overflow Protection**
 ALWAYS add overflow handling to text widgets in constrained spaces:

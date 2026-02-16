@@ -4,7 +4,6 @@ emulator -avd Pixel_6 -gpu swiftshader_indirect
 
 emulator -avd Pixel_6 -no-snapshot -gpu swiftshader_indirect
 
-
 flutter devices
 Should show emulator-5554 • Android 13 • Android Emulator
 
@@ -28,6 +27,7 @@ Homepage components:
 Admin:
 -✅User Acceptance (after login) module
 -✅User Management (tweaks)
+-✅Season Management
 -Stats (later)
 -Library Management (CRUD) for files and Folders
 

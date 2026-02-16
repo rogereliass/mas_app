@@ -369,13 +369,16 @@ class _HomePageState extends State<HomePage> {
       return const NoRoleMessage();
     }
     
-    // Show role-specific components based on selected role
-    if (_selectedRole == 'System Admin') {
-      return SystemAdminStats(selectedRole: _selectedRole ?? 'System Admin');
+    // Show role-specific components based on role rank
+    final selectedRoleRank = authProvider.getRankForRole(_selectedRole ?? '');
+    
+    // System Admins (rank 100) and Admins (rank 90-99) see the system dashboard
+    if (selectedRoleRank >= 90) {
+      return SystemAdminStats(selectedRole: _selectedRole ?? 'Admin');
     }
     
-    // Show troop head/leader management dashboard for troop-scoped roles
-    if (_selectedRole == 'Troop Head' || _selectedRole == 'Troop Leader') {
+    // Troop Head (rank 70) and Troop Leader (rank 60) see troop dashboard
+    if (selectedRoleRank >= 60 && selectedRoleRank < 90) {
       return TroopHeadStats(selectedRole: _selectedRole ?? 'Troop Head');
     }
     

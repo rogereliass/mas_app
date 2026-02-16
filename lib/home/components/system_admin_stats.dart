@@ -141,6 +141,34 @@ class SystemAdminStats extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             
+            // Season Management Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(context, AppRouter.seasonManagement);
+                },
+                icon: const Icon(Icons.calendar_today_rounded),
+                label: const Text('Season Management'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Manage system-wide activity seasons and codes',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // User Acceptance Button
             SizedBox(
               width: double.infinity,
@@ -155,8 +183,8 @@ class SystemAdminStats extends StatelessWidget {
                 icon: const Icon(Icons.how_to_reg),
                 label: const Text('User Acceptance'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
+                  backgroundColor: colorScheme.secondary,
+                  foregroundColor: colorScheme.onSecondary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -187,9 +215,13 @@ class SystemAdminStats extends StatelessWidget {
                 icon: const Icon(Icons.manage_accounts_outlined),
                 label: const Text('User Management'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.secondary,
-                  foregroundColor: colorScheme.onSecondary,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  foregroundColor: colorScheme.onSurfaceVariant,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
+                  side: BorderSide(
+                    color: colorScheme.outline.withValues(alpha: 0.5),
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

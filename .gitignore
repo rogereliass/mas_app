@@ -1,6 +1,15 @@
 .env
 .env.*
 
+# Flutter / Android
+build/
+.android/
+.gradle/
+local.properties
+*.apk
+*.aab
+
+
 # Miscellaneous
 *.class
 *.log

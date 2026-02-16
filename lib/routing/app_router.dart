@@ -15,6 +15,7 @@ import '../library/ui/about_page.dart';
 import '../profile/profile_page.dart';
 import '../home/pages/admin_approval/ui/user_acceptance_page.dart';
 import '../home/pages/user_management/ui/user_management_page.dart';
+import '../home/pages/season_management/ui/season_management_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -73,6 +74,9 @@ class AppRouter {
 
   /// User management page route (admin and troop roles)
   static const String userManagement = '/user-management';
+  
+  /// Season management page route (admin only)
+  static const String seasonManagement = '/season-management';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -143,6 +147,13 @@ class AppRouter {
       final selectedRole = args?['selectedRole'] as String?;
       return MaterialPageRoute(
         builder: (context) => UserManagementPage(selectedRole: selectedRole),
+      );
+    }
+    
+    // Handle Season Management
+    if (settings.name == seasonManagement) {
+      return MaterialPageRoute(
+        builder: (context) => const SeasonManagementPage(),
       );
     }
     
