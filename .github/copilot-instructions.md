@@ -90,10 +90,17 @@ Centralized Material 3 theme with dark/light mode:
 - **Single source**: [core/config/app_colors.dart](lib/core/config/app_colors.dart) - **NO hardcoded colors elsewhere**
 - **Access**: Use `AppColors.colorName` for all custom colors, `Theme.of(context).colorScheme` for Material 3 colors
 - **Toggle**: `ThemeProvider().toggleTheme()` - persists to SharedPreferences
+- **Theme logic**: Always use `ThemeProvider` from [core/config/theme_provider.dart](lib/core/config/theme_provider.dart) to read and apply light/dark mode. Do not re-implement theme mode logic per page; every page must reflect app colors via `AppColors` or `Theme.of(context)`.
 - **CRITICAL RULE**: Every color in the UI must be wired to either `AppColors.*` constants or `Theme.of(context).colorScheme.*`
   - ❌ WRONG: `Colors.green`, `Colors.grey[600]`, `Color(0xFF...)` hardcoded
   - ✅ RIGHT: `AppColors.success`, `AppColors.textSecondaryLight`, `Theme.of(context).primaryColor`
   - If a color isn't available in AppColors, add it to [app_colors.dart](lib/core/config/app_colors.dart) with clear documentation
+
+### 4.1 Current User Data (SharedPreferences)
+When you only need the currently logged-in user's cached data (ID, name, phone, auth status), fetch it from SharedPreferences via `AuthProvider` helpers, not directly from Supabase.
+- Use `AuthProvider.getUserId()`, `AuthProvider.getUserFullName()`, `AuthProvider.getUserPhone()`, and `AuthProvider.isUserAuthenticated()`.
+- Do not access SharedPreferences keys directly outside `AuthProvider`.
+- Use Supabase only when fresh server data is required (e.g., profile/roles refresh).
 
 ### 5. Navigation Pattern
 ```dart

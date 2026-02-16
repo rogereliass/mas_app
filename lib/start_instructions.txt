@@ -21,7 +21,7 @@ flutter run
 
 ---------------------------------------------------------
 
-I now want you to act as an expert senior software engineer to review all the implementation of this feature making sure it works correctly as planned with no problems or production risks as well as abiding by the app rules and conventions, have modern UI that matched the app and has no security issues. if you find any errors please fix them immediatley in a bulletproof solution and make sure you've followed the best practices
+Act as a senior production software engineer and review this implementation to ensure it matches the planned behavior and app conventions, is secure, stable, production-safe, has modern UI consistent with the existing design, contains no crashes, edge-case failures, or bad state handling, and follows best practices without over-engineering; if any issue exists, fix it immediately with the simplest bulletproof solution, re-check security, stability, and performance after the fix, and return only: 1) critical issues found (if any), 2) corrected final code, 3) confirmation the feature is production-ready.
 
 ---------------------------------------------------------
 Homepage components:

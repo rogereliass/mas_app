@@ -209,33 +209,30 @@ class _HomePageState extends State<HomePage> {
         child: Stack(
           children: [
             SafeArea(
-              child: RefreshIndicator(
-                onRefresh: _refreshData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Welcome Header
-                      _buildWelcomeHeader(context, authProvider),
-                      const SizedBox(height: 24),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Welcome Header
+                    _buildWelcomeHeader(context, authProvider),
+                    const SizedBox(height: 24),
 
-                      // Quick Actions
-                      _buildQuickActions(context),
-                      const SizedBox(height: 32),
+                    // Quick Actions
+                    _buildQuickActions(context),
+                    const SizedBox(height: 32),
 
-                      // Summary / Stats
-                      _buildSummaryStats(context),
-                      const SizedBox(height: 32),
+                    // Summary / Stats
+                    _buildSummaryStats(context),
+                    const SizedBox(height: 32),
 
-                  // // Recent Activity
-                  // _buildRecentActivity(context),
-                  
-                  // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
-                  const SizedBox(height: 24),
-                    ],
-                  ),
+                    // // Recent Activity
+                    // _buildRecentActivity(context),
+                    
+                    // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
             ),
@@ -570,15 +567,6 @@ class _HomePageState extends State<HomePage> {
   //     ],
   //   );
   // }
-
-  /// Handles pull-to-refresh action
-  Future<void> _refreshData() async {
-    if (!mounted) return;
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.refreshProfile();
-    // TODO: Add other data refreshes here (Stats, Activities, etc.)
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
 
   /// Handle role change event
   void _onRoleChanged(String newRole) {

@@ -121,7 +121,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
             builder: (context, provider, _) {
               return IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: provider.isLoadingUsers ? null : () => provider.refresh(),
+                onPressed: provider.isLoadingUsers ? null : () => provider.refresh(forceRefresh: true),
                 tooltip: 'Refresh',
               );
             },
@@ -133,54 +133,49 @@ class _UserManagementPageState extends State<UserManagementPage> {
           AdminScopeBanner(selectedRoleName: _roleContext),
           _buildSearchAndFilters(context),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await context.read<UserManagementProvider>().refresh();
-              },
-              child: Consumer<UserManagementProvider>(
-                builder: (context, provider, _) {
-                  if (provider.isLoadingUsers) {
-                    return const LoadingView(message: 'Loading users...');
-                  }
+            child: Consumer<UserManagementProvider>(
+              builder: (context, provider, _) {
+                if (provider.isLoadingUsers) {
+                  return const LoadingView(message: 'Loading users...');
+                }
 
-                  if (provider.hasError) {
-                    return ErrorView(
-                      message: provider.error ?? 'Unknown error occurred',
-                      onRetry: () => provider.loadUsers(),
-                    );
-                  }
-
-                  if (provider.users.isEmpty) {
-                    return _buildEmptyState(context, provider, isInitialState: true);
-                  }
-                  
-                  final filteredUsers = provider.filteredUsers;
-                  
-                  if (filteredUsers.isEmpty) {
-                    return _buildEmptyState(context, provider, isInitialState: false);
-                  }
-
-                  return Column(
-                    children: [
-                      _buildUserCountBadge(provider.filteredUsers.length, provider.users.length, theme),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredUsers.length,
-                          itemBuilder: (context, index) {
-                            final user = filteredUsers[index];
-                            return UserCard(
-                              key: ValueKey(user.id),
-                              profile: user,
-                              onEdit: () => _showEditDialog(context, user),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                if (provider.hasError) {
+                  return ErrorView(
+                    message: provider.error ?? 'Unknown error occurred',
+                    onRetry: () => provider.loadUsers(),
                   );
-                },
-              ),
+                }
+
+                if (provider.users.isEmpty) {
+                  return _buildEmptyState(context, provider, isInitialState: true);
+                }
+                
+                final filteredUsers = provider.filteredUsers;
+                
+                if (filteredUsers.isEmpty) {
+                  return _buildEmptyState(context, provider, isInitialState: false);
+                }
+
+                return Column(
+                  children: [
+                    _buildUserCountBadge(provider.filteredUsers.length, provider.users.length, theme),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredUsers.length,
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          return UserCard(
+                            key: ValueKey(user.id),
+                            profile: user,
+                            onEdit: () => _showEditDialog(context, user),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -349,7 +344,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ],
       ),
       child: DropdownButtonFormField<String?>(
-        value: provider.selectedRoleFilter,
+        initialValue: provider.selectedRoleFilter,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: isNarrow ? null : 'Filter by Role',
@@ -444,7 +439,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ],
       ),
       child: DropdownButtonFormField<String?>(
-        value: provider.selectedTroopFilter,
+        initialValue: provider.selectedTroopFilter,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: isNarrow ? null : 'Filter by Troop',

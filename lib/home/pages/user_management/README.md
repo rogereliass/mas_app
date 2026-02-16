@@ -271,7 +271,8 @@ The User Management feature implements **hierarchical role-based access control*
 
 4. **Role Assignment Restrictions**:
    - Admins can only assign roles up to their own rank
-   - Troop leaders can only assign troop-scoped roles for their troop
+  - Troop leaders can only assign roles with rank 1-40 within their troop
+  - Troop leaders cannot assign troop-scoped roles (rank 60/70)
    - System admins can assign any role with any troop context
 
 ### Permission Requirements
@@ -280,7 +281,7 @@ The User Management feature implements **hierarchical role-based access control*
 |---------|-------------------------|---------------------|
 | View users | Own troop only | All troops |
 | Edit profiles | Own troop only | All users |
-| Assign roles | Troop-scoped only (same troop) | Any role, any context |
+| Assign roles | Ranks 1-40 only (same troop) | Any role, any context |
 | Change troop context | None | Yes |
 | Manage system roles | None | Yes |
 
@@ -303,6 +304,7 @@ final effectiveRank = authProvider.getRankForRole('Troop Leader');
 - Require a troop context (which troop the role applies to)
 - Dropdown automatically appears when these roles are selected
 - Validation ensures troop context is provided before saving
+- Assignment is limited to system admins (rank ≥ 90)
 
 **System Roles** (ranks <60 or ≥80):
 - No troop context required

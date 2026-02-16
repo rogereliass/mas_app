@@ -6,6 +6,7 @@ import '../data/auth_repository.dart';
 import '../data/role_repository.dart';
 import '../models/user_profile.dart';
 import '../models/role.dart';
+import '../../core/utils/ttl_cache.dart';
 
 /// Authentication state management provider
 ///
@@ -16,6 +17,10 @@ class AuthProvider with ChangeNotifier {
   final RoleRepository _roleRepository = RoleRepository();
   StreamSubscription<AuthState>? _authSubscription;
   static SharedPreferences? _cachedPrefs;
+  
+  // TTL caching for troops list
+  static const Duration _troopsCacheTtl = Duration(minutes: 60);
+  final TtlCache<String, List<Map<String, dynamic>>> _troopsCache = TtlCache();
 
   void _logDebug(String message) {
     if (kDebugMode) {
@@ -540,9 +545,21 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Get list of troops with id and name from Supabase
-  Future<List<Map<String, dynamic>>> getTroops() async {
+  Future<List<Map<String, dynamic>>> getTroops({bool forceRefresh = false}) async {
+    // Check cache if not forcing refresh
+    if (!forceRefresh) {
+      final cachedTroops = _troopsCache.get('troops');
+      if (cachedTroops != null) {
+        _logDebug('📦 Using cached troops (${cachedTroops.length} items)');
+        return cachedTroops;
+      }
+    }
+    
     try {
-      return await _authRepository.getTroops();
+      final troops = await _authRepository.getTroops();
+      _troopsCache.set('troops', troops, _troopsCacheTtl);
+      _logDebug('✅ Loaded ${troops.length} troops (cached for ${_troopsCacheTtl.inMinutes}min)');
+      return troops;
     } catch (e) {
       _logDebug('Failed to fetch troops: $e');
       return [];

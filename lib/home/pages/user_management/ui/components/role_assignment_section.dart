@@ -419,7 +419,7 @@ class RoleAssignmentSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: selectedTroopId,
+            initialValue: selectedTroopId,
             isExpanded: true, // Allow text to expand and truncate properly
             decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(
@@ -479,8 +479,18 @@ class RoleAssignmentSection extends StatelessWidget {
             }).toList(),
             onChanged: (String? newValue) {
               onTroopContextChanged(role.id, newValue);
+              if (newValue == null) {
+                debugPrint('🔄 Troop context cleared: ${role.name}');
+                return;
+              }
+              final troopName = troops
+                  .firstWhere(
+                    (troop) => troop['id'] == newValue,
+                    orElse: () => {'name': 'Unknown troop'},
+                  )['name']
+                  .toString();
               debugPrint(
-                  '🔄 Troop context updated: ${role.name} -> ${troops.firstWhere((t) => t['id'] == newValue)['name']}');
+                  '🔄 Troop context updated: ${role.name} -> $troopName');
             },
             validator: (value) {
               if (value == null || value.isEmpty) {

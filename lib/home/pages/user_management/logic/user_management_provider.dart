@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/utils/ttl_cache.dart';
 import '../../../../auth/data/role_repository.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/models/role.dart';
@@ -8,9 +9,16 @@ import '../data/user_management_service.dart';
 
 /// Provider for user management operations
 class UserManagementProvider with ChangeNotifier {
+  static const Duration _usersCacheTtl = Duration(minutes: 3);
+  static const Duration _rolesCacheTtl = Duration(minutes: 60);
+
   final UserManagementService _service;
   final AuthProvider _authProvider;
   final RoleRepository _roleRepository = RoleRepository();
+  final TtlCache<String, List<ManagedUserProfile>> _usersCache =
+      TtlCache<String, List<ManagedUserProfile>>();
+  final TtlCache<String, List<Role>> _rolesCache =
+      TtlCache<String, List<Role>>();
 
   String? _selectedRoleName;
   
@@ -34,6 +42,8 @@ class UserManagementProvider with ChangeNotifier {
   }
 
   void _onAuthChanged() {
+    _usersCache.clear();
+    _rolesCache.clear();
     notifyListeners();
   }
 
@@ -124,10 +134,10 @@ class UserManagementProvider with ChangeNotifier {
       final query = _searchQuery.toLowerCase();
       filtered = filtered.where((user) {
         final name = user.fullName.toLowerCase();
-        final email = user.email?.toLowerCase() ?? '';
+         final phone = user.phone?.toLowerCase() ?? '';
         final scoutCode = user.scoutCode?.toLowerCase() ?? '';
         return name.contains(query) || 
-               email.contains(query) || 
+           phone.contains(query) || 
                scoutCode.contains(query);
       }).toList();
     }
@@ -240,7 +250,7 @@ class UserManagementProvider with ChangeNotifier {
     return true;
   }
 
-  Future<void> loadUsers() async {
+  Future<void> loadUsers({bool forceRefresh = false}) async {
     _isLoadingUsers = true;
     _error = null;
     notifyListeners();
@@ -251,7 +261,21 @@ class UserManagementProvider with ChangeNotifier {
         throw Exception('No authenticated user');
       }
 
+      final cacheKey =
+          '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}';
+      if (!forceRefresh) {
+        final cachedUsers = _usersCache.get(cacheKey);
+        if (cachedUsers != null && cachedUsers.isNotEmpty) {
+          _users = cachedUsers;
+          _clearFilterCache();
+          _isLoadingUsers = false;
+          notifyListeners();
+          return;
+        }
+      }
+
       _users = await _service.fetchUsers(currentUser: currentUser);
+      _usersCache.set(cacheKey, _users, _usersCacheTtl);
       _clearFilterCache();
     } catch (e) {
       _error = 'Unable to load users. Please check your connection and try again.';
@@ -262,13 +286,24 @@ class UserManagementProvider with ChangeNotifier {
     }
   }
 
-  Future<void> loadRoles() async {
+  Future<void> loadRoles({bool forceRefresh = false}) async {
     _isLoadingRoles = true;
     _error = null;
     notifyListeners();
 
     try {
+      if (!forceRefresh) {
+        final cachedRoles = _rolesCache.get('all_roles');
+        if (cachedRoles != null && cachedRoles.isNotEmpty) {
+          _roles = cachedRoles;
+          _isLoadingRoles = false;
+          notifyListeners();
+          return;
+        }
+      }
+
       _roles = await _service.fetchRoles();
+      _rolesCache.set('all_roles', _roles, _rolesCacheTtl);
     } catch (e) {
       _error = 'Unable to load roles. Please try again.';
       debugPrint('❌ Error loading roles: $e');
@@ -399,7 +434,7 @@ class UserManagementProvider with ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
-    await loadUsers();
+  Future<void> refresh({bool forceRefresh = false}) async {
+    await loadUsers(forceRefresh: forceRefresh);
   }
 }

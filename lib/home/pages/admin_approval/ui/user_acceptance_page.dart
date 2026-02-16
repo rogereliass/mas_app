@@ -132,7 +132,7 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
                 icon: const Icon(Icons.refresh),
                 onPressed: provider.isLoadingPending
                     ? null
-                    : () => provider.refresh(),
+                    : () => provider.refresh(forceRefresh: true),
                 tooltip: 'Refresh',
               );
             },
@@ -145,29 +145,24 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
           AdminScopeBanner(selectedRoleName: roleContext),
           
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await context.read<AdminProvider>().refresh();
+            child: Consumer<AdminProvider>(
+              builder: (context, provider, _) {
+                // Loading state
+                if (provider.isLoadingPending) {
+                  return const LoadingView(message: 'Loading pending profiles...');
+                }
+
+                // Error state
+                if (provider.hasError) {
+                  return ErrorView(
+                    message: provider.error ?? 'Unknown error occurred',
+                    onRetry: () => provider.loadPendingProfiles(),
+                  );
+                }
+
+                // Profiles list
+                return _buildProfilesList(provider, colorScheme, theme);
               },
-              child: Consumer<AdminProvider>(
-                builder: (context, provider, _) {
-                  // Loading state
-                  if (provider.isLoadingPending) {
-                    return const LoadingView(message: 'Loading pending profiles...');
-                  }
-
-                  // Error state
-                  if (provider.hasError) {
-                    return ErrorView(
-                      message: provider.error ?? 'Unknown error occurred',
-                      onRetry: () => provider.loadPendingProfiles(),
-                    );
-                  }
-
-                  // Profiles list
-                  return _buildProfilesList(provider, colorScheme, theme);
-                },
-              ),
             ),
           ),
         ],
@@ -252,10 +247,6 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
       context: context,
       builder: (dialogContext) => _ProfileDetailsDialog(profile: profile),
     );
-    
-    // Refresh the pending profiles list after dialog closes
-    if (!context.mounted) return;
-    context.read<AdminProvider>().loadPendingProfiles();
   }
 }
 

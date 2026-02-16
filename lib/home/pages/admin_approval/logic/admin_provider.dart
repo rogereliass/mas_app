@@ -7,6 +7,7 @@ import '../../../../auth/models/role.dart';
 import '../../../../auth/models/user_profile.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/data/role_repository.dart';
+import '../../../../core/utils/ttl_cache.dart';
 
 /// Admin Provider
 /// 
@@ -18,6 +19,12 @@ class AdminProvider with ChangeNotifier {
   final AdminService _service;
   final AuthProvider _authProvider;
   final RoleRepository _roleRepository = RoleRepository();
+  
+  // TTL caching
+  static const Duration _pendingProfilesCacheTtl = Duration(seconds: 60);
+  static const Duration _rolesCacheTtl = Duration(minutes: 60);
+  final TtlCache<String, List<PendingProfile>> _pendingProfilesCache = TtlCache();
+  final TtlCache<String, List<Role>> _rolesCache = TtlCache();
   
   // Role context override for multi-role users
   String? _selectedRoleName;
@@ -41,6 +48,9 @@ class AdminProvider with ChangeNotifier {
   
   /// Handle auth provider changes (e.g., user profile loaded)
   void _onAuthChanged() {
+    // Clear caches on auth change
+    _pendingProfilesCache.clear();
+    _rolesCache.clear();
     // Notify listeners when auth state changes
     // This ensures UI rebuilds when user profile becomes available
     notifyListeners();
@@ -195,14 +205,27 @@ class AdminProvider with ChangeNotifier {
   // ==================== PUBLIC METHODS ====================
 
   /// Load all available roles
-  Future<void> loadRoles() async {
+  Future<void> loadRoles({bool forceRefresh = false}) async {
     _isLoadingRoles = true;
     _error = null;
     notifyListeners();
+    
+    // Check cache if not forcing refresh
+    if (!forceRefresh) {
+      final cachedRoles = _rolesCache.get('roles');
+      if (cachedRoles != null) {
+        _roles = cachedRoles;
+        _isLoadingRoles = false;
+        debugPrint('📦 Using cached roles (${_roles.length} items)');
+        notifyListeners();
+        return;
+      }
+    }
 
     try {
       _roles = await _service.fetchRoles();
-      debugPrint('✅ Loaded ${_roles.length} roles');
+      _rolesCache.set('roles', _roles, _rolesCacheTtl);
+      debugPrint('✅ Loaded ${_roles.length} roles (cached for ${_rolesCacheTtl.inMinutes}min)');
     } catch (e) {
       _error = 'Unable to load roles. Please check your connection and try again.';
       debugPrint('❌ Error loading roles: $e');
@@ -214,24 +237,44 @@ class AdminProvider with ChangeNotifier {
 
   /// Load all pending profiles (approved = false)
   /// Automatically filtered by user's role and troop context
-  Future<void> loadPendingProfiles() async {
+  Future<void> loadPendingProfiles({bool forceRefresh = false}) async {
     _isLoadingPending = true;
     _error = null;
     notifyListeners();
+    
+    final currentUser = _effectiveUserProfile;
+    if (currentUser == null) {
+      _error = 'No authenticated user';
+      _isLoadingPending = false;
+      notifyListeners();
+      return;
+    }
+    
+    // Build cache key from role rank and troop context
+    final troopId = currentUser.managedTroopId ?? 'all';
+    final cacheKey = '${currentUser.roleRank}:$troopId';
+    
+    // Check cache if not forcing refresh
+    if (!forceRefresh) {
+      final cachedProfiles = _pendingProfilesCache.get(cacheKey);
+      if (cachedProfiles != null) {
+        _pendingProfiles = cachedProfiles;
+        _isLoadingPending = false;
+        debugPrint('📦 Using cached pending profiles (${_pendingProfiles.length} items)');
+        notifyListeners();
+        return;
+      }
+    }
 
     try {
-      final currentUser = _effectiveUserProfile;
-      if (currentUser == null) {
-        throw Exception('No authenticated user');
-      }
-      
       debugPrint('🔍 Loading pending profiles with role context: $_selectedRoleName (rank ${currentUser.roleRank})');
       
       // Pass effective user profile to service for automatic scoping
       _pendingProfiles = await _service.fetchPendingProfiles(
         currentUser: currentUser,
       );
-      debugPrint('✅ Loaded ${_pendingProfiles.length} pending profiles (scoped)');
+      _pendingProfilesCache.set(cacheKey, _pendingProfiles, _pendingProfilesCacheTtl);
+      debugPrint('✅ Loaded ${_pendingProfiles.length} pending profiles (scoped, cached for ${_pendingProfilesCacheTtl.inSeconds}sec)');
     } catch (e) {
       _error = 'Unable to load pending profiles. Please check your connection and try again.';
       debugPrint('❌ Error loading pending profiles: $e');
@@ -332,6 +375,9 @@ class AdminProvider with ChangeNotifier {
 
       // Remove from pending list
       _pendingProfiles.removeWhere((p) => p.id == profileId);
+      
+      // Invalidate pending profiles cache
+      _pendingProfilesCache.clear();
 
       // Clear selection if it was the accepted profile
       if (_selectedProfile?.id == profileId) {
@@ -391,6 +437,9 @@ class AdminProvider with ChangeNotifier {
       if (_selectedProfile?.id == profileId) {
         _selectedProfileApprovals = await _service.fetchProfileApprovals(profileId);
       }
+      
+      // Invalidate pending profiles cache (comment added = state changed)
+      _pendingProfilesCache.clear();
 
       debugPrint('✅ Comment added to profile: $profileId');
       return true;
@@ -438,6 +487,9 @@ class AdminProvider with ChangeNotifier {
 
       // Remove from pending list
       _pendingProfiles.removeWhere((p) => p.id == profileId);
+      
+      // Invalidate pending profiles cache
+      _pendingProfilesCache.clear();
 
       // Clear selection if it was the rejected profile
       if (_selectedProfile?.id == profileId) {
@@ -511,7 +563,7 @@ class AdminProvider with ChangeNotifier {
   }
 
   /// Refresh pending profiles list
-  Future<void> refresh() async {
-    await loadPendingProfiles();
+  Future<void> refresh({bool forceRefresh = false}) async {
+    await loadPendingProfiles(forceRefresh: forceRefresh);
   }
 }

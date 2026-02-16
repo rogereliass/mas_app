@@ -63,7 +63,7 @@ class _UserEditDialogState extends State<UserEditDialog> {
   // Role management
   final List<Role> _selectedRoles = [];
   final Map<String, String?> _roleTroopContext = {}; // roleId -> troopId
-  bool _rolesInitialized = false;
+  final bool _rolesInitialized = false;
 
   // Other fields
   DateTime? _selectedBirthdate;
@@ -100,10 +100,12 @@ class _UserEditDialogState extends State<UserEditDialog> {
           : '',
     );
 
-    // Initialize gender (capitalize first letter)
-    _selectedGender = profile.gender != null 
-        ? profile.gender!.substring(0, 1).toUpperCase() + profile.gender!.substring(1).toLowerCase()
-        : null;
+    // Initialize gender (capitalize first letter safely)
+    final normalizedGender = profile.gender?.trim();
+    _selectedGender = (normalizedGender != null && normalizedGender.isNotEmpty)
+      ? normalizedGender.substring(0, 1).toUpperCase() +
+        normalizedGender.substring(1).toLowerCase()
+      : null;
 
     // Initialize roles
     _selectedRoles
@@ -597,6 +599,9 @@ class _UserEditDialogState extends State<UserEditDialog> {
 
     // Validate gender selection
     if (_selectedGender == null) {
+      setState(() {
+        _isSaving = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a gender')),
       );
@@ -633,6 +638,9 @@ class _UserEditDialogState extends State<UserEditDialog> {
         .toList();
 
     if (canEditRoles && selectedRoleIds.isEmpty) {
+      setState(() {
+        _isSaving = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select at least one role')),
       );

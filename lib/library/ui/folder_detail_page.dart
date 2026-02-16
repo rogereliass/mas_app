@@ -176,7 +176,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => provider.refreshFolderContents(),
+                      onPressed: () => provider.refreshFolderContents(forceRefresh: true),
                       child: const Text('Retry'),
                     ),
                   ],

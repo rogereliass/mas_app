@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../data/library_models.dart';
 import '../data/library_service.dart';
 import '../../auth/logic/auth_provider.dart';
+import '../../core/utils/ttl_cache.dart';
 
 /// Library Provider
 /// 
@@ -37,6 +38,17 @@ class LibraryProvider with ChangeNotifier {
   // Cache for folders and files
   final Map<String, LibraryFolder> _folderCache = {};
   final Map<String, LibraryFile> _fileCache = {};
+  
+  // TTL caching - track timestamps for existing caches
+  static const Duration _rootContentsTtl = Duration(minutes: 3);
+  static const Duration _folderContentsTtl = Duration(minutes: 2);
+  static const Duration _fileMetadataTtl = Duration(minutes: 10);
+  static const Duration _signedUrlTtl = Duration(minutes: 50);
+  
+  DateTime? _rootContentsTimestamp;
+  final Map<String, DateTime> _folderTimestamps = {};
+  final Map<String, DateTime> _fileTimestamps = {};
+  final TtlCache<String, String> _signedUrlCache = TtlCache();
 
   bool _hasCheckedRls = false;
 
@@ -97,12 +109,24 @@ class LibraryProvider with ChangeNotifier {
 
   /// Load root folders and recent files
   /// Called on Library home page
-  Future<void> loadRootContents() async {
+  Future<void> loadRootContents({bool forceRefresh = false}) async {
     if (_isLoadingRoot) return;
-
+    
     _isLoadingRoot = true;
     _error = null;
     notifyListeners();
+    
+    // Check cache if not forcing refresh
+    if (!forceRefresh && _rootContentsTimestamp != null) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_rootContentsTimestamp!);
+      if (elapsed < _rootContentsTtl && _rootFolders.isNotEmpty) {
+        _isLoadingRoot = false;
+        debugPrint('📦 Using cached root contents (age: ${elapsed.inSeconds}s)');
+        notifyListeners();
+        return;
+      }
+    }
 
     try {
       final result = await _service.fetchRootContents(recentFilesLimit: 10);
@@ -121,7 +145,11 @@ class LibraryProvider with ChangeNotifier {
       // Cache ALL files (even filtered ones) for direct access
       for (final file in allRecentFiles) {
         _fileCache[file.id] = file;
+        _fileTimestamps[file.id] = DateTime.now();
       }
+      
+      // Mark root contents as cached
+      _rootContentsTimestamp = DateTime.now();
 
       _isLoadingRoot = false;
       _error = null;
@@ -145,22 +173,36 @@ class LibraryProvider with ChangeNotifier {
   }
 
   /// Refresh root contents (pull-to-refresh)
-  Future<void> refreshRootContents() async {
-    return loadRootContents();
+  Future<void> refreshRootContents({bool forceRefresh = false}) async {
+    return loadRootContents(forceRefresh: forceRefresh);
   }
 
   // ==================== FOLDER OPERATIONS ====================
 
   /// Load folder contents (subfolders and files)
   /// Called when navigating into a folder
-  Future<void> loadFolderContents(String folderId) async {
+  Future<void> loadFolderContents(String folderId, {bool forceRefresh = false}) async {
     if (_isLoadingFolder) return;
-
+    
     _isLoadingFolder = true;
     _error = null;
     _fileOffset = 0;
     _hasMoreFiles = true;
     notifyListeners();
+    
+    // Check cache if not forcing refresh and not currently viewing different folder
+    if (!forceRefresh && 
+        _currentFolder?.id == folderId && 
+        _folderTimestamps.containsKey(folderId)) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_folderTimestamps[folderId]!);
+      if (elapsed < _folderContentsTtl && _currentFiles.isNotEmpty) {
+        _isLoadingFolder = false;
+        debugPrint('📦 Using cached folder contents for $folderId (age: ${elapsed.inSeconds}s)');
+        notifyListeners();
+        return;
+      }
+    }
 
     try {
       // Load folder details if not in cache
@@ -195,7 +237,11 @@ class LibraryProvider with ChangeNotifier {
       // Cache ALL files (even filtered ones) for direct access
       for (final file in allFiles) {
         _fileCache[file.id] = file;
+        _fileTimestamps[file.id] = DateTime.now();
       }
+      
+      // Mark folder contents as cached
+      _folderTimestamps[folderId] = DateTime.now();
 
       _isLoadingFolder = false;
       _error = null;
@@ -229,6 +275,7 @@ class LibraryProvider with ChangeNotifier {
       // Cache ALL files (even filtered ones) for direct access
       for (final file in nextFiles) {
         _fileCache[file.id] = file;
+        _fileTimestamps[file.id] = DateTime.now();
       }
 
       // Append filtered files to current list
@@ -243,9 +290,9 @@ class LibraryProvider with ChangeNotifier {
   }
 
   /// Refresh current folder contents
-  Future<void> refreshFolderContents() async {
+  Future<void> refreshFolderContents({bool forceRefresh = false}) async {
     if (_currentFolder != null) {
-      return loadFolderContents(_currentFolder!.id);
+      return loadFolderContents(_currentFolder!.id, forceRefresh: forceRefresh);
     }
   }
 
@@ -264,18 +311,24 @@ class LibraryProvider with ChangeNotifier {
 
   /// Get file by ID from cache or fetch from server
   /// Returns null if file not found OR user doesn't have access
-  Future<LibraryFile?> getFile(String fileId) async {
-    // Check cache first
-    if (_fileCache.containsKey(fileId)) {
-      final file = _fileCache[fileId]!;
+  Future<LibraryFile?> getFile(String fileId, {bool forceRefresh = false}) async {
+    // Check cache first (with TTL)
+    if (!forceRefresh && _fileCache.containsKey(fileId) && _fileTimestamps.containsKey(fileId)) {
+      final now = DateTime.now();
+      final elapsed = now.difference(_fileTimestamps[fileId]!);
       
-      // Verify access even for cached files
-      if (!_canAccessFile(file)) {
-        debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
-        return null;
+      if (elapsed < _fileMetadataTtl) {
+        final file = _fileCache[fileId]!;
+        
+        // Verify access even for cached files
+        if (!_canAccessFile(file)) {
+          debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          return null;
+        }
+        
+        debugPrint('📦 Using cached file metadata for $fileId (age: ${elapsed.inMinutes}min)');
+        return file;
       }
-      
-      return file;
     }
 
     // Fetch from server
@@ -283,6 +336,7 @@ class LibraryProvider with ChangeNotifier {
       final file = await _service.fetchFileById(fileId);
       if (file != null) {
         _fileCache[fileId] = file;
+        _fileTimestamps[fileId] = DateTime.now();
         
         // Verify access to fetched file
         if (!_canAccessFile(file)) {
@@ -302,9 +356,9 @@ class LibraryProvider with ChangeNotifier {
   /// Get signed URL for a file
   /// Returns null for text files or on error
   /// Falls back to iconUrl if storage file not found
-  Future<String?> getFileUrl(String fileId) async {
+  Future<String?> getFileUrl(String fileId, {bool forceRefresh = false}) async {
     try {
-      final file = await getFile(fileId);
+      final file = await getFile(fileId, forceRefresh: forceRefresh);
       if (file == null) {
         debugPrint('⚠️ File not found or access denied: $fileId');
         return null;
@@ -314,12 +368,25 @@ class LibraryProvider with ChangeNotifier {
       if (file.isTextFile) {
         return null;
       }
+      
+      // Check signed URL cache
+      if (!forceRefresh) {
+        final cachedUrl = _signedUrlCache.get(fileId);
+        if (cachedUrl != null) {
+          debugPrint('📦 Using cached signed URL for $fileId');
+          return cachedUrl;
+        }
+      }
 
       final url = await _service.getFileSignedUrl(file);
       
       if (url == null || url.isEmpty) {
         debugPrint('⚠️ No URL generated for file: ${file.title}');
+        return null;
       }
+      
+      // Cache signed URL (50min TTL)
+      _signedUrlCache.set(fileId, url, _signedUrlTtl);
       
       return url;
     } catch (e) {
@@ -407,6 +474,10 @@ class LibraryProvider with ChangeNotifier {
   void clearCache() {
     _folderCache.clear();
     _fileCache.clear();
+    _rootContentsTimestamp = null;
+    _folderTimestamps.clear();
+    _fileTimestamps.clear();
+    _signedUrlCache.clear();
     notifyListeners();
   }
   
