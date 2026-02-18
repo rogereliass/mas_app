@@ -14,45 +14,65 @@ class SeasonManagementPage extends StatefulWidget {
 
 class _SeasonManagementPageState extends State<SeasonManagementPage> {
   bool _hasLoadedSeasons = false;
+  AuthProvider? _authProvider;
 
   @override
   void initState() {
     super.initState();
-    // Don't access provider in initState - do it in didChangeDependencies
+    _authProvider = context.read<AuthProvider>();
+    _authProvider?.addListener(_onAuthChanged);
+  }
+
+  @override
+  void dispose() {
+    _authProvider?.removeListener(_onAuthChanged);
+    super.dispose();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
-    if (!_hasLoadedSeasons) {
-      _hasLoadedSeasons = true;
-      
-      // Access guard: Only System Admins (rank >= 98) can access
-      final authProvider = context.read<AuthProvider>();
-      final userRank = authProvider.currentUserRoleRank;
-      final colorScheme = Theme.of(context).colorScheme;
+    if (_hasLoadedSeasons) return;
+    _attemptLoad();
+  }
 
-      if (userRank < 98) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Access Denied: System Admin privileges required'),
-              backgroundColor: colorScheme.error,
-            ),
-          );
-        });
-        return;
-      }
+  void _onAuthChanged() {
+    if (!mounted) return;
+    if (_hasLoadedSeasons) return;
+    _attemptLoad();
+  }
 
-      // Load seasons if authorized
+  void _attemptLoad() {
+    final authProvider = _authProvider;
+    if (authProvider == null) return;
+    if (authProvider.profileLoading || authProvider.currentUserProfile == null) {
+      return;
+    }
+
+    _hasLoadedSeasons = true;
+
+    // Access guard: System-wide admins (rank >= 90) can access
+    final userRank = authProvider.currentUserRoleRank;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (userRank < 90) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        context.read<SeasonManagementProvider>().loadSeasons();
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Access Denied: System Admin privileges required'),
+            backgroundColor: colorScheme.error,
+          ),
+        );
       });
+      return;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SeasonManagementProvider>().loadSeasons();
+    });
   }
 
   @override

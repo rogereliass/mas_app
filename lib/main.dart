@@ -11,6 +11,7 @@ import 'auth/logic/auth_provider.dart';
 import 'home/pages/user_approval/logic/admin_provider.dart';
 import 'home/pages/user_management/logic/user_management_provider.dart';
 import 'home/pages/season_management/logic/season_management_provider.dart';
+import 'home/pages/patrols_management/logic/patrols_management_provider.dart';
 import 'offline/offline_storage.dart';
 import 'app.dart';
 
@@ -61,6 +62,15 @@ void main() async {
           ),
           update: (context, auth, previous) =>
             previous ?? UserManagementProvider(authProvider: auth),
+        ),
+
+        // PatrolsManagementProvider depends on AuthProvider for role-based scoping
+        ChangeNotifierProxyProvider<AuthProvider, PatrolsManagementProvider>(
+          create: (context) => PatrolsManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+            previous ?? PatrolsManagementProvider(authProvider: auth),
         ),
         
         // LibraryProvider depends on AuthProvider for role-based filtering

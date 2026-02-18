@@ -104,7 +104,9 @@ class _HomePageState extends State<HomePage> {
     }
 
     // Set default role if not set and roles are available
-    if (_selectedRole == null && userRoles.isNotEmpty) {
+    if (userRoles.isNotEmpty &&
+        (_selectedRole == null ||
+            !userRoles.any((role) => role.name == _selectedRole))) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
@@ -388,14 +390,17 @@ class _HomePageState extends State<HomePage> {
     
     // Show role-specific components based on role rank
     final selectedRoleRank = authProvider.getRankForRole(_selectedRole ?? '');
+    final effectiveRank = selectedRoleRank > 0
+      ? selectedRoleRank
+      : authProvider.currentUserRoleRank;
     
     // System Admins (rank 100) and Admins (rank 90-99) see the system dashboard
-    if (selectedRoleRank >= 90) {
+    if (effectiveRank >= 90) {
       return SystemAdminStats(selectedRole: _selectedRole ?? 'Admin');
     }
     
     // Troop Head (rank 70) and Troop Leader (rank 60) see troop dashboard
-    if (selectedRoleRank == 60 || selectedRoleRank == 70) {
+    if (effectiveRank == 60 || effectiveRank == 70) {
       return TroopHeadStats(selectedRole: _selectedRole ?? 'Troop Head');
     }
     

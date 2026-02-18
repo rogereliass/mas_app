@@ -16,6 +16,7 @@ import '../profile/profile_page.dart';
 import '../home/pages/user_approval/ui/user_acceptance_page.dart';
 import '../home/pages/user_management/ui/user_management_page.dart';
 import '../home/pages/season_management/ui/season_management_page.dart';
+import '../home/pages/patrols_management/ui/patrols_management_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -77,6 +78,9 @@ class AppRouter {
   
   /// Season management page route (admin only)
   static const String seasonManagement = '/season-management';
+
+  /// Patrols management page route (admin and troop roles)
+  static const String patrolsManagement = '/patrols-management';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -156,6 +160,15 @@ class AppRouter {
         builder: (context) => const SeasonManagementPage(),
       );
     }
+
+    // Handle Patrols Management with role context
+    if (settings.name == patrolsManagement) {
+      final args = settings.arguments as Map<String, dynamic>?;
+      final selectedRole = args?['selectedRole'] as String?;
+      return MaterialPageRoute(
+        builder: (context) => PatrolsManagementPage(selectedRole: selectedRole),
+      );
+    }
     
     return null; // Let onUnknownRoute handle it
   }
@@ -201,6 +214,7 @@ class AppRouter {
       ),
     );
   }
+
 
   // ============================================================================
   // NAVIGATION HELPERS

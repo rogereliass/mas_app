@@ -235,6 +235,36 @@ class SystemAdminStats extends StatelessWidget {
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRouter.patrolsManagement,
+                    arguments: {'selectedRole': selectedRole},
+                  );
+                },
+                icon: const Icon(Icons.groups_2_outlined),
+                label: const Text('Patrols Management'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.tertiary,
+                  foregroundColor: colorScheme.onTertiary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create patrols, assign members, and review unassigned scouts',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
