@@ -13,7 +13,7 @@ import '../library/ui/file_viewer_page.dart';
 import '../library/ui/all_folders_page.dart';
 import '../library/ui/about_page.dart';
 import '../profile/profile_page.dart';
-import '../home/pages/admin_approval/ui/user_acceptance_page.dart';
+import '../home/pages/user_approval/ui/user_acceptance_page.dart';
 import '../home/pages/user_management/ui/user_management_page.dart';
 import '../home/pages/season_management/ui/season_management_page.dart';
 

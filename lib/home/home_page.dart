@@ -378,7 +378,7 @@ class _HomePageState extends State<HomePage> {
     }
     
     // Troop Head (rank 70) and Troop Leader (rank 60) see troop dashboard
-    if (selectedRoleRank >= 60 && selectedRoleRank < 90) {
+    if (selectedRoleRank == 60 || selectedRoleRank == 70) {
       return TroopHeadStats(selectedRole: _selectedRole ?? 'Troop Head');
     }
     

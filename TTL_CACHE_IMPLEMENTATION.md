@@ -52,7 +52,7 @@ Completed: [Current Session]
 ---
 
 ### 2. AdminProvider
-**File**: `lib/home/pages/admin_approval/logic/admin_provider.dart`
+**File**: `lib/home/pages/user_approval/logic/admin_provider.dart`
 
 **Caches Added**:
 - **Pending Profiles**: 60-second TTL
@@ -135,7 +135,7 @@ IconButton(
 )
 ```
 
-**UserAcceptancePage** (`lib/home/pages/admin_approval/ui/user_acceptance_page.dart`):
+**UserAcceptancePage** (`lib/home/pages/user_approval/ui/user_acceptance_page.dart`):
 ```dart
 IconButton(
   icon: const Icon(Icons.refresh),
@@ -310,11 +310,11 @@ provider.clearCache(); // Reset all caches for fresh start
 ### Files to Revert
 - `lib/core/utils/ttl_cache.dart` (delete)
 - `lib/home/pages/user_management/logic/user_management_provider.dart`
-- `lib/home/pages/admin_approval/logic/admin_provider.dart`
+- `lib/home/pages/user_approval/logic/admin_provider.dart`
 - `lib/auth/logic/auth_provider.dart`
 - `lib/library/logic/library_provider.dart`
 - `lib/home/pages/user_management/ui/user_management_page.dart`
-- `lib/home/pages/admin_approval/ui/user_acceptance_page.dart`
+- `lib/home/pages/user_approval/ui/user_acceptance_page.dart`
 - `lib/library/ui/folder_detail_page.dart`
 
 ### Git Revert Command

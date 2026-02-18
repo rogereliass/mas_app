@@ -18,7 +18,7 @@ lib/
     ├── home_page.dart
     ├── components/      # Home-specific UI components
     └── pages/           # Feature pages grouped under home
-        └── admin_approval/  # Example: Admin features
+        └── user_approval/  # Example: Admin features
             ├── data/
             ├── logic/
             ├── ui/
@@ -33,7 +33,7 @@ Each feature follows **3-layer clean architecture**:
 - `ui/` - Pages, components (presentation)
 
 **File Organization Rules**:
-- **Feature-specific code**: Group under parent page (e.g., `home/pages/admin_approval/`)
+- **Feature-specific code**: Group under parent page (e.g., `home/pages/user_approval/`)
 - **Reusable widgets**: Place in `core/widgets/` (e.g., `loading_view.dart`, `error_view.dart`)
 - **Feature components**: Keep in feature's `ui/components/` subdirectory
 - **Shared utilities**: Place in `core/utils/`
@@ -166,7 +166,7 @@ flutter run -d <device-id>  # Target specific device
 ## Code Conventions
 
 ### File Organization
-- **Page-specific features**: Organize under parent page in `pages/` subdirectory (e.g., `home/pages/admin_approval/`)
+- **Page-specific features**: Organize under parent page in `pages/` subdirectory (e.g., `home/pages/user_approval/`)
 - **Reusable widgets**: Place in `core/widgets/` (e.g., `loading_view.dart`, `error_view.dart`, etc.)
 - **Feature-specific components**: Keep in feature's `ui/components/` subdirectory
 - **Models**: Immutable with `copyWith()` and JSON factories
@@ -211,7 +211,7 @@ Reference [database/migrations/](database/migrations/) for schema. Key tables:
 5. Create feature exports file: `feature_name.dart`
 6. Document in feature's `README.md`
 
-Example: `home/pages/admin_approval/` with data/logic/ui structure
+Example: `home/pages/user_approval/` with data/logic/ui structure
 
 **Add standalone feature module**: Create `feature/` folder with `data/`, `logic/`, `ui/` subdirectories at lib root level. Use for major features like `auth/`, `library/`, etc
 
@@ -652,4 +652,4 @@ Reference this feature when implementing similar functionality.
 - Auth setup: [lib/auth/AUTH_SETUP.md](lib/auth/AUTH_SETUP.md)
 - Main entry: [lib/main.dart](lib/main.dart)
 - App root: [lib/app.dart](lib/app.dart)
-- Current focus: Implementing role-based file visibility filtering
+- Current focus: Refining role-specific dashboard views (Troop Leader/Head) in HomePage.
