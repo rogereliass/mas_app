@@ -286,7 +286,9 @@ class OfflineStorageService {
     for (var key in keys) {
       await deleteFile(key);
     }
-    debugPrint('🧹 Cleared all offline files');
+    if (kDebugMode) {
+      debugPrint('🧹 Cleared all offline files');
+    }
   }
 }
 

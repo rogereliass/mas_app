@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/library_provider.dart';
@@ -67,9 +68,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
     
     try {
       final file = await provider.getFile(widget.fileId);
-      debugPrint('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
-      debugPrint('📁 Storage path: ${file?.storagePath}');
-      debugPrint('🔗 Icon URL: ${file?.iconUrl}');
+      if (kDebugMode) {
+        debugPrint('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
+        debugPrint('📁 Storage path: ${file?.storagePath}');
+        debugPrint('🔗 Icon URL: ${file?.iconUrl}');
+      }
       
       if (file != null) {
         _file = file;
@@ -87,7 +90,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
         
         if (isVideo) {
           // For video files, use storagePath directly (YouTube URL)
-          debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
+          if (kDebugMode) {
+            debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
+          }
           
           if (mounted) {
             setState(() {
@@ -97,7 +102,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         } else if (hasOffline) {
           // Use offline cached file for PDFs, images, and audio
-          debugPrint('💾 Using offline cached file: $offlinePath');
+          if (kDebugMode) {
+            debugPrint('💾 Using offline cached file: $offlinePath');
+          }
           
           if (mounted) {
             setState(() {
@@ -108,9 +115,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         } else if (isAudio) {
           // For audio files, get signed URL from Supabase storage
-          debugPrint('🎵 Audio file - getting signed URL');
+          if (kDebugMode) {
+            debugPrint('🎵 Audio file - getting signed URL');
+          }
           final url = await provider.getFileUrl(widget.fileId);
-          debugPrint('🔗 Generated signed URL for audio: $url');
+          if (kDebugMode) {
+            debugPrint('🔗 Generated signed URL for audio: $url');
+          }
           
           if (mounted) {
             setState(() {
@@ -121,7 +132,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
         } else if (!file.isTextFile) {
           // Get signed URL for non-video, non-text files
           final url = await provider.getFileUrl(widget.fileId);
-          debugPrint('🔗 Generated signed URL: $url');
+          if (kDebugMode) {
+            debugPrint('🔗 Generated signed URL: $url');
+          }
           
           if (mounted) {
             setState(() {
@@ -132,7 +145,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
         } else {
           // For text files, load content from storage if text_content is empty
           final textContent = await provider.getTextFileContent(widget.fileId);
-          debugPrint('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
+          if (kDebugMode) {
+            debugPrint('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
+          }
           
           if (mounted) {
             setState(() {
@@ -162,7 +177,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
           }
         }
       } else {
-        debugPrint('❌ File not found');
+        if (kDebugMode) {
+          debugPrint('❌ File not found');
+        }
         if (mounted) {
           setState(() {
             _isLoadingFile = false;
@@ -170,7 +187,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error loading file: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error loading file: $e');
+      }
       if (mounted) {
         setState(() {
           _isLoadingFile = false;
@@ -211,11 +230,15 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
     // Validate storage path before updating
     if (_file!.storagePath == null || _file!.storagePath!.isEmpty) {
-      debugPrint('⚠️ Cannot auto-update: Storage path not available');
+      if (kDebugMode) {
+        debugPrint('⚠️ Cannot auto-update: Storage path not available');
+      }
       return;
     }
 
-    debugPrint('🔄 New version available, auto-updating...');
+    if (kDebugMode) {
+      debugPrint('🔄 New version available, auto-updating...');
+    }
     
     setState(() {
       _isCheckingUpdate = true;
@@ -265,7 +288,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
         await _loadFileData();
       }
     } catch (e) {
-      debugPrint('❌ Error checking for updates: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error checking for updates: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -723,11 +748,15 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
   /// Build appropriate file viewer based on file type
   Widget _buildFileViewer(String fileType) {
-    debugPrint('🎬 Building viewer for type: $fileType');
+    if (kDebugMode) {
+      debugPrint('🎬 Building viewer for type: $fileType');
+    }
     
     // For text files, pass the text content directly
     if (fileType == 'text' || fileType == 'txt') {
-      debugPrint('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
+      if (kDebugMode) {
+        debugPrint('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
+      }
       return TxtViewerWidget(
         url: '',
         textContent: _file?.textContent,
@@ -737,7 +766,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
     // For other files, use the signed URL
     final streamUrl = _fileUrl ?? widget.fileUrl ?? '';
-    debugPrint('🔗 Using URL for viewer: $streamUrl');
+    if (kDebugMode) {
+      debugPrint('🔗 Using URL for viewer: $streamUrl');
+    }
 
     switch (fileType.toLowerCase()) {
       case 'pdf':

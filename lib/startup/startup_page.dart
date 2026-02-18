@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/config/theme_provider.dart';
@@ -33,15 +34,21 @@ class _StartupPageState extends State<StartupPage> {
       if (!mounted) return;
       
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      debugPrint('🚀 StartupPage - Checking auth state...');
-      debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
+      if (kDebugMode) {
+        debugPrint('🚀 StartupPage - Checking auth state...');
+        debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
+      }
       
       if (authProvider.isAuthenticated) {
-        debugPrint('✅ User logged in, redirecting to home immediately...');
+        if (kDebugMode) {
+          debugPrint('✅ User logged in, redirecting to home immediately...');
+        }
         // Redirect immediately, HomePage will handle loading roles
         Navigator.of(context).pushReplacementNamed(AppRouter.home);
       } else {
-        debugPrint('ℹ️ No active session, staying on startup page');
+        if (kDebugMode) {
+          debugPrint('ℹ️ No active session, staying on startup page');
+        }
       }
     });
   }

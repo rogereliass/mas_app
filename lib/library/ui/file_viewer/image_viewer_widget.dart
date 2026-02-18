@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Image Viewer Widget
@@ -40,7 +41,9 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
     }
 
     final isLocal = _isLocalFile(widget.url);
-    debugPrint('🖼️ ImageViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    if (kDebugMode) {
+      debugPrint('🖼️ ImageViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    }
 
     return InteractiveViewer(
       transformationController: _transformationController,
@@ -52,7 +55,9 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
                 File(widget.url),
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint('❌ Error loading local image: $error');
+                  if (kDebugMode) {
+                    debugPrint('❌ Error loading local image: $error');
+                  }
                   return _buildErrorWidget();
                 },
               )
@@ -79,7 +84,9 @@ class _ImageViewerWidgetState extends State<ImageViewerWidget> {
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  debugPrint('❌ Error loading network image: $error');
+                  if (kDebugMode) {
+                    debugPrint('❌ Error loading network image: $error');
+                  }
                   return _buildErrorWidget();
                 },
               ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth/logic/auth_provider.dart';
@@ -24,28 +25,40 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      debugPrint('🏠 HomePage initState - Auth check...');
-      debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
-      debugPrint('   User: ${authProvider.fullName}');
+      if (kDebugMode) {
+        debugPrint('🏠 HomePage initState - Auth check...');
+        debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
+        debugPrint('   User: ${authProvider.fullName}');
+      }
       
       if (!authProvider.isAuthenticated) {
-        debugPrint('❌ User not authenticated, redirecting to startup...');
+        if (kDebugMode) {
+          debugPrint('❌ User not authenticated, redirecting to startup...');
+        }
         // User not authenticated, redirect to startup page
         Navigator.of(context).pushReplacementNamed(AppRouter.startup);
         return;
       }
       
-      debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
+      if (kDebugMode) {
+        debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
+      }
       if (authProvider.userRoles.isNotEmpty) {
-        debugPrint('🏠 Roles available: ${authProvider.userRoles.map((r) => r.name).join(', ')}');
+        if (kDebugMode) {
+          debugPrint('🏠 Roles available: ${authProvider.userRoles.map((r) => r.name).join(', ')}');
+        }
         if (_selectedRole == null) {
           setState(() {
             _selectedRole = authProvider.userRoles.first.name;
           });
-          debugPrint('🏠 Set initial role to: $_selectedRole');
+          if (kDebugMode) {
+            debugPrint('🏠 Set initial role to: $_selectedRole');
+          }
         }
       } else {
-        debugPrint('⚠️ No roles found for user');
+        if (kDebugMode) {
+          debugPrint('⚠️ No roles found for user');
+        }
       }
     });
   }
@@ -58,16 +71,18 @@ class _HomePageState extends State<HomePage> {
     final userRoles = authProvider.userRoles;
 
     // Detailed debug logging
-    debugPrint('🏠 ============ HomePage Build ============');
-    debugPrint('   Current User ID: ${authProvider.userId}');
-    debugPrint('   Full Name: ${authProvider.fullName}');
-    debugPrint('   Profile Loading: ${authProvider.profileLoading}');
-    debugPrint('   Roles Count: ${userRoles.length}');
-    debugPrint('   Selected Role: $_selectedRole');
-    if (userRoles.isNotEmpty) {
-      debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
+    if (kDebugMode) {
+      debugPrint('🏠 ============ HomePage Build ============');
+      debugPrint('   Current User ID: ${authProvider.userId}');
+      debugPrint('   Full Name: ${authProvider.fullName}');
+      debugPrint('   Profile Loading: ${authProvider.profileLoading}');
+      debugPrint('   Roles Count: ${userRoles.length}');
+      debugPrint('   Selected Role: $_selectedRole');
+      if (userRoles.isNotEmpty) {
+        debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
+      }
+      debugPrint('🏠 ======================================');
     }
-    debugPrint('🏠 ======================================');
 
     // Show loading state while profile is being fetched
     if (authProvider.profileLoading) {
@@ -95,7 +110,9 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _selectedRole = userRoles.first.name;
           });
-          debugPrint('🏠 Auto-selected first role: ${userRoles.first.name}');
+          if (kDebugMode) {
+            debugPrint('🏠 Auto-selected first role: ${userRoles.first.name}');
+          }
         }
       });
     }

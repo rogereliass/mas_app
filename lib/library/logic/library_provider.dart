@@ -91,7 +91,9 @@ class LibraryProvider with ChangeNotifier {
     }).toList();
     
     if (filtered.length < files.length) {
-      debugPrint('🔒 Filtered ${files.length - filtered.length} files based on role (user rank: $userRoleRank)');
+      if (kDebugMode) {
+        debugPrint('🔒 Filtered ${files.length - filtered.length} files based on role (user rank: $userRoleRank)');
+      }
     }
     
     return filtered;
@@ -122,7 +124,9 @@ class LibraryProvider with ChangeNotifier {
       final elapsed = now.difference(_rootContentsTimestamp!);
       if (elapsed < _rootContentsTtl && _rootFolders.isNotEmpty) {
         _isLoadingRoot = false;
-        debugPrint('📦 Using cached root contents (age: ${elapsed.inSeconds}s)');
+        if (kDebugMode) {
+          debugPrint('📦 Using cached root contents (age: ${elapsed.inSeconds}s)');
+        }
         notifyListeners();
         return;
       }
@@ -198,7 +202,9 @@ class LibraryProvider with ChangeNotifier {
       final elapsed = now.difference(_folderTimestamps[folderId]!);
       if (elapsed < _folderContentsTtl && _currentFiles.isNotEmpty) {
         _isLoadingFolder = false;
-        debugPrint('📦 Using cached folder contents for $folderId (age: ${elapsed.inSeconds}s)');
+        if (kDebugMode) {
+          debugPrint('📦 Using cached folder contents for $folderId (age: ${elapsed.inSeconds}s)');
+        }
         notifyListeners();
         return;
       }
@@ -322,11 +328,15 @@ class LibraryProvider with ChangeNotifier {
         
         // Verify access even for cached files
         if (!_canAccessFile(file)) {
-          debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          if (kDebugMode) {
+            debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          }
           return null;
         }
         
-        debugPrint('📦 Using cached file metadata for $fileId (age: ${elapsed.inMinutes}min)');
+        if (kDebugMode) {
+          debugPrint('📦 Using cached file metadata for $fileId (age: ${elapsed.inMinutes}min)');
+        }
         return file;
       }
     }
@@ -340,7 +350,9 @@ class LibraryProvider with ChangeNotifier {
         
         // Verify access to fetched file
         if (!_canAccessFile(file)) {
-          debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          if (kDebugMode) {
+            debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+          }
           return null;
         }
         
@@ -360,7 +372,9 @@ class LibraryProvider with ChangeNotifier {
     try {
       final file = await getFile(fileId, forceRefresh: forceRefresh);
       if (file == null) {
-        debugPrint('⚠️ File not found or access denied: $fileId');
+        if (kDebugMode) {
+          debugPrint('⚠️ File not found or access denied: $fileId');
+        }
         return null;
       }
 
@@ -373,7 +387,9 @@ class LibraryProvider with ChangeNotifier {
       if (!forceRefresh) {
         final cachedUrl = _signedUrlCache.get(fileId);
         if (cachedUrl != null) {
-          debugPrint('📦 Using cached signed URL for $fileId');
+          if (kDebugMode) {
+            debugPrint('📦 Using cached signed URL for $fileId');
+          }
           return cachedUrl;
         }
       }
@@ -381,7 +397,9 @@ class LibraryProvider with ChangeNotifier {
       final url = await _service.getFileSignedUrl(file);
       
       if (url == null || url.isEmpty) {
-        debugPrint('⚠️ No URL generated for file: ${file.title}');
+        if (kDebugMode) {
+          debugPrint('⚠️ No URL generated for file: ${file.title}');
+        }
         return null;
       }
       
@@ -404,12 +422,16 @@ class LibraryProvider with ChangeNotifier {
 
       // If text_content is populated in database, use it
       if (file.textContent != null && file.textContent!.isNotEmpty) {
-        debugPrint('✅ Using text_content from database (${file.textContent!.length} chars)');
+        if (kDebugMode) {
+          debugPrint('✅ Using text_content from database (${file.textContent!.length} chars)');
+        }
         return file.textContent;
       }
 
       // Otherwise, load from storage
-      debugPrint('📄 text_content empty, loading from storage...');
+      if (kDebugMode) {
+        debugPrint('📄 text_content empty, loading from storage...');
+      }
       final content = await _service.loadTextFileContent(file);
       return content;
     } catch (e) {
@@ -500,7 +522,9 @@ class LibraryProvider with ChangeNotifier {
       _currentFiles = _filterFilesByRole(allCurrentFiles);
     }
     
-    debugPrint('🔄 Reapplied role-based filtering (user rank: ${_authProvider?.currentUserRoleRank ?? 0})');
+    if (kDebugMode) {
+      debugPrint('🔄 Reapplied role-based filtering (user rank: ${_authProvider?.currentUserRoleRank ?? 0})');
+    }
     notifyListeners();
   }
 }

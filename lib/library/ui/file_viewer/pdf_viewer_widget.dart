@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
@@ -34,7 +35,9 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
     }
 
     final isLocal = _isLocalFile(widget.url);
-    debugPrint('📄 PDFViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    if (kDebugMode) {
+      debugPrint('📄 PDFViewer loading ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+    }
 
     // Use appropriate constructor based on source type
     return isLocal
@@ -46,7 +49,9 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             canShowScrollHead: true,
             canShowScrollStatus: true,
             onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-              debugPrint('❌ PDF load failed (local): ${details.error} - ${details.description}');
+              if (kDebugMode) {
+                debugPrint('❌ PDF load failed (local): ${details.error} - ${details.description}');
+              }
             },
           )
         : SfPdfViewer.network(
@@ -57,7 +62,9 @@ class _PDFViewerWidgetState extends State<PDFViewerWidget> {
             canShowScrollHead: true,
             canShowScrollStatus: true,
             onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-              debugPrint('❌ PDF load failed (network): ${details.error} - ${details.description}');
+              if (kDebugMode) {
+                debugPrint('❌ PDF load failed (network): ${details.error} - ${details.description}');
+              }
             },
           );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -73,7 +74,9 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
       await _audioPlayer.stop();
 
       final isLocal = _isLocalFile(widget.url);
-      debugPrint('🎵 Initializing audio from ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+      if (kDebugMode) {
+        debugPrint('🎵 Initializing audio from ${isLocal ? "local file" : "network URL"}: ${widget.url}');
+      }
 
       // Listen to player state changes
       _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
@@ -125,9 +128,13 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
         });
       }
 
-      debugPrint('✅ Audio initialized successfully');
+      if (kDebugMode) {
+        debugPrint('✅ Audio initialized successfully');
+      }
     } catch (e) {
-      debugPrint('❌ Error initializing audio: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error initializing audio: $e');
+      }
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -158,7 +165,9 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
         await _audioPlayer.resume();
       }
     } catch (e) {
-      debugPrint('❌ Error toggling play/pause: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error toggling play/pause: $e');
+      }
     }
   }
 
@@ -166,7 +175,9 @@ class _AudioViewerWidgetState extends State<AudioViewerWidget> {
     try {
       await _audioPlayer.seek(position);
     } catch (e) {
-      debugPrint('❌ Error seeking: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Error seeking: $e');
+      }
     }
   }
 
