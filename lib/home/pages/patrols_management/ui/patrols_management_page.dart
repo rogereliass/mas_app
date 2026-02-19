@@ -64,10 +64,17 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       _effectiveRank = selectedRank > 0
           ? selectedRank
           : authProvider.currentUserRoleRank;
-      patrolsProvider.setRoleContext(resolvedRole);
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        patrolsProvider.setRoleContext(resolvedRole);
+      });
     } else {
       _effectiveRank = authProvider.currentUserRoleRank;
-      patrolsProvider.clearRoleContext();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        patrolsProvider.clearRoleContext();
+      });
     }
 
     final rank = _effectiveRank ?? 0;
@@ -105,7 +112,10 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     }
 
     _initialized = true;
-    patrolsProvider.initialize(selectedRoleName: _roleContext);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      patrolsProvider.initialize(selectedRoleName: _roleContext);
+    });
   }
 
   void _onAuthChanged() {
@@ -356,6 +366,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       name: result.name,
       description: result.description,
       patrolLeaderProfileId: result.patrolLeaderProfileId,
+      assistant1ProfileId: result.assistant1ProfileId,
+      assistant2ProfileId: result.assistant2ProfileId,
     );
 
     if (!context.mounted) return;
@@ -387,6 +399,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       name: result.name,
       description: result.description,
       patrolLeaderProfileId: result.patrolLeaderProfileId,
+      assistant1ProfileId: result.assistant1ProfileId,
+      assistant2ProfileId: result.assistant2ProfileId,
     );
 
     if (!context.mounted) return;

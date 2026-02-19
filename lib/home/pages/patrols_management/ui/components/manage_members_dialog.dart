@@ -124,24 +124,60 @@ class _ManageMembersDialogState extends State<ManageMembersDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Manage Members • ${widget.patrol.name}',
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                    Row(
+                      children: [
+                        Icon(Icons.manage_accounts_outlined, color: theme.colorScheme.primary, size: 24),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Manage Members',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              Text(
+                                widget.patrol.name,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: _searchController,
                       onChanged: _onSearchChanged,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Search members by name or phone',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: theme.colorScheme.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
                   ],
@@ -149,81 +185,126 @@ class _ManageMembersDialogState extends State<ManageMembersDialog> {
               ),
               // Scrollable body
               Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Assigned Members ──────────────────────────────
-                      _SectionHeader(
-                          title: 'Assigned Members',
-                          count: assignedFiltered.length),
-                      const SizedBox(height: 8),
-                      if (assignedFiltered.isEmpty)
-                        _EmptySection(
-                            message: 'No assigned members in current filter')
-                      else
-                        ...assignedFiltered.map(_buildMemberTile),
-
-                      const SizedBox(height: 16),
-
-                      // ── Unassigned Members (no patrol yet) ────────────
-                      _SectionHeader(
-                          title: 'Unassigned Members',
-                          count: unassignedFiltered.length),
-                      const SizedBox(height: 8),
-                      if (unassignedFiltered.isEmpty)
-                        _EmptySection(
-                            message: _searchQuery.isEmpty
-                                ? 'All troop members are in a patrol'
-                                : 'No unassigned members match your search')
-                      else
-                        ...unassignedFiltered.map(_buildMemberTile),
-
-                      const SizedBox(height: 16),
-
-                      // ── All Troop Members (collapsible) ───────────────
-                      InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => setState(
-                            () => _allMembersExpanded = !_allMembersExpanded),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _SectionHeader(
-                                  title: 'All Troop Members',
-                                  count: allAvailableFiltered.length,
-                                ),
-                              ),
-                              Icon(
-                                _allMembersExpanded
-                                    ? Icons.expand_less
-                                    : Icons.expand_more,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ],
-                          ),
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    // ── Assigned Members ──────────────────────────────
+                    _SectionHeader(
+                        title: 'Assigned Members',
+                        count: assignedFiltered.length),
+                    const SizedBox(height: 12),
+                    if (assignedFiltered.isEmpty)
+                      const _EmptySection(
+                          message: 'No assigned members in current filter')
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          children: assignedFiltered.map(_buildMemberTile).toList(),
                         ),
                       ),
-                      if (_allMembersExpanded) ...[
-                        const SizedBox(height: 8),
-                        if (allAvailableFiltered.isEmpty)
-                          _EmptySection(
-                              message: 'No available members in current filter')
-                        else
-                          ...allAvailableFiltered.map(_buildMemberTile),
-                      ],
+
+                    const SizedBox(height: 24),
+
+                    // ── Unassigned Members (no patrol yet) ────────────
+                    _SectionHeader(
+                        title: 'Unassigned Members',
+                        count: unassignedFiltered.length),
+                    const SizedBox(height: 12),
+                    if (unassignedFiltered.isEmpty)
+                      _EmptySection(
+                          message: _searchQuery.isEmpty
+                              ? 'All troop members are in a patrol'
+                              : 'No unassigned members match your search')
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          children: unassignedFiltered.map(_buildMemberTile).toList(),
+                        ),
+                      ),
+
+                    const SizedBox(height: 24),
+
+                    // ── All Troop Members (collapsible) ───────────────
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(
+                          () => _allMembersExpanded = !_allMembersExpanded),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'All Troop Members',
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: ShapeDecoration(
+                                color: theme.colorScheme.secondaryContainer,
+                                shape: const StadiumBorder(),
+                              ),
+                              child: Text(
+                                '${allAvailableFiltered.length}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSecondaryContainer,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              _allMembersExpanded
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_allMembersExpanded) ...[
+                      const SizedBox(height: 12),
+                      if (allAvailableFiltered.isEmpty)
+                        const _EmptySection(
+                            message: 'No available members in current filter')
+                      else
+                        Container(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            children: allAvailableFiltered.map(_buildMemberTile).toList(),
+                          ),
+                        ),
                     ],
-                  ),
+                  ],
                 ),
               ),
               // Footer actions
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -232,13 +313,19 @@ class _ManageMembersDialogState extends State<ManageMembersDialog> {
                         final nav = Navigator.of(context);
                         if (await _onWillPop()) nav.pop();
                       },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
                       child: const Text('Cancel'),
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
+                    const SizedBox(width: 12),
+                    FilledButton(
                       onPressed: _hasUnsavedChanges ? _submit : null,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('Save Changes'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Save Changes'),
                     ),
                   ],
                 ),
@@ -269,35 +356,65 @@ class _ManageMembersDialogState extends State<ManageMembersDialog> {
         currentPatrolId != null && currentPatrolId != widget.patrol.id;
 
     return CheckboxListTile(
-      contentPadding: EdgeInsets.zero,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      activeColor: theme.colorScheme.primary,
       dense: true,
       value: selected,
       controlAffinity: ListTileControlAffinity.leading,
-      title: Text(
-        member.fullName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              member.fullName,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (member.id == widget.patrol.patrolLeaderProfileId)
+            _buildStarBadge(3, Colors.amber)
+          else if (member.id == widget.patrol.assistant1ProfileId)
+            _buildStarBadge(2, Colors.amber)
+          else if (member.id == widget.patrol.assistant2ProfileId)
+            _buildStarBadge(1, Colors.amber),
+        ],
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            member.displayPhone,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            children: [
+              Icon(Icons.phone_outlined, size: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  member.displayPhone,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
           if (isInAnotherPatrol)
-            Text(
-              'In: ${widget.patrolNamesById[currentPatrolId] ?? 'another patrol'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.tertiary,
-                fontStyle: FontStyle.italic,
-              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'In: ${widget.patrolNamesById[currentPatrolId] ?? 'another patrol'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textDirection: RegExp(r'[\u0600-\u06FF]').hasMatch(widget.patrolNamesById[currentPatrolId] ?? '') ? TextDirection.rtl : TextDirection.ltr,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
             ),
         ],
       ),
@@ -358,6 +475,24 @@ class _ManageMembersDialogState extends State<ManageMembersDialog> {
         _searchQuery = value;
       });
     });
+  }
+
+  Widget _buildStarBadge(int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(
+          count,
+          (index) => Icon(Icons.star, size: 10, color: color),
+        ),
+      ),
+    );
   }
 
   void _submit() {

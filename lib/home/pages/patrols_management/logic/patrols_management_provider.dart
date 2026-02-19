@@ -121,9 +121,19 @@ class PatrolsManagementProvider with ChangeNotifier {
           ? membersById[patrol.patrolLeaderProfileId!]
           : null;
 
+      final assistant1 = patrol.assistant1ProfileId != null
+          ? membersById[patrol.assistant1ProfileId!]
+          : null;
+
+      final assistant2 = patrol.assistant2ProfileId != null
+          ? membersById[patrol.assistant2ProfileId!]
+          : null;
+
       return PatrolWithMembers(
         patrol: patrol,
         patrolLeader: leader,
+        assistant1: assistant1,
+        assistant2: assistant2,
         members: assigned,
       );
     }).toList();
@@ -231,6 +241,8 @@ class PatrolsManagementProvider with ChangeNotifier {
     required String name,
     String? description,
     String? patrolLeaderProfileId,
+    String? assistant1ProfileId,
+    String? assistant2ProfileId,
   }) async {
     return _processMutation(() async {
       final context = _mutationContext();
@@ -241,6 +253,8 @@ class PatrolsManagementProvider with ChangeNotifier {
         name: name,
         description: description,
         patrolLeaderProfileId: patrolLeaderProfileId,
+        assistant1ProfileId: assistant1ProfileId,
+        assistant2ProfileId: assistant2ProfileId,
       );
 
       await loadPatrolsAndMembers(forceRefresh: true);
@@ -253,6 +267,8 @@ class PatrolsManagementProvider with ChangeNotifier {
     required String name,
     String? description,
     String? patrolLeaderProfileId,
+    String? assistant1ProfileId,
+    String? assistant2ProfileId,
   }) async {
     return _processMutation(() async {
       final context = _mutationContext();
@@ -264,6 +280,8 @@ class PatrolsManagementProvider with ChangeNotifier {
         name: name,
         description: description,
         patrolLeaderProfileId: patrolLeaderProfileId,
+        assistant1ProfileId: assistant1ProfileId,
+        assistant2ProfileId: assistant2ProfileId,
       );
 
       await loadPatrolsAndMembers(forceRefresh: true);
@@ -293,6 +311,15 @@ class PatrolsManagementProvider with ChangeNotifier {
     return _processMutation(() async {
       final context = _mutationContext();
 
+      // Local update for immediate feedback
+      _troopMembers = _troopMembers.map((m) {
+        if (m.id == memberProfileId) {
+          return m.copyWith(patrolId: patrolId);
+        }
+        return m;
+      }).toList();
+      notifyListeners();
+
       await _service.assignMemberToPatrol(
         currentUser: context.user,
         troopId: context.troopId,
@@ -311,6 +338,19 @@ class PatrolsManagementProvider with ChangeNotifier {
   }) async {
     return _processMutation(() async {
       final context = _mutationContext();
+
+      // Local update for immediate feedback
+      _troopMembers = _troopMembers.map((m) {
+        if (m.patrolId == patrolId) {
+          if (!memberIds.contains(m.id)) {
+            return m.copyWith(clearPatrolId: true);
+          }
+        } else if (memberIds.contains(m.id)) {
+          return m.copyWith(patrolId: patrolId);
+        }
+        return m;
+      }).toList();
+      notifyListeners();
 
       await _service.updatePatrolMembers(
         currentUser: context.user,

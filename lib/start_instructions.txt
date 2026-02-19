@@ -28,15 +28,18 @@ Admin:
 -✅User Acceptance (after login) module
 -✅User Management (tweaks)
 -✅Season Management
+-✅Patrols View (manage patrol members/leaders ,filter by,)
 -Stats (later)
 -Library Management (CRUD) for files and Folders
 
 Troop Head/Leader:
 -✅User Acceptance (after login) module [filtered by their troop]
 -✅User Management (assign to patrols,& roles)
--Patrols View (manage patrol members/leaders ,filter by,)
--Meeting Manager (CRUD for meetings of their troop).
-
+-✅Patrols View (manage patrol members/leaders ,filter by,)
+-Meeting Manager Tab (CRUD for meetings of their troop).
+    - Meeting Creatioon
+    - Attendance
+    - Points System
 
 Scouts:
 -View their meetings & history

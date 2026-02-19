@@ -76,12 +76,13 @@ class AppBottomNavBar extends StatelessWidget {
       ),
       _buildNavItem(
         context: context,
-        icon: Icons.search_outlined,
-        activeIcon: Icons.search,
-        label: 'Search',
-        page: 'search',
-        onTap: () => _showComingSoon(context, 'Search'),
+        icon: Icons.event_outlined,
+        activeIcon: Icons.event,
+        label: 'Meetings',
+        page: 'meetings',
+        onTap: () => _navigateTo(context, 'meetings'),
       ),
+      
       _buildNavItem(
         context: context,
         icon: Icons.person_outline,
