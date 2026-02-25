@@ -15,8 +15,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String? _selectedRole;
-
   @override
   void initState() {
     super.initState();
@@ -43,19 +41,7 @@ class _HomePageState extends State<HomePage> {
       if (kDebugMode) {
         debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
       }
-      if (authProvider.userRoles.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('🏠 Roles available: ${authProvider.userRoles.map((r) => r.name).join(', ')}');
-        }
-        if (_selectedRole == null) {
-          setState(() {
-            _selectedRole = authProvider.userRoles.first.name;
-          });
-          if (kDebugMode) {
-            debugPrint('🏠 Set initial role to: $_selectedRole');
-          }
-        }
-      } else {
+      if (authProvider.userRoles.isEmpty) {
         if (kDebugMode) {
           debugPrint('⚠️ No roles found for user');
         }
@@ -69,6 +55,7 @@ class _HomePageState extends State<HomePage> {
     final colorScheme = theme.colorScheme;
     final authProvider = Provider.of<AuthProvider>(context);
     final userRoles = authProvider.userRoles;
+    final selectedRole = authProvider.selectedRoleName;
 
     // Detailed debug logging
     if (kDebugMode) {
@@ -77,7 +64,7 @@ class _HomePageState extends State<HomePage> {
       debugPrint('   Full Name: ${authProvider.fullName}');
       debugPrint('   Profile Loading: ${authProvider.profileLoading}');
       debugPrint('   Roles Count: ${userRoles.length}');
-      debugPrint('   Selected Role: $_selectedRole');
+      debugPrint('   Selected Role: $selectedRole');
       if (userRoles.isNotEmpty) {
         debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
       }
@@ -105,13 +92,11 @@ class _HomePageState extends State<HomePage> {
 
     // Set default role if not set and roles are available
     if (userRoles.isNotEmpty &&
-        (_selectedRole == null ||
-            !userRoles.any((role) => role.name == _selectedRole))) {
+        (selectedRole == null ||
+            !userRoles.any((role) => role.name == selectedRole))) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          setState(() {
-            _selectedRole = userRoles.first.name;
-          });
+          authProvider.setSelectedRole(userRoles.first.name);
           if (kDebugMode) {
             debugPrint('🏠 Auto-selected first role: ${userRoles.first.name}');
           }
@@ -148,7 +133,7 @@ class _HomePageState extends State<HomePage> {
                 )
               : DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _selectedRole,
+                    value: selectedRole,
                     icon: Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
@@ -168,9 +153,7 @@ class _HomePageState extends State<HomePage> {
                     }).toList(),
                     onChanged: (String? newValue) {
                       if (newValue != null) {
-                        setState(() {
-                          _selectedRole = newValue;
-                        });
+                        authProvider.setSelectedRole(newValue);
                         // Trigger refresh of content based on new role
                         _onRoleChanged(newValue);
                       }
@@ -260,7 +243,7 @@ class _HomePageState extends State<HomePage> {
               bottom: 0,
               left: 0,
               right: 0,
-              child: const AppBottomNavBar(
+              child: AppBottomNavBar(
                 currentPage: 'home',
                 isAuthenticated: true,
               ),
@@ -288,7 +271,7 @@ class _HomePageState extends State<HomePage> {
     debugPrint('   userMetadata: ${authProvider.userMetadata}');
 
     final userName = authProvider.fullName ?? 'User';
-    final currentRole = _selectedRole ?? 'No Role';
+    final currentRole = authProvider.selectedRoleName ?? 'No Role';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,24 +367,26 @@ class _HomePageState extends State<HomePage> {
     final roleRank = authProvider.currentUserRoleRank;
     
     // Show no role message if user has no roles assigned
-    if (authProvider.userRoles.isEmpty || _selectedRole == null || _selectedRole == 'No Role') {
+    final selectedRole = authProvider.selectedRoleName;
+
+    if (authProvider.userRoles.isEmpty || selectedRole == null || selectedRole == 'No Role') {
       return const NoRoleMessage();
     }
     
     // Show role-specific components based on role rank
-    final selectedRoleRank = authProvider.getRankForRole(_selectedRole ?? '');
+    final selectedRoleRank = authProvider.getRankForRole(selectedRole);
     final effectiveRank = selectedRoleRank > 0
       ? selectedRoleRank
       : authProvider.currentUserRoleRank;
     
     // System Admins (rank 100) and Admins (rank 90-99) see the system dashboard
     if (effectiveRank >= 90) {
-      return SystemAdminStats(selectedRole: _selectedRole ?? 'Admin');
+      return const SystemAdminStats();
     }
     
     // Troop Head (rank 70) and Troop Leader (rank 60) see troop dashboard
     if (effectiveRank == 60 || effectiveRank == 70) {
-      return TroopHeadStats(selectedRole: _selectedRole ?? 'Troop Head');
+      return const TroopHeadStats();
     }
     
     // Default stats for other roles

@@ -9,9 +9,7 @@ import '../../auth/logic/auth_provider.dart';
 /// - System Admin/Moderator → "Managing: All Users" (blue)
 /// - Troop Leader/Head → "Managing: [Troop Name]" (orange)
 class AdminScopeBanner extends StatefulWidget {
-  final String? selectedRoleName;
-  
-  const AdminScopeBanner({super.key, this.selectedRoleName});
+  const AdminScopeBanner({super.key});
 
   @override
   State<AdminScopeBanner> createState() => _AdminScopeBannerState();
@@ -25,14 +23,6 @@ class _AdminScopeBannerState extends State<AdminScopeBanner> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadTroopNameIfNeeded();
-  }
-
-  @override
-  void didUpdateWidget(AdminScopeBanner oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedRoleName != widget.selectedRoleName) {
-      _loadTroopNameIfNeeded();
-    }
   }
 
   Future<void> _loadTroopNameIfNeeded() async {
@@ -85,27 +75,24 @@ class _AdminScopeBannerState extends State<AdminScopeBanner> {
     
     if (user == null) return const SizedBox.shrink();
     
-    // Use selected role if provided, otherwise use user's highest rank
-    int effectiveRank;
-    String roleLabel;
-    
-    if (widget.selectedRoleName != null) {
-      effectiveRank = authProvider.getRankForRole(widget.selectedRoleName!);
-      roleLabel = widget.selectedRoleName!;
+    final selectedRole = authProvider.selectedRoleName;
+    final effectiveRank = selectedRole != null
+        ? authProvider.getRankForRole(selectedRole)
+        : user.roleRank;
+
+    final String roleLabel;
+    if (selectedRole != null && selectedRole.isNotEmpty) {
+      roleLabel = selectedRole;
+    } else if (effectiveRank == 100) {
+      roleLabel = 'System Admin';
+    } else if (effectiveRank == 90) {
+      roleLabel = 'Moderator';
+    } else if (effectiveRank == 70) {
+      roleLabel = 'Troop Head';
+    } else if (effectiveRank == 60) {
+      roleLabel = 'Troop Leader';
     } else {
-      effectiveRank = user.roleRank;
-      // Determine role label from rank
-      if (effectiveRank == 100) {
-        roleLabel = 'System Admin';
-      } else if (effectiveRank == 90) {
-        roleLabel = 'Moderator';
-      } else if (effectiveRank == 70) {
-        roleLabel = 'Troop Head';
-      } else if (effectiveRank == 60) {
-        roleLabel = 'Troop Leader';
-      } else {
-        roleLabel = 'User';
-      }
+      roleLabel = 'User';
     }
     
     final bool isSystemWide = effectiveRank >= 90;
@@ -132,11 +119,11 @@ class _AdminScopeBannerState extends State<AdminScopeBanner> {
     
     final Color bannerColor = isSystemWide
         ? theme.colorScheme.primaryContainer
-        : Colors.orange.shade100;
+      : theme.colorScheme.tertiaryContainer;
     
     final Color textColor = isSystemWide
         ? theme.colorScheme.onPrimaryContainer
-        : Colors.orange.shade900;
+      : theme.colorScheme.onTertiaryContainer;
     
     final IconData icon = isSystemWide 
         ? Icons.admin_panel_settings 
@@ -190,7 +177,7 @@ class _AdminScopeBannerState extends State<AdminScopeBanner> {
               child: Icon(
                 Icons.warning_amber,
                 size: 18,
-                color: Colors.red.shade700,
+                color: theme.colorScheme.error,
               ),
             ),
         ],

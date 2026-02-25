@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../auth/models/role.dart';
-import '../../../../../core/constants/app_colors.dart';
 import '../../data/models/managed_user_profile.dart';
 
 /// Role Assignment Section Component

@@ -207,7 +207,7 @@ class UserManagementProvider with ChangeNotifier {
       }
 
       final cacheKey =
-          '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:${_searchQuery}:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
+          '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:$_searchQuery:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
       
       // Only use cache if not forcing refresh and we're loading the first page
       if (!forceRefresh) {
@@ -271,7 +271,7 @@ class UserManagementProvider with ChangeNotifier {
         
         // Update cache with the full list
         final cacheKey =
-            '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:${_searchQuery}:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
+            '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:$_searchQuery:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
         _usersCache.set(cacheKey, _users, _usersCacheTtl);
       }
     } catch (e) {

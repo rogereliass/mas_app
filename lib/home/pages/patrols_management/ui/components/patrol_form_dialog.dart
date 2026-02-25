@@ -185,7 +185,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          value: _selectedLeaderId,
+                          initialValue: _selectedLeaderId,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Leader',
@@ -242,7 +242,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          value: _selectedAssistant1Id,
+                          initialValue: _selectedAssistant1Id,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Assistant 1',
@@ -299,7 +299,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          value: _selectedAssistant2Id,
+                          initialValue: _selectedAssistant2Id,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Assistant 2',

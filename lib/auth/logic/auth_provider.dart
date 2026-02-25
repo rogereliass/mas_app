@@ -105,6 +105,7 @@ class AuthProvider with ChangeNotifier {
   User? _currentUser;
   UserProfile? _currentUserProfile;
   List<Role> _userRoles = [];
+  String? _selectedRoleName;
   bool _isLoading = false;
   String? _errorMessage;
   String? _profileLoadError;
@@ -114,6 +115,7 @@ class AuthProvider with ChangeNotifier {
   User? get currentUser => _currentUser;
   UserProfile? get currentUserProfile => _currentUserProfile;
   List<Role> get userRoles => _userRoles;
+  String? get selectedRoleName => _selectedRoleName;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _currentUser != null;
   String? get errorMessage => _errorMessage;
@@ -122,6 +124,14 @@ class AuthProvider with ChangeNotifier {
   
   /// Get current user's role rank (0 if unauthenticated)
   int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
+
+  /// Effective role rank for the globally selected role context.
+  /// Falls back to the current user's highest rank when no role is selected.
+  int get selectedRoleRank {
+    if (_selectedRoleName == null) return currentUserRoleRank;
+    final rank = getRankForRole(_selectedRoleName!);
+    return rank > 0 ? rank : currentUserRoleRank;
+  }
   
   /// Get specific role by name from user's assigned roles
   Role? getRoleByName(String roleName) {
@@ -306,13 +316,69 @@ class AuthProvider with ChangeNotifier {
     try {
       _logDebug('🔄 Loading roles for user');
       _userRoles = await _roleRepository.getCurrentUserRoles();
+      await _hydrateAndNormalizeSelectedRole();
       _logDebug('✅ Loaded ${_userRoles.length} roles for user');
     } catch (e, stackTrace) {
       _logDebug('❌ Failed to load user roles: $e');
       _logDebug('   StackTrace: $stackTrace');
       _userRoles = [];
+      _selectedRoleName = null;
       // Don't throw - allow app to continue without roles
     }
+  }
+
+  /// Initializes selected role from local storage and ensures it's still valid
+  /// for the current authenticated user's available role list.
+  Future<void> _hydrateAndNormalizeSelectedRole() async {
+    final prefs = await _prefs;
+
+    _selectedRoleName ??= prefs.getString('selected_role_name');
+
+    if (_userRoles.isEmpty) {
+      _selectedRoleName = null;
+      await prefs.remove('selected_role_name');
+      return;
+    }
+
+    final isValid = _selectedRoleName != null &&
+        _userRoles.any((r) => r.name.toLowerCase() == _selectedRoleName!.toLowerCase());
+
+    if (!isValid) {
+      _selectedRoleName = _userRoles.first.name;
+      await prefs.setString('selected_role_name', _selectedRoleName!);
+    }
+  }
+
+  /// Sets the globally selected role context for the whole app.
+  ///
+  /// Passing null will auto-fallback to the first assigned role (if available).
+  Future<void> setSelectedRole(String? roleName) async {
+    final prefs = await _prefs;
+
+    if (_userRoles.isEmpty) {
+      _selectedRoleName = null;
+      await prefs.remove('selected_role_name');
+      notifyListeners();
+      return;
+    }
+
+    String? nextRole = roleName?.trim();
+    if (nextRole != null && nextRole.isEmpty) nextRole = null;
+
+    if (nextRole != null) {
+      final exists = _userRoles.any((r) => r.name.toLowerCase() == nextRole!.toLowerCase());
+      if (!exists) {
+        nextRole = _userRoles.first.name;
+      }
+    }
+
+    nextRole ??= _userRoles.first.name;
+
+    if (_selectedRoleName == nextRole) return;
+
+    _selectedRoleName = nextRole;
+    await prefs.setString('selected_role_name', nextRole);
+    notifyListeners();
   }
 
   @override
@@ -421,8 +487,11 @@ class AuthProvider with ChangeNotifier {
         prefs.remove('user_signup_troop'),
         prefs.remove('user_generation'),
         prefs.remove('user_role_rank'),
+        prefs.remove('selected_role_name'),
         prefs.setBool('is_authenticated', false),
       ]);
+
+      _selectedRoleName = null;
 
       return true;
     } catch (e) {

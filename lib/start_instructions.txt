@@ -15,7 +15,7 @@ flutter run
 
 ---------------------------------------------------------
 -supabase RLS 
--login process - Twilio Account Needed but logic is working
+- login process - Twilio Account Needed but logic is working
 -file views & download stats
 
 ---------------------------------------------------------
@@ -29,8 +29,9 @@ Admin:
 -✅User Management (tweaks)
 -✅Season Management
 -✅Patrols View (manage patrol members/leaders ,filter by,)
--Stats (later)
 -Library Management (CRUD) for files and Folders
+-Stats (later)
+
 
 Troop Head/Leader:
 -✅User Acceptance (after login) module [filtered by their troop]
@@ -44,3 +45,9 @@ Troop Head/Leader:
 Scouts:
 -View their meetings & history
 -View their attendance stats
+
+---------------------------------
+add UI save button in attendance
+meetings dropdown view UI
+add comments on attendance button
+CRUD for meeting Management

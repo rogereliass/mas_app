@@ -17,9 +17,7 @@ import 'components/user_edit_dialog.dart';
 ///
 /// Allows system admins and troop-scoped leaders to update user profiles
 class UserManagementPage extends StatefulWidget {
-  final String? selectedRole;
-
-  const UserManagementPage({super.key, this.selectedRole});
+  const UserManagementPage({super.key});
 
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -45,12 +43,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _userProvider = userProvider;
       final colorScheme = Theme.of(context).colorScheme;
 
-      // Extract and cache role context once
-      _roleContext = widget.selectedRole;
-      if (_roleContext == null) {
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-        _roleContext = args?['selectedRole'] as String?;
-      }
+      // Extract and cache role context from global app state.
+      _roleContext = authProvider.selectedRoleName;
 
       if (_roleContext != null) {
         _effectiveRank = authProvider.getRankForRole(_roleContext!);
@@ -160,7 +154,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
       body: Column(
         children: [
-          AdminScopeBanner(selectedRoleName: _roleContext),
+          const AdminScopeBanner(),
           _buildSearchAndFilters(context),
           Expanded(
             child: Consumer<UserManagementProvider>(

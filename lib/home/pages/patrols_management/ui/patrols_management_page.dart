@@ -13,9 +13,7 @@ import 'components/patrol_card.dart';
 import 'components/patrol_form_dialog.dart';
 
 class PatrolsManagementPage extends StatefulWidget {
-  final String? selectedRole;
-
-  const PatrolsManagementPage({super.key, this.selectedRole});
+  const PatrolsManagementPage({super.key});
 
   @override
   State<PatrolsManagementPage> createState() => _PatrolsManagementPageState();
@@ -45,10 +43,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       return;
     }
 
-    // Resolve role from widget param first, then route arguments
-    final resolvedRole = widget.selectedRole ??
-        (ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?)
-            ?['selectedRole'] as String?;
+    // Resolve role from global app state.
+    final resolvedRole = authProvider.selectedRoleName;
 
     // Skip re-init if nothing has changed
     if (_initialized && resolvedRole == _lastResolvedRole) return;
@@ -176,7 +172,7 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
         ),
         body: Column(
           children: [
-            AdminScopeBanner(selectedRoleName: _roleContext),
+            const AdminScopeBanner(),
             _buildTroopSelector(),
             Expanded(
               child: Consumer<PatrolsManagementProvider>(

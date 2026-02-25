@@ -12,6 +12,8 @@ import 'home/pages/user_approval/logic/admin_provider.dart';
 import 'home/pages/user_management/logic/user_management_provider.dart';
 import 'home/pages/season_management/logic/season_management_provider.dart';
 import 'home/pages/patrols_management/logic/patrols_management_provider.dart';
+import 'meetings/pages/meeting_creation/logic/meetings_provider.dart';
+import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'offline/offline_storage.dart';
 import 'app.dart';
 
@@ -88,6 +90,24 @@ void main() async {
         ),
         
         ChangeNotifierProvider(create: (_) => SeasonManagementProvider()),
+
+        // MeetingsProvider depends on AuthProvider for role-based scoping
+        ChangeNotifierProxyProvider<AuthProvider, MeetingsProvider>(
+          create: (context) => MeetingsProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+            previous ?? MeetingsProvider(authProvider: auth),
+        ),
+
+        // AttendanceProvider depends on AuthProvider for role/scope checks
+        ChangeNotifierProxyProvider<AuthProvider, AttendanceProvider>(
+          create: (context) => AttendanceProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+            previous ?? AttendanceProvider(authProvider: auth),
+        ),
       ],
       child: const MyApp(),
     ),

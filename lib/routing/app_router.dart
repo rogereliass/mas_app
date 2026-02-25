@@ -17,6 +17,7 @@ import '../home/pages/user_approval/ui/user_acceptance_page.dart';
 import '../home/pages/user_management/ui/user_management_page.dart';
 import '../home/pages/season_management/ui/season_management_page.dart';
 import '../home/pages/patrols_management/ui/patrols_management_page.dart';
+import '../meetings/meetings_page.dart';
 
 /// Centralized routing configuration for the application
 /// 
@@ -82,6 +83,9 @@ class AppRouter {
   /// Patrols management page route (admin and troop roles)
   static const String patrolsManagement = '/patrols-management';
 
+  /// Meetings page route
+  static const String meetings = '/meetings';
+
   // ============================================================================
   // ROUTE DEFINITIONS
   // ============================================================================
@@ -138,19 +142,15 @@ class AppRouter {
     
     // Handle User Acceptance with role context
     if (settings.name == userAcceptance) {
-      final args = settings.arguments as Map<String, dynamic>?;
-      final selectedRole = args?['selectedRole'] as String?;
       return MaterialPageRoute(
-        builder: (context) => UserAcceptancePage(selectedRole: selectedRole),
+        builder: (context) => const UserAcceptancePage(),
       );
     }
 
     // Handle User Management with role context
     if (settings.name == userManagement) {
-      final args = settings.arguments as Map<String, dynamic>?;
-      final selectedRole = args?['selectedRole'] as String?;
       return MaterialPageRoute(
-        builder: (context) => UserManagementPage(selectedRole: selectedRole),
+        builder: (context) => const UserManagementPage(),
       );
     }
     
@@ -163,13 +163,18 @@ class AppRouter {
 
     // Handle Patrols Management with role context
     if (settings.name == patrolsManagement) {
-      final args = settings.arguments as Map<String, dynamic>?;
-      final selectedRole = args?['selectedRole'] as String?;
       return MaterialPageRoute(
-        builder: (context) => PatrolsManagementPage(selectedRole: selectedRole),
+        builder: (context) => const PatrolsManagementPage(),
       );
     }
     
+    // Handle Meetings with role context
+    if (settings.name == meetings) {
+      return MaterialPageRoute(
+        builder: (context) => const MeetingsPage(),
+      );
+    }
+
     return null; // Let onUnknownRoute handle it
   }
   

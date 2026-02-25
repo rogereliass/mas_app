@@ -9,9 +9,7 @@ import '../../routing/app_router.dart';
 /// - Recent troop activity
 /// - Quick actions for troop management
 class TroopHeadStats extends StatelessWidget {
-  final String selectedRole;
-
-  const TroopHeadStats({super.key, required this.selectedRole});
+  const TroopHeadStats({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +118,6 @@ class TroopHeadStats extends StatelessWidget {
                   Navigator.pushNamed(
                     context,
                     AppRouter.userAcceptance,
-                    arguments: {'selectedRole': selectedRole},
                   );
                 },
                 icon: const Icon(Icons.how_to_reg),
@@ -152,7 +149,6 @@ class TroopHeadStats extends StatelessWidget {
                   Navigator.pushNamed(
                     context,
                     AppRouter.userManagement,
-                    arguments: {'selectedRole': selectedRole},
                   );
                 },
                 icon: const Icon(Icons.manage_accounts_outlined),
@@ -182,7 +178,6 @@ class TroopHeadStats extends StatelessWidget {
                   Navigator.pushNamed(
                     context,
                     AppRouter.patrolsManagement,
-                    arguments: {'selectedRole': selectedRole},
                   );
                 },
                 icon: const Icon(Icons.groups_2_outlined),

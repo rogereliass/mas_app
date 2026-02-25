@@ -312,7 +312,7 @@ class _CreateSeasonDialogState extends State<CreateSeasonDialog> {
     List<Widget> Function(BuildContext)? selectedItemBuilder,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       items: items,
       onChanged: onChanged,
       selectedItemBuilder: selectedItemBuilder,

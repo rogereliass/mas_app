@@ -21,12 +21,8 @@ import 'package:intl/intl.dart';
 /// - System Admin (100) and Moderator (90): See ALL pending profiles
 /// - Troop Head (70) and Troop Leader (60): See ONLY their troop's pending profiles
 /// 
-/// Supports role context: When navigating from HomePage with selectedRole argument,
-/// filters data based on that specific role instead of user's highest rank
 class UserAcceptancePage extends StatefulWidget {
-  final String? selectedRole;
-  
-  const UserAcceptancePage({super.key, this.selectedRole});
+  const UserAcceptancePage({super.key});
 
   @override
   State<UserAcceptancePage> createState() => _UserAcceptancePageState();
@@ -47,12 +43,8 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
       final adminProvider = context.read<AdminProvider>();
       _adminProvider = adminProvider;
       
-      // Get selected role from widget or navigation arguments
-      String? roleContext = widget.selectedRole;
-      if (roleContext == null) {
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-        roleContext = args?['selectedRole'] as String?;
-      }
+      // Resolve selected role from global app state.
+      final String? roleContext = authProvider.selectedRoleName;
       
       // SECURITY: Determine effective rank based on role context
       int effectiveRank;
@@ -149,12 +141,9 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    // Get selected role from widget or route arguments
-    String? roleContext = widget.selectedRole;
-    if (roleContext == null) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-      roleContext = args?['selectedRole'] as String?;
-    }
+    // Resolve selected role from global app state.
+    final authProvider = context.watch<AuthProvider>();
+    final String? roleContext = authProvider.selectedRoleName;
 
     return Scaffold(
       appBar: AppBar(
@@ -176,7 +165,7 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
       body: Column(
         children: [
           // Show current admin scope (system-wide or troop-specific)
-          AdminScopeBanner(selectedRoleName: roleContext),
+          const AdminScopeBanner(),
           
           Expanded(
             child: Consumer<AdminProvider>(

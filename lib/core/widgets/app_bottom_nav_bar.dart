@@ -80,7 +80,7 @@ class AppBottomNavBar extends StatelessWidget {
         activeIcon: Icons.event,
         label: 'Meetings',
         page: 'meetings',
-        onTap: () => _navigateTo(context, 'meetings'),
+        onTap: () => _navigateTo(context, AppRouter.meetings),
       ),
       
       _buildNavItem(
@@ -178,7 +178,7 @@ class AppBottomNavBar extends StatelessWidget {
   }
 
   /// Navigate to a route
-  void _navigateTo(BuildContext context, String route) {
+  void _navigateTo(BuildContext context, String route, {Object? arguments}) {
     // Don't navigate if already on the page
     if (_isCurrentRoute(route)) return;
     
@@ -186,6 +186,7 @@ class AppBottomNavBar extends StatelessWidget {
       context,
       route,
       (route) => false,
+      arguments: arguments,
     );
   }
 
@@ -196,6 +197,8 @@ class AppBottomNavBar extends StatelessWidget {
         return currentPage == 'home';
       case AppRouter.library:
         return currentPage == 'library';
+      case AppRouter.meetings:
+        return currentPage == 'meetings';
       case AppRouter.about:
         return currentPage == 'about';
       case AppRouter.profile:
