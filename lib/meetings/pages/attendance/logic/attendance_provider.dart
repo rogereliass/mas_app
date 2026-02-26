@@ -33,6 +33,9 @@ class AttendanceProvider with ChangeNotifier {
   /// Attendance record IDs keyed by profileId — required for batch updates.
   Map<String, String> _recordIdByProfileId = {};
 
+  /// In-memory notes cache updated after a successful note save.
+  /// Keyed by profileId; overrides the value from member.record?.notes.
+  Map<String, String?> _localNotes = {};
 
   /// Patrol name → sorted member list (members assigned to a patrol).
   Map<String, List<MemberWithAttendance>> _patrolGroups = {};
@@ -122,6 +125,20 @@ class AttendanceProvider with ChangeNotifier {
   AttendanceStatus statusFor(String profileId) =>
       _localAttendance[profileId] ?? AttendanceStatus.absent;
 
+  /// Returns the current note for [profileId] — prefers the in-memory cache
+  /// over the attached record so freshly saved notes are reflected instantly.
+  String? notesFor(String profileId) {
+    if (_localNotes.containsKey(profileId)) return _localNotes[profileId];
+    try {
+      return _members
+          .firstWhere((m) => m.profileId == profileId)
+          .record
+          ?.notes;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Public methods ─────────────────────────────────────────────────────────
 
   /// Loads the list of meetings for [troopId] + [seasonId] and auto-selects
@@ -187,6 +204,23 @@ class AttendanceProvider with ChangeNotifier {
       _modifiedProfileIds.add(profileId);
     }
 
+    notifyListeners();
+  }
+
+  /// Immediately persists a note for [profileId]'s current attendance record.
+  /// Updates the in-memory cache and notifies listeners on success.
+  Future<void> updateNotes(String profileId, String? notes) async {
+    final recordId = _recordIdByProfileId[profileId];
+    if (recordId == null) {
+      debugPrint('AttendanceProvider.updateNotes: no recordId for $profileId — skipped');
+      return;
+    }
+    await _attendanceService.updateAttendanceNotes(
+      recordId: recordId,
+      notes: notes,
+    );
+    _localNotes[profileId] =
+        (notes?.trim().isEmpty ?? true) ? null : notes!.trim();
     notifyListeners();
   }
 
@@ -387,6 +421,7 @@ class AttendanceProvider with ChangeNotifier {
     _originalAttendance = {};
     _modifiedProfileIds.clear();
     _recordIdByProfileId = {};
+    _localNotes = {};
     _patrolGroups = {};
     _unassignedMembers = [];
   }

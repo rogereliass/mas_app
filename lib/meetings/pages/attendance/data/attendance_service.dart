@@ -143,6 +143,22 @@ class AttendanceService {
     }
   }
 
+  /// Updates only the [notes] field for a single attendance record.
+  /// Pass `null` or an empty string to clear the note.
+  Future<void> updateAttendanceNotes({
+    required String recordId,
+    required String? notes,
+  }) async {
+    try {
+      await _supabase
+          .from('attendance')
+          .update({'notes': (notes?.trim().isEmpty ?? true) ? null : notes!.trim()})
+          .eq('id', recordId);
+    } catch (e) {
+      throw Exception('AttendanceService.updateAttendanceNotes: $e');
+    }
+  }
+
   /// Batch-updates only the [changedRecords] in the `attendance` table.
   ///
   /// Each record is updated individually in parallel via [Future.wait].

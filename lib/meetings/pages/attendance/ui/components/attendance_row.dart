@@ -6,11 +6,14 @@ import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.d
 /// A single row representing a member and their attendance status.
 /// Editors can tap the status badge to change it via a popup menu.
 /// Regular members see a read-only status badge.
+/// Tapping the member name or the comment icon opens the note editor dialog.
 class AttendanceRow extends StatelessWidget {
   final MemberWithAttendance member;
   final AttendanceStatus currentStatus;
   final bool isEditor;
   final ValueChanged<AttendanceStatus>? onStatusChanged;
+  final VoidCallback? onNotesTap;
+  final String? currentNote;
 
   const AttendanceRow({
     super.key,
@@ -18,6 +21,8 @@ class AttendanceRow extends StatelessWidget {
     required this.currentStatus,
     required this.isEditor,
     this.onStatusChanged,
+    this.onNotesTap,
+    this.currentNote,
   });
 
   @override
@@ -38,51 +43,82 @@ class AttendanceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          // Avatar with initials
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              member.initialsName,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
+          // Avatar with initials — tappable for editors to open note dialog
+          GestureDetector(
+            onTap: onNotesTap,
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                member.initialsName,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          // Name + patrol
+          // Name + patrol — tappable for editors to open note dialog
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  member.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (member.patrolName != null &&
-                    member.patrolName!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+            child: GestureDetector(
+              onTap: onNotesTap,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    member.patrolName!,
+                    member.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
+                  // Patrol name omitted here because rows are grouped
+                  // by patrol in the parent list to avoid duplication.
+                  // Show note preview if one exists
+                  if (currentNote != null && currentNote!.isNotEmpty) ...[  
+                    const SizedBox(height: 3),
+                    Text(
+                      currentNote!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
+          // Comment/note icon button (editors only)
+          if (isEditor)
+            IconButton(
+              onPressed: onNotesTap,
+              icon: Icon(
+                currentNote != null && currentNote!.isNotEmpty
+                    ? Icons.comment
+                    : Icons.comment_outlined,
+                size: 20,
+              ),
+              color: currentNote != null && currentNote!.isNotEmpty
+                  ? theme.colorScheme.primary
+                  : (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight),
+              tooltip: currentNote != null && currentNote!.isNotEmpty
+                  ? 'Edit note'
+                  : 'Add note',
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          const SizedBox(width: 4),
           // Status control
           isEditor
               ? _EditableStatusBadge(

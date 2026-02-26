@@ -209,6 +209,7 @@ class AppBottomNavBar extends StatelessWidget {
   }
 
   /// Show coming soon message
+  // ignore: unused_element
   void _showComingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

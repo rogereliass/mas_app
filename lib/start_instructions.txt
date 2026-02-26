@@ -23,31 +23,37 @@ flutter run
 Act as a senior production software engineer and review this implementation to ensure it matches the planned behavior and app conventions, is secure, stable, production-safe, has modern UI consistent with the existing design, contains no crashes, edge-case failures, or bad state handling, and follows best practices without over-engineering; if any issue exists, fix it immediately with the simplest bulletproof solution, re-check security, stability, and performance after the fix, and return only: 1) critical issues found (if any), 2) corrected final code, 3) confirmation the feature is production-ready.
 
 ---------------------------------------------------------
+
+add UI save button in attendance - PROMPTED
+meetings dropdown view UI - PROMPTED
+add comments on attendance button - PROMPTED
+CRUD for meeting Management
+
+---------------------------------------------------------
+
 Homepage components:
 Admin:
 -✅User Acceptance (after login) module
 -✅User Management (tweaks)
 -✅Season Management
 -✅Patrols View (manage patrol members/leaders ,filter by,)
--Library Management (CRUD) for files and Folders
--Stats (later)
+- Library Management (CRUD) for files and Folders
+- System Stats (later)
 
 
 Troop Head/Leader:
 -✅User Acceptance (after login) module [filtered by their troop]
--✅User Management (assign to patrols,& roles)
+-✅User Management (assign to patrols,& roles) [filtered by their troop]
 -✅Patrols View (manage patrol members/leaders ,filter by,)
 -Meeting Manager Tab (CRUD for meetings of their troop).
-    - Meeting Creatioon
-    - Attendance
+    - Meeting Creation
+    - Attendance + Stats?
     - Points System
+- Homepage Stats for Meeting/Attendance/Scoring
+- Eftekad Module
+-
 
 Scouts:
 -View their meetings & history
 -View their attendance stats
 
----------------------------------
-add UI save button in attendance
-meetings dropdown view UI
-add comments on attendance button
-CRUD for meeting Management

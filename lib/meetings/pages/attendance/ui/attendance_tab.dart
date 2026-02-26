@@ -90,22 +90,34 @@ class _AttendanceTabState extends State<AttendanceTab> {
           return const _NoMeetingsView();
         }
 
-        return Column(
+        return Stack(
           children: [
-            // Meeting selector dropdown.
-            // ValueKey forces a fresh FormField state whenever the provider
-            // itself changes the selection (e.g. auto-select on load/reload).
-            _MeetingDropdown(
-              key: ValueKey(provider.selectedMeetingId),
-              provider: provider,
+            Column(
+              children: [
+                // Meeting selector dropdown.
+                // ValueKey forces a fresh FormField state whenever the provider
+                // itself changes the selection (e.g. auto-select on load/reload).
+                _MeetingDropdown(
+                  key: ValueKey(provider.selectedMeetingId),
+                  provider: provider,
+                ),
+                // Member list
+                Expanded(
+                  child: _buildMemberList(context, provider),
+                ),
+                // Keep the full-width save button for clarity on larger devices.
+                if (provider.isEditor && provider.hasUnsavedChanges)
+                  _SaveButton(provider: provider),
+              ],
             ),
-            // Member list
-            Expanded(
-              child: _buildMemberList(context, provider),
-            ),
-            // Save button (editors only, when there are unsaved changes)
+
+            // Small chic floating save button for quick manual saves.
             if (provider.isEditor && provider.hasUnsavedChanges)
-              _SaveButton(provider: provider),
+              Positioned(
+                right: 20,
+                bottom: 28,
+                child: _FloatingSaveFab(provider: provider),
+              ),
           ],
         );
       },
@@ -142,6 +154,39 @@ class _AttendanceTabState extends State<AttendanceTab> {
             provider: provider,
           ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Small floating save FAB for quick manual saves
+// ---------------------------------------------------------------------------
+
+class _FloatingSaveFab extends StatelessWidget {
+  final AttendanceProvider provider;
+
+  const _FloatingSaveFab({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final modified = provider.modifiedCount;
+
+    return FloatingActionButton.small(
+      onPressed: provider.isSaving ? null : () => provider.saveChanges(),
+      backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
+      foregroundColor:
+          isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary,
+      tooltip: modified > 0 ? 'Save ($modified)' : 'Save',
+      elevation: 6,
+      child: provider.isSaving
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.save),
     );
   }
 }
@@ -275,27 +320,28 @@ class _MeetingDropdown extends StatelessWidget {
     final cardColor =
         isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
 
-    return Container(
+    return Material(
+      elevation: 2,
+      borderRadius: BorderRadius.circular(14),
       color: cardColor,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: DropdownButtonFormField<String>(
-        initialValue: provider.selectedMeetingId,
-        isExpanded: true,
-        itemHeight: 56,
-        decoration: InputDecoration(
-          labelText: 'Meeting',
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: DropdownButtonFormField<String>(
+          initialValue: provider.selectedMeetingId,
+          isExpanded: true,
+          itemHeight: 56,
+          decoration: InputDecoration(
+            hintText: 'Select meeting',
+            prefixIcon: Icon(Icons.event, color: theme.colorScheme.primary),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
             ),
+            filled: true,
+            fillColor: cardColor,
           ),
-        ),
         selectedItemBuilder: (context) {
           return provider.meetings.map((m) {
             return Align(
@@ -331,7 +377,7 @@ class _MeetingDropdown extends StatelessWidget {
           }
         },
       ),
-    );
+    ));
   }
 
   Future<void> _confirmDiscardAndSwitch(
@@ -388,25 +434,65 @@ class _PatrolSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header
-        Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 6),
-          child: Text(
-            patrolName,
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+        // Section header — card with left accent border + member count badge
+        Container(
+          margin: const EdgeInsets.only(top: 20, bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer
+                .withValues(alpha: isDark ? 0.18 : 0.28),
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            border: Border(
+              left: BorderSide(
+                color: theme.colorScheme.primary,
+                width: 4,
+              ),
             ),
           ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.group_outlined,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  patrolName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Member count chip
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${members.length}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        Divider(
-          height: 1,
-          thickness: 1,
-          color: isDark ? AppColors.dividerDark : AppColors.divider,
-        ),
-        const SizedBox(height: 6),
         // Members
         ...members.map(
           (member) => AttendanceRow(
@@ -414,13 +500,146 @@ class _PatrolSection extends StatelessWidget {
             member: member,
             currentStatus: provider.statusFor(member.profileId),
             isEditor: provider.isEditor,
+            currentNote: provider.notesFor(member.profileId),
             onStatusChanged: provider.isEditor
                 ? (status) => provider.updateStatus(member.profileId, status)
+                : null,
+            onNotesTap: provider.isEditor
+                ? () => _showNoteDialog(context, member, provider)
                 : null,
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _showNoteDialog(
+    BuildContext context,
+    MemberWithAttendance member,
+    AttendanceProvider provider,
+  ) async {
+    final controller = TextEditingController(
+      text: provider.notesFor(member.profileId) ?? '',
+    );
+    final theme = Theme.of(context);
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Text(
+                        member.initialsName,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            member.displayName,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Attendance Note',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Note text field
+                TextField(
+                  controller: controller,
+                  maxLines: 3,
+                  minLines: 2,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    hintText: 'Add a note for this attendance record...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      icon: const Icon(Icons.save_outlined, size: 16),
+                      label: const Text('Save Note'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Capture text now (dialog has been popped) and perform save if requested.
+    final noteText = controller.text;
+    if (result == true && context.mounted) {
+      try {
+        await provider.updateNotes(member.profileId, noteText);
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save note. Please try again.'),
+            ),
+          );
+        }
+      }
+    }
+
+    // Dispose the controller after the next frame to ensure the TextField
+    // has been fully removed from the widget tree and cleared its listeners.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        controller.dispose();
+      } catch (_) {
+        // Swallow: defensive - controller may already be disposed by framework.
+      }
+    });
   }
 }
 
