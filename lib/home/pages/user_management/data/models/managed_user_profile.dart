@@ -66,8 +66,11 @@ class ManagedUserProfile {
   });
 
   String get fullName {
-    final parts = [firstName, middleName, lastName]
-        .where((part) => part != null && part.isNotEmpty);
+    final parts = [
+      firstName,
+      middleName,
+      lastName,
+    ].where((part) => part != null && part.isNotEmpty);
     return parts.isNotEmpty ? parts.join(' ') : 'Unnamed User';
   }
 
@@ -78,65 +81,101 @@ class ManagedUserProfile {
   }
 
   factory ManagedUserProfile.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) => value is String ? value : null;
+    DateTime? asDateTime(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
     final rolesJson = json['profile_roles'] as List<dynamic>? ?? [];
-    
+
     // Parse role assignments with troop context
     final List<RoleAssignment> assignments = [];
     final List<Role> parsedRoles = [];
-    
+
     for (var entry in rolesJson) {
-      final roleData = entry['roles'] as Map<String, dynamic>?;
-      if (roleData != null) {
-        final role = Role.fromJson(roleData);
-        parsedRoles.add(role);
-        
-        // Get troop context from profile_roles junction table
-        final troopContextId = entry['troop_context'] as String?;
-        String? troopContextName;
-        
-        // Check if troop context data is available
-        if (troopContextId != null && entry['troops'] != null) {
-          final troopData = entry['troops'] as Map<String, dynamic>?;
-          troopContextName = troopData?['name'] as String?;
+      try {
+        final roleData = entry['roles'] as Map<String, dynamic>?;
+        if (roleData != null && roleData.isNotEmpty) {
+          // Validate required role fields before parsing
+          if (roleData['id'] != null &&
+              roleData['name'] != null &&
+              roleData['created_at'] != null) {
+            final role = Role.fromJson(roleData);
+            parsedRoles.add(role);
+
+            // Get troop context from profile_roles junction table
+            final troopContextId = asString(entry['troop_context']);
+            String? troopContextName;
+
+            // Check if troop context data is available
+            if (troopContextId != null && entry['troops'] != null) {
+              final troopData = entry['troops'] as Map<String, dynamic>?;
+              troopContextName = asString(troopData?['name']);
+            }
+
+            assignments.add(
+              RoleAssignment(
+                role: role,
+                troopContextId: troopContextId,
+                troopContextName: troopContextName,
+              ),
+            );
+          }
         }
-        
-        assignments.add(RoleAssignment(
-          role: role,
-          troopContextId: troopContextId,
-          troopContextName: troopContextName,
-        ));
+      } catch (e) {
+        // Skip invalid role entries but log the error
+        print('⚠️ Skipping invalid role entry: $e');
+        continue;
       }
     }
 
+    // Validate required profile fields
+    final id = asString(json['id']);
+    final userId = asString(json['user_id']);
+    final createdAt = asDateTime(json['created_at']);
+
+    if (id == null || id.isEmpty) {
+      throw ArgumentError('Profile id is required but was null or invalid');
+    }
+    if (userId == null || userId.isEmpty) {
+      throw ArgumentError(
+        'Profile user_id is required but was null or invalid',
+      );
+    }
+    if (createdAt == null) {
+      throw ArgumentError(
+        'Profile created_at is required but was null or invalid',
+      );
+    }
+
     return ManagedUserProfile(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      firstName: json['first_name'] as String?,
-      middleName: json['middle_name'] as String?,
-      lastName: json['last_name'] as String?,
-      nameAr: json['name_ar'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      address: json['address'] as String?,
-      birthdate: json['birthdate'] != null
-          ? DateTime.parse(json['birthdate'] as String)
-          : null,
-      gender: json['gender'] as String?,
-      generation: json['generation'] as String?,
-      scoutOrgId: json['scout_org_id'] as String?,
-      scoutCode: json['scout_code'] as String?,
-      medicalNotes: json['medical_notes'] as String?,
-      allergies: json['allergies'] as String?,
-      signupTroopId: json['signup_troop'] as String?,
+      id: id,
+      userId: userId,
+      firstName: asString(json['first_name']),
+      middleName: asString(json['middle_name']),
+      lastName: asString(json['last_name']),
+      nameAr: asString(json['name_ar']),
+      email: asString(json['email']),
+      phone: asString(json['phone']),
+      address: asString(json['address']),
+      birthdate: asDateTime(json['birthdate']),
+      gender: asString(json['gender']),
+      generation: asString(json['generation']),
+      scoutOrgId: asString(json['scout_org_id']),
+      scoutCode: asString(json['scout_code']),
+      medicalNotes: asString(json['medical_notes']),
+      allergies: asString(json['allergies']),
+      signupTroopId: asString(json['signup_troop']),
       signupTroopName: json['troops'] != null && json['troops'] is Map
-          ? json['troops']['name'] as String?
+          ? asString(json['troops']['name'])
           : null,
       roles: parsedRoles,
       roleAssignments: assignments,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
+      createdAt: createdAt,
+      updatedAt: asDateTime(json['updated_at']),
     );
   }
 

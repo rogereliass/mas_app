@@ -18,6 +18,8 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  String? _modalError;
 
   DateTime? _meetingDate;
   TimeOfDay? _startTime;
@@ -36,21 +38,56 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     _dateDisplayController.dispose();
     _startTimeDisplayController.dispose();
     _endTimeDisplayController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
   String _formatDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   String _formatTime(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
+    // Convert TimeOfDay to a 12-hour string like '6:00 PM'.
+    final hour12 = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final min = time.minute.toString().padLeft(2, '0');
-    return '$hour:$min';
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour12:$min $period';
+  }
+
+  int? _parsePrice(String? input) {
+    if (input == null) return null;
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return null;
+    final normalized = trimmed.replaceAll(RegExp(r'\s+'), '');
+    if (!RegExp(r'^-?\d+$').hasMatch(normalized)) return null;
+    return int.tryParse(normalized);
+  }
+
+  String _mapCreateError(String rawError) {
+    final lower = rawError.toLowerCase();
+    if (lower.contains('smallint') ||
+        lower.contains('22p02') ||
+        lower.contains('invalid input syntax for type')) {
+      return 'Price must be a whole number between 0 and 32,767 EGP.';
+    }
+    if (lower.contains('between 0 and 32767')) {
+      return 'Price must be a whole number between 0 and 32,767 EGP.';
+    }
+    return 'Failed to create meeting. Please review the form and try again.';
   }
 
   Future<void> _pickDate() async {
@@ -85,7 +122,8 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   Future<void> _pickEndTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _endTime ??
+      initialTime:
+          _endTime ??
           (_startTime != null
               ? TimeOfDay(
                   hour: (_startTime!.hour + 2) % 24,
@@ -115,41 +153,40 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
 
+    setState(() {
+      _modalError = null;
+    });
+
     // At this point validators guarantee non-null values
     final startsAt = _combine(_meetingDate!, _startTime!);
     final endsAt = _combine(_meetingDate!, _endTime!);
 
-    try {
-      await provider.createMeeting(
-        title: _titleController.text.trim(),
-        location: _locationController.text.trim(),
-        meetingDate: _meetingDate!,
-        startsAt: startsAt,
-        endsAt: endsAt,
-        description: _descriptionController.text.trim().isNotEmpty
-            ? _descriptionController.text.trim()
-            : null,
-      );
+    // Parse optional price (validated by form)
+    final price = _parsePrice(_priceController.text);
 
-      if (mounted && provider.error == null) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      // Surface unexpected errors via SnackBar
-      _showError('Failed to create meeting: $e');
-    }
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+    await provider.createMeeting(
+      title: _titleController.text.trim(),
+      location: _locationController.text.trim(),
+      meetingDate: _meetingDate!,
+      startsAt: startsAt,
+      endsAt: endsAt,
+      description: _descriptionController.text.trim().isNotEmpty
+          ? _descriptionController.text.trim()
+          : null,
+      price: price,
     );
+
+    if (!mounted) return;
+
+    if (provider.error != null) {
+      setState(() {
+        _modalError = _mapCreateError(provider.error!);
+      });
+      provider.clearError();
+      return;
+    }
+
+    Navigator.of(context).pop();
   }
 
   @override
@@ -158,7 +195,9 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Dialog(
-      backgroundColor: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
+      backgroundColor: isDark
+          ? AppColors.cardDarkElevated
+          : AppColors.cardLight,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
@@ -168,16 +207,6 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
             padding: const EdgeInsets.all(24),
             child: Consumer<MeetingsProvider>(
               builder: (context, provider, _) {
-                // Show provider-level error if any
-                if (provider.error != null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      _showError(provider.error!);
-                      provider.clearError();
-                    }
-                  });
-                }
-
                 return Form(
                   key: _formKey,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -192,6 +221,23 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (_modalError != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _modalError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
 
                       // Meeting Title field
@@ -202,7 +248,9 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                         hint: 'e.g. Weekly Troop Meeting',
                         isDark: isDark,
                         theme: theme,
-                        validator: (v) => (v?.trim().isEmpty ?? true) ? 'Please enter a meeting title' : null,
+                        validator: (v) => (v?.trim().isEmpty ?? true)
+                            ? 'Please enter a meeting title'
+                            : null,
                       ),
                       const SizedBox(height: 14),
 
@@ -214,7 +262,9 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                         hint: 'e.g. Community Hall',
                         isDark: isDark,
                         theme: theme,
-                        validator: (v) => (v?.trim().isEmpty ?? true) ? 'Please enter a location' : null,
+                        validator: (v) => (v?.trim().isEmpty ?? true)
+                            ? 'Please enter a location'
+                            : null,
                       ),
                       const SizedBox(height: 14),
 
@@ -231,11 +281,17 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                           theme: theme,
                         ),
                         validator: (_) {
-                          if (_meetingDate == null) return 'Please select a date';
+                          if (_meetingDate == null)
+                            return 'Please select a date';
                           final now = DateTime.now();
-                          final selected = DateTime(_meetingDate!.year, _meetingDate!.month, _meetingDate!.day);
+                          final selected = DateTime(
+                            _meetingDate!.year,
+                            _meetingDate!.month,
+                            _meetingDate!.day,
+                          );
                           final today = DateTime(now.year, now.month, now.day);
-                          if (selected.isBefore(today)) return 'Date cannot be in the past';
+                          if (selected.isBefore(today))
+                            return 'Date cannot be in the past';
                           return null;
                         },
                       ),
@@ -251,12 +307,14 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                               onTap: _pickStartTime,
                               decoration: _inputDecoration(
                                 label: 'Start Time',
-                                hint: '18:00',
+                                hint: '6:00 PM',
                                 suffixIcon: Icons.access_time_outlined,
                                 isDark: isDark,
                                 theme: theme,
                               ),
-                              validator: (_) => _startTime == null ? 'Please select a start time' : null,
+                              validator: (_) => _startTime == null
+                                  ? 'Please select a start time'
+                                  : null,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -267,23 +325,60 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                               onTap: _pickEndTime,
                               decoration: _inputDecoration(
                                 label: 'End Time',
-                                hint: '20:00',
+                                hint: '8:00 PM',
                                 suffixIcon: Icons.access_time_outlined,
                                 isDark: isDark,
                                 theme: theme,
                               ),
                               validator: (_) {
-                                if (_endTime == null) return 'Please select an end time';
-                                if (_meetingDate != null && _startTime != null && _endTime != null) {
-                                  final startsAt = _combine(_meetingDate!, _startTime!);
-                                  final endsAt = _combine(_meetingDate!, _endTime!);
-                                  if (!endsAt.isAfter(startsAt)) return 'End time must be after start time';
+                                if (_endTime == null)
+                                  return 'Please select an end time';
+                                if (_meetingDate != null &&
+                                    _startTime != null &&
+                                    _endTime != null) {
+                                  final startsAt = _combine(
+                                    _meetingDate!,
+                                    _startTime!,
+                                  );
+                                  final endsAt = _combine(
+                                    _meetingDate!,
+                                    _endTime!,
+                                  );
+                                  if (!endsAt.isAfter(startsAt))
+                                    return 'End time must be after start time';
                                 }
                                 return null;
                               },
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Price field (optional)
+                      TextFormField(
+                        controller: _priceController,
+                        keyboardType: TextInputType.number,
+                        decoration: _inputDecoration(
+                          label: 'Price (optional)',
+                          hint: '5',
+                          isDark: isDark,
+                          theme: theme,
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return null;
+                          final parsed = _parsePrice(v);
+                          if (parsed == null) {
+                            return 'Enter a valid whole number';
+                          }
+                          if (parsed < 0) {
+                            return 'Price cannot be negative';
+                          }
+                          if (parsed > 32767) {
+                            return 'Price must be 32,767 or less';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -387,13 +482,14 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       suffixIcon: suffixIcon != null
-          ? Icon(suffixIcon, size: 18, color: theme.colorScheme.onSurfaceVariant)
+          ? Icon(
+              suffixIcon,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            )
           : null,
     );
   }

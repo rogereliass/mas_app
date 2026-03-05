@@ -14,9 +14,9 @@ flutter run
 
 
 ---------------------------------------------------------
--supabase RLS 
+- supabase RLS 
 - login process - Twilio Account Needed but logic is working
--file views & download stats
+- file views & download stats
 
 ---------------------------------------------------------
 
@@ -26,7 +26,6 @@ Act as a senior production software engineer and review this implementation to e
 
 add UI save button in attendance - PROMPTED
 meetings dropdown view UI - PROMPTED
-add comments on attendance button - PROMPTED
 CRUD for meeting Management
 
 ---------------------------------------------------------
@@ -46,10 +45,10 @@ Troop Head/Leader:
 -✅User Management (assign to patrols,& roles) [filtered by their troop]
 -✅Patrols View (manage patrol members/leaders ,filter by,)
 -Meeting Manager Tab (CRUD for meetings of their troop).
-    - Meeting Creation
-    - Attendance + Stats?
+    - 🏗️Meeting Creation
+    - 🏗️Attendance + Stats?
     - Points System
-- Homepage Stats for Meeting/Attendance/Scoring
+- 🏗️Homepage Stats for Meeting/Attendance/Scoring
 - Eftekad Module
 -
 

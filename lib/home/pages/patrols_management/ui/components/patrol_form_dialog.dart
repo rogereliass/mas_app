@@ -21,6 +21,7 @@ class PatrolFormResult {
 
 class PatrolFormDialog extends StatefulWidget {
   final Patrol? initialPatrol;
+
   /// Members eligible to be patrol leader.
   /// Pass an empty list (or omit via create path) to hide the leader field.
   final List<TroopMember> leaderCandidates;
@@ -48,7 +49,9 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.initialPatrol?.name ?? '');
+    _nameController = TextEditingController(
+      text: widget.initialPatrol?.name ?? '',
+    );
     _descriptionController = TextEditingController(
       text: widget.initialPatrol?.description ?? '',
     );
@@ -71,6 +74,71 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final candidateMembersById = <String, TroopMember>{
+      for (final member in widget.leaderCandidates) member.id: member,
+    };
+    final candidateMembers = candidateMembersById.values.toList();
+
+    String? safeLeaderId = _selectedLeaderId;
+    String? safeAssistant1Id = _selectedAssistant1Id;
+    String? safeAssistant2Id = _selectedAssistant2Id;
+
+    if (safeLeaderId != null &&
+        !candidateMembersById.containsKey(safeLeaderId)) {
+      safeLeaderId = null;
+    }
+    if (safeAssistant1Id != null &&
+        !candidateMembersById.containsKey(safeAssistant1Id)) {
+      safeAssistant1Id = null;
+    }
+    if (safeAssistant2Id != null &&
+        !candidateMembersById.containsKey(safeAssistant2Id)) {
+      safeAssistant2Id = null;
+    }
+
+    if (safeAssistant1Id != null && safeAssistant1Id == safeLeaderId) {
+      safeAssistant1Id = null;
+    }
+    if (safeAssistant2Id != null &&
+        (safeAssistant2Id == safeLeaderId ||
+            safeAssistant2Id == safeAssistant1Id)) {
+      safeAssistant2Id = null;
+    }
+
+    final shouldSyncSanitizedState =
+        safeLeaderId != _selectedLeaderId ||
+        safeAssistant1Id != _selectedAssistant1Id ||
+        safeAssistant2Id != _selectedAssistant2Id;
+
+    if (shouldSyncSanitizedState) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedLeaderId = safeLeaderId;
+          _selectedAssistant1Id = safeAssistant1Id;
+          _selectedAssistant2Id = safeAssistant2Id;
+        });
+      });
+    }
+
+    final leaderOptions = candidateMembers
+        .where(
+          (member) =>
+              member.id != safeAssistant1Id && member.id != safeAssistant2Id,
+        )
+        .toList();
+    final assistant1Options = candidateMembers
+        .where(
+          (member) =>
+              member.id != safeLeaderId && member.id != safeAssistant2Id,
+        )
+        .toList();
+    final assistant2Options = candidateMembers
+        .where(
+          (member) =>
+              member.id != safeLeaderId && member.id != safeAssistant1Id,
+        )
+        .toList();
 
     return Dialog(
       backgroundColor: theme.colorScheme.surface,
@@ -87,12 +155,16 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _isEditMode ? Icons.edit_note_outlined : Icons.add_circle_outline,
+                    _isEditMode
+                        ? Icons.edit_note_outlined
+                        : Icons.add_circle_outline,
                     color: theme.colorScheme.primary,
                     size: 28,
                   ),
@@ -130,18 +202,36 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         controller: _nameController,
                         textInputAction: TextInputAction.next,
                         maxLength: 50,
-                        textAlign: RegExp(r'[\u0600-\u06FF]').hasMatch(_nameController.text) ? TextAlign.right : TextAlign.left,
-                        textDirection: RegExp(r'[\u0600-\u06FF]').hasMatch(_nameController.text) ? TextDirection.rtl : TextDirection.ltr,
+                        textAlign:
+                            RegExp(
+                              r'[\u0600-\u06FF]',
+                            ).hasMatch(_nameController.text)
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        textDirection:
+                            RegExp(
+                              r'[\u0600-\u06FF]',
+                            ).hasMatch(_nameController.text)
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: 'Patrol Name *',
                           hintText: 'e.g. Eagle Patrol',
-                          prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.badge_outlined,
+                            size: 20,
+                          ),
                           filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.1),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                           ),
                         ),
                         validator: (value) {
@@ -156,24 +246,43 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         textInputAction: TextInputAction.newline,
                         maxLines: 3,
                         maxLength: 180,
-                        textAlign: RegExp(r'[\u0600-\u06FF]').hasMatch(_descriptionController.text) ? TextAlign.right : TextAlign.left,
-                        textDirection: RegExp(r'[\u0600-\u06FF]').hasMatch(_descriptionController.text) ? TextDirection.rtl : TextDirection.ltr,
+                        textAlign:
+                            RegExp(
+                              r'[\u0600-\u06FF]',
+                            ).hasMatch(_descriptionController.text)
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        textDirection:
+                            RegExp(
+                              r'[\u0600-\u06FF]',
+                            ).hasMatch(_descriptionController.text)
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
                         decoration: InputDecoration(
                           labelText: 'Description',
                           hintText: 'Tell us a bit about this patrol',
-                          prefixIcon: const Icon(Icons.description_outlined, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.description_outlined,
+                            size: 20,
+                          ),
                           alignLabelWithHint: true,
                           filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.1),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                           ),
                         ),
                       ),
-                      
-                      if (_isEditMode && widget.leaderCandidates.isNotEmpty) ...[
+
+                      if (_isEditMode &&
+                          widget.leaderCandidates.isNotEmpty) ...[
                         const SizedBox(height: 24),
                         Text(
                           'Leadership',
@@ -185,19 +294,30 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          initialValue: _selectedLeaderId,
+                          initialValue: safeLeaderId,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Leader',
-                            prefixIcon: const Icon(Icons.star_outline, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.star_outline,
+                              size: 20,
+                            ),
                             filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            fillColor: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.outlineVariant,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           items: [
                             const DropdownMenuItem<String?>(
@@ -207,11 +327,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                 style: TextStyle(fontStyle: FontStyle.italic),
                               ),
                             ),
-                            ...widget.leaderCandidates
-                                .where((member) =>
-                                    member.id != _selectedAssistant1Id &&
-                                    member.id != _selectedAssistant2Id)
-                                .map(
+                            ...leaderOptions.map(
                               (member) => DropdownMenuItem<String?>(
                                 value: member.id,
                                 child: Row(
@@ -223,11 +339,20 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (member.id == widget.initialPatrol?.patrolLeaderProfileId)
+                                    if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.patrolLeaderProfileId)
                                       _buildStarBadge(3, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant1ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant1ProfileId)
                                       _buildStarBadge(2, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant2ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant2ProfileId)
                                       _buildStarBadge(1, Colors.amber),
                                   ],
                                 ),
@@ -237,24 +362,41 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                           onChanged: (value) {
                             setState(() {
                               _selectedLeaderId = value;
+                              if (_selectedAssistant1Id == value) {
+                                _selectedAssistant1Id = null;
+                              }
+                              if (_selectedAssistant2Id == value) {
+                                _selectedAssistant2Id = null;
+                              }
                             });
                           },
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          initialValue: _selectedAssistant1Id,
+                          initialValue: safeAssistant1Id,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Assistant 1',
-                            prefixIcon: const Icon(Icons.star_half_outlined, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.star_half_outlined,
+                              size: 20,
+                            ),
                             filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            fillColor: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.outlineVariant,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           items: [
                             const DropdownMenuItem<String?>(
@@ -264,11 +406,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                 style: TextStyle(fontStyle: FontStyle.italic),
                               ),
                             ),
-                            ...widget.leaderCandidates
-                                .where((member) =>
-                                    member.id != _selectedLeaderId &&
-                                    member.id != _selectedAssistant2Id)
-                                .map(
+                            ...assistant1Options.map(
                               (member) => DropdownMenuItem<String?>(
                                 value: member.id,
                                 child: Row(
@@ -280,11 +418,20 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (member.id == widget.initialPatrol?.patrolLeaderProfileId)
+                                    if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.patrolLeaderProfileId)
                                       _buildStarBadge(3, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant1ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant1ProfileId)
                                       _buildStarBadge(2, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant2ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant2ProfileId)
                                       _buildStarBadge(1, Colors.amber),
                                   ],
                                 ),
@@ -294,24 +441,39 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                           onChanged: (value) {
                             setState(() {
                               _selectedAssistant1Id = value;
+                              if (value != null &&
+                                  _selectedAssistant2Id == value) {
+                                _selectedAssistant2Id = null;
+                              }
                             });
                           },
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String?>(
-                          initialValue: _selectedAssistant2Id,
+                          initialValue: safeAssistant2Id,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Patrol Assistant 2',
-                            prefixIcon: const Icon(Icons.star_half_outlined, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.star_half_outlined,
+                              size: 20,
+                            ),
                             filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            fillColor: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                              borderSide: BorderSide(
+                                color: theme.colorScheme.outlineVariant,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           items: [
                             const DropdownMenuItem<String?>(
@@ -321,11 +483,7 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                 style: TextStyle(fontStyle: FontStyle.italic),
                               ),
                             ),
-                            ...widget.leaderCandidates
-                                .where((member) =>
-                                    member.id != _selectedLeaderId &&
-                                    member.id != _selectedAssistant1Id)
-                                .map(
+                            ...assistant2Options.map(
                               (member) => DropdownMenuItem<String?>(
                                 value: member.id,
                                 child: Row(
@@ -337,11 +495,20 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (member.id == widget.initialPatrol?.patrolLeaderProfileId)
+                                    if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.patrolLeaderProfileId)
                                       _buildStarBadge(3, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant1ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant1ProfileId)
                                       _buildStarBadge(2, Colors.amber)
-                                    else if (member.id == widget.initialPatrol?.assistant2ProfileId)
+                                    else if (member.id ==
+                                        widget
+                                            .initialPatrol
+                                            ?.assistant2ProfileId)
                                       _buildStarBadge(1, Colors.amber),
                                   ],
                                 ),
@@ -351,6 +518,10 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                           onChanged: (value) {
                             setState(() {
                               _selectedAssistant2Id = value;
+                              if (value != null &&
+                                  _selectedAssistant1Id == value) {
+                                _selectedAssistant1Id = null;
+                              }
                             });
                           },
                         ),
@@ -366,7 +537,9 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(20),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -374,7 +547,10 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text('Cancel'),
                   ),
@@ -382,8 +558,13 @@ class _PatrolFormDialogState extends State<PatrolFormDialog> {
                   FilledButton(
                     onPressed: _submit,
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: Text(_isEditMode ? 'Save Changes' : 'Create Patrol'),
                   ),

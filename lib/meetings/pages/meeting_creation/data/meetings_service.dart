@@ -95,8 +95,13 @@ class MeetingsService {
     required DateTime startsAt,
     required DateTime endsAt,
     String? description,
+    int? price,
   }) async {
     try {
+      if (price != null && (price < 0 || price > 32767)) {
+        throw Exception('Meeting price must be between 0 and 32767.');
+      }
+
       final payload = <String, dynamic>{
         // TODO: Implement clan-based meeting support
         'troop_id': troopId,
@@ -108,6 +113,7 @@ class MeetingsService {
         'starts_at': startsAt.toIso8601String(),
         'ends_at': endsAt.toIso8601String(),
         if (description != null) 'description': description,
+        if (price != null) 'price': price,
       };
 
       final result = await _supabase

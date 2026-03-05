@@ -21,7 +21,7 @@ class UserManagementProvider with ChangeNotifier {
       TtlCache<String, List<Role>>();
 
   String? _selectedRoleName;
-  
+
   // Search and filter state
   String _searchQuery = '';
   String? _selectedRoleFilter;
@@ -35,8 +35,8 @@ class UserManagementProvider with ChangeNotifier {
   UserManagementProvider({
     UserManagementService? service,
     required AuthProvider authProvider,
-  })  : _service = service ?? UserManagementService.instance(),
-        _authProvider = authProvider {
+  }) : _service = service ?? UserManagementService.instance(),
+       _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
   }
 
@@ -109,17 +109,19 @@ class UserManagementProvider with ChangeNotifier {
   bool get isProcessing => _isProcessing;
   bool get hasError => _error != null;
   String? get error => _error;
-  
+
   // Search and filter getters
   String get searchQuery => _searchQuery;
   String? get selectedRoleFilter => _selectedRoleFilter;
   String? get selectedTroopFilter => _selectedTroopFilter;
 
   bool get isRolesReady =>
-      !_isLoadingRoles && !_authProvider.profileLoading && _effectiveUserProfile != null;
+      !_isLoadingRoles &&
+      !_authProvider.profileLoading &&
+      _effectiveUserProfile != null;
 
   List<ManagedUserProfile> get filteredUsers => _users;
-  
+
   /// Get list of available troops from loaded users
   List<Map<String, String>> get availableTroops {
     final troopMap = <String, String>{};
@@ -128,12 +130,10 @@ class UserManagementProvider with ChangeNotifier {
         troopMap[user.signupTroopId!] = user.signupTroopName!;
       }
     }
-    return troopMap.entries
-        .map((e) => {'id': e.key, 'name': e.value})
-        .toList()
+    return troopMap.entries.map((e) => {'id': e.key, 'name': e.value}).toList()
       ..sort((a, b) => a['name']!.compareTo(b['name']!));
   }
-  
+
   /// Update search query
   void setSearchQuery(String query) {
     if (_searchQuery == query) return;
@@ -147,12 +147,42 @@ class UserManagementProvider with ChangeNotifier {
     loadUsers(forceRefresh: true);
   }
 
+  bool _sanitizeSelectedRoleFilter() {
+    if (_selectedRoleFilter == null) return false;
+
+    final selectedId = _selectedRoleFilter!;
+    final selectedMatches = _roles
+        .where((role) => role.id == selectedId)
+        .toList();
+
+    if (selectedMatches.length != 1) {
+      _selectedRoleFilter = null;
+      return true;
+    }
+
+    final effectiveUser = _effectiveUserProfile;
+    if (effectiveUser != null) {
+      final isTroopScoped =
+          effectiveUser.roleRank >= 60 && effectiveUser.roleRank < 90;
+      if (isTroopScoped) {
+        final role = selectedMatches.first;
+        final canSeeRole = role.rank > 0 && role.rank <= 40;
+        if (!canSeeRole) {
+          _selectedRoleFilter = null;
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   void setTroopFilter(String? troopId) {
     if (_selectedTroopFilter == troopId) return;
     _selectedTroopFilter = troopId;
     loadUsers(forceRefresh: true);
   }
-  
+
   /// Clear all filters
   void clearFilters() {
     _searchQuery = '';
@@ -166,10 +196,14 @@ class UserManagementProvider with ChangeNotifier {
     if (effectiveUser == null) return [];
 
     final effectiveRank = effectiveUser.roleRank;
-    var filteredRoles = _roles.where((role) => role.rank < effectiveRank).toList();
+    var filteredRoles = _roles
+        .where((role) => role.rank < effectiveRank)
+        .toList();
 
     if (effectiveRank >= 60 && effectiveRank < 90) {
-      filteredRoles = filteredRoles.where((role) => role.rank > 0 && role.rank <= 40).toList();
+      filteredRoles = filteredRoles
+          .where((role) => role.rank > 0 && role.rank <= 40)
+          .toList();
     }
 
     return filteredRoles;
@@ -195,6 +229,11 @@ class UserManagementProvider with ChangeNotifier {
   }
 
   Future<void> loadUsers({bool forceRefresh = false}) async {
+    final roleFilterWasSanitized = _sanitizeSelectedRoleFilter();
+    if (roleFilterWasSanitized) {
+      _usersCache.clear();
+    }
+
     _isLoadingUsers = true;
     _hasMoreUsers = true;
     _error = null;
@@ -208,13 +247,13 @@ class UserManagementProvider with ChangeNotifier {
 
       final cacheKey =
           '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:$_searchQuery:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
-      
+
       // Only use cache if not forcing refresh and we're loading the first page
       if (!forceRefresh) {
         final cachedUsers = _usersCache.get(cacheKey);
         if (cachedUsers != null && cachedUsers.isNotEmpty) {
           _users = cachedUsers;
-          _hasMoreUsers = _users.length >= _pageSize; 
+          _hasMoreUsers = _users.length >= _pageSize;
           _isLoadingUsers = false;
           notifyListeners();
           return;
@@ -229,11 +268,12 @@ class UserManagementProvider with ChangeNotifier {
         roleFilter: _selectedRoleFilter,
         troopFilter: _selectedTroopFilter,
       );
-      
+
       _hasMoreUsers = _users.length >= _pageSize;
       _usersCache.set(cacheKey, _users, _usersCacheTtl);
     } catch (e) {
-      _error = 'Unable to load users. Please check your connection and try again.';
+      _error =
+          'Unable to load users. Please check your connection and try again.';
       debugPrint('❌ Error loading users: $e');
     } finally {
       _isLoadingUsers = false;
@@ -242,6 +282,11 @@ class UserManagementProvider with ChangeNotifier {
   }
 
   Future<void> loadMoreUsers() async {
+    final roleFilterWasSanitized = _sanitizeSelectedRoleFilter();
+    if (roleFilterWasSanitized) {
+      _usersCache.clear();
+    }
+
     if (_isLoadingMore || !_hasMoreUsers || _isLoadingUsers) return;
 
     _isLoadingMore = true;
@@ -268,7 +313,7 @@ class UserManagementProvider with ChangeNotifier {
       } else {
         _users.addAll(moreUsers);
         _hasMoreUsers = moreUsers.length >= _pageSize;
-        
+
         // Update cache with the full list
         final cacheKey =
             '${currentUser.roleRank}:${currentUser.managedTroopId ?? 'none'}:${_selectedRoleName ?? 'default'}:$_searchQuery:${_selectedRoleFilter ?? ''}:${_selectedTroopFilter ?? ''}';
@@ -292,14 +337,31 @@ class UserManagementProvider with ChangeNotifier {
       if (!forceRefresh) {
         final cachedRoles = _rolesCache.get('all_roles');
         if (cachedRoles != null && cachedRoles.isNotEmpty) {
-          _roles = cachedRoles;
+          final dedupedCached = <String, Role>{
+            for (final role in cachedRoles) role.id: role,
+          };
+          _roles = dedupedCached.values.toList()
+            ..sort((a, b) => a.rank.compareTo(b.rank));
+          final roleFilterWasSanitized = _sanitizeSelectedRoleFilter();
+          if (roleFilterWasSanitized) {
+            _usersCache.clear();
+          }
           _isLoadingRoles = false;
           notifyListeners();
           return;
         }
       }
 
-      _roles = await _service.fetchRoles();
+      final fetchedRoles = await _service.fetchRoles();
+      final dedupedFetched = <String, Role>{
+        for (final role in fetchedRoles) role.id: role,
+      };
+      _roles = dedupedFetched.values.toList()
+        ..sort((a, b) => a.rank.compareTo(b.rank));
+      final roleFilterWasSanitized = _sanitizeSelectedRoleFilter();
+      if (roleFilterWasSanitized) {
+        _usersCache.clear();
+      }
       _rolesCache.set('all_roles', _roles, _rolesCacheTtl);
     } catch (e) {
       _error = 'Unable to load roles. Please try again.';
@@ -340,24 +402,30 @@ class UserManagementProvider with ChangeNotifier {
       final currentRoleIds = profile.roles.map((role) => role.id).toSet();
       final requestedRoleIds = roleIds?.toSet();
       final shouldUpdateRoles =
-          requestedRoleIds != null && !setEquals(currentRoleIds, requestedRoleIds);
+          requestedRoleIds != null &&
+          !setEquals(currentRoleIds, requestedRoleIds);
 
       if (shouldUpdateRoles) {
         // Permission check: Verify current user can modify target user's roles
         // (also enforced by server-side RLS policies)
         if (!canEditRoles) {
-          throw Exception('You do not have permission to change this user\'s roles');
+          throw Exception(
+            'You do not have permission to change this user\'s roles',
+          );
         }
 
         // Validate all requested roles are assignable by current user
-        final assignableRoleIds = assignableRoles.map((role) => role.id).toSet();
+        final assignableRoleIds = assignableRoles
+            .map((role) => role.id)
+            .toSet();
         if (!requestedRoleIds.every(assignableRoleIds.contains)) {
           throw Exception('One or more selected roles are not assignable');
         }
 
         // Determine troop context for role assignment
         // Use profile's signup troop or current user's managed troop
-        final troopContextId = profile.signupTroopId ?? currentUser.managedTroopId;
+        final troopContextId =
+            profile.signupTroopId ?? currentUser.managedTroopId;
 
         // Update role assignments in database
         await _service.updateProfileRoles(

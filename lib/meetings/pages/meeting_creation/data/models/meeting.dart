@@ -14,6 +14,7 @@ class Meeting {
   final bool isTemplate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final double? price;
 
   /// Corresponds to the `meeting_date` (date) column — required.
   final DateTime meetingDate;
@@ -32,6 +33,7 @@ class Meeting {
     this.createdAt,
     this.updatedAt,
     required this.meetingDate,
+    this.price,
   });
 
   factory Meeting.fromJson(Map<String, dynamic> json) {
@@ -49,6 +51,13 @@ class Meeting {
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
       updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? ''),
       meetingDate: DateTime.parse(json['meeting_date'] as String),
+      price: (() {
+        final p = json['price'];
+        if (p == null) return null;
+        if (p is num) return p.toDouble();
+        if (p is String) return double.tryParse(p);
+        return null;
+      })(),
     );
   }
 
@@ -66,6 +75,7 @@ class Meeting {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? meetingDate,
+    double? price,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -81,6 +91,7 @@ class Meeting {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       meetingDate: meetingDate ?? this.meetingDate,
+      price: price ?? this.price,
     );
   }
 
@@ -91,10 +102,13 @@ class Meeting {
   /// [startsAt] or [endsAt] is null.
   String get formattedTimeRange {
     if (startsAt == null || endsAt == null) return '';
-    final fmt = DateFormat('HH:mm');
+    // Display times in 12-hour format (e.g. '6:00 PM') for UI clarity.
+    final fmt = DateFormat('h:mm a');
     return '${fmt.format(startsAt!)} \u2013 ${fmt.format(endsAt!)}';
   }
 
   @override
-  String toString() => 'Meeting(id: $id, title: $title, meetingDate: $meetingDate)';
-}
+  String toString() =>
+      'Meeting(id: $id, title: $title, meetingDate: $meetingDate, price: $price)';
+
+  }

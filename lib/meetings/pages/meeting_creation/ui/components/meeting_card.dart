@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:masapp/core/constants/app_colors.dart';
+import 'package:intl/intl.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 /// A card displaying summary information for a single [Meeting].
@@ -75,6 +76,17 @@ class MeetingCard extends StatelessWidget {
                     label: meeting.formattedTimeRange,
                     secondaryColor: secondaryTextColor,
                     theme: theme,
+                  ),
+                ],
+                // Price row (optional) - always show in EGP
+                if (meeting.price != null) ...[
+                  const SizedBox(height: 3),
+                  _MetaRow(
+                    icon: Icons.attach_money,
+                    label: NumberFormat.currency(symbol: 'EGP ').format(meeting.price!),
+                    secondaryColor: secondaryTextColor,
+                    theme: theme,
+                    maxLines: 1,
                   ),
                 ],
                 // Location row (conditional)

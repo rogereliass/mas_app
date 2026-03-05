@@ -90,12 +90,14 @@ class UserManagementService with ScopedServiceMixin {
       // Apply search query
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final q = '%${searchQuery.trim()}%';
-        query = query.or('first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q');
+        query = query.or(
+          'first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q',
+        );
       }
 
       // Sort by last name
       var sortedQuery = query.order('last_name', ascending: true);
-      
+
       // Apply pagination if provided
       if (limit != null) {
         final start = offset ?? 0;
@@ -105,9 +107,19 @@ class UserManagementService with ScopedServiceMixin {
 
       final response = await sortedQuery;
 
-      return (response as List)
-          .map((json) => ManagedUserProfile.fromJson(json))
-          .toList();
+      final users = <ManagedUserProfile>[];
+      for (final row in (response as List)) {
+        try {
+          users.add(ManagedUserProfile.fromJson(row as Map<String, dynamic>));
+        } catch (error) {
+          final profileId = row is Map<String, dynamic> ? row['id'] : null;
+          debugPrint(
+            '⚠️ Skipping invalid profile row in fetchUsers. id=$profileId error=$error',
+          );
+        }
+      }
+
+      return users;
     } catch (e) {
       _logError('fetchUsers', e);
       rethrow;
@@ -184,10 +196,7 @@ class UserManagementService with ScopedServiceMixin {
         await _validateProfileAccess(profileId, currentUser);
       }
 
-      await _supabase
-          .from(_profilesTable)
-          .update(updates)
-          .eq('id', profileId);
+      await _supabase.from(_profilesTable).update(updates).eq('id', profileId);
     } catch (e) {
       _logError('updateProfile', e);
       rethrow;
@@ -214,10 +223,9 @@ class UserManagementService with ScopedServiceMixin {
           .select('id, role_rank');
 
       final roleRanks = Map<String, int>.fromEntries(
-        (rolesResponse as List).map((r) => MapEntry(
-          r['id'] as String,
-          r['role_rank'] as int? ?? 0,
-        )),
+        (rolesResponse as List).map(
+          (r) => MapEntry(r['id'] as String, r['role_rank'] as int? ?? 0),
+        ),
       );
 
       for (final roleId in roleIds) {
@@ -228,7 +236,7 @@ class UserManagementService with ScopedServiceMixin {
         if (currentUser.isTroopScoped && rank > 40) {
           throw Exception('Troop-scoped roles can only assign ranks 1-40');
         }
-        
+
         // Check troop context requirement using per-role map or fallback
         if (rank == 60 || rank == 70) {
           final contextForRole = roleTroopContextMap?[roleId] ?? troopContextId;
@@ -243,24 +251,20 @@ class UserManagementService with ScopedServiceMixin {
           .delete()
           .eq('profile_id', profileId);
 
-      final roleRecords = roleIds
-          .map((roleId) {
-            final rank = roleRanks[roleId] ?? 0;
-            final contextForRole = roleTroopContextMap?[roleId] ?? troopContextId;
-            
-            return {
-              'profile_id': profileId,
-              'role_id': roleId,
-              'assigned_by': assignedBy,
-              if ((rank == 60 || rank == 70) && contextForRole != null) 
-                'troop_context': contextForRole,
-            };
-          })
-          .toList();
+      final roleRecords = roleIds.map((roleId) {
+        final rank = roleRanks[roleId] ?? 0;
+        final contextForRole = roleTroopContextMap?[roleId] ?? troopContextId;
 
-      await _supabase
-          .from(_profileRolesTable)
-          .insert(roleRecords);
+        return {
+          'profile_id': profileId,
+          'role_id': roleId,
+          'assigned_by': assignedBy,
+          if ((rank == 60 || rank == 70) && contextForRole != null)
+            'troop_context': contextForRole,
+        };
+      }).toList();
+
+      await _supabase.from(_profileRolesTable).insert(roleRecords);
     } catch (e) {
       _logError('updateProfileRoles', e);
       rethrow;

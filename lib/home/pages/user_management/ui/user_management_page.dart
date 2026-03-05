@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../auth/logic/auth_provider.dart';
+import '../../../../auth/models/role.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/admin_scope_banner.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -53,7 +54,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         _effectiveRank = authProvider.currentUserRoleRank;
         userProvider.clearRoleContext();
       }
-      
+
       final effectiveRank = _effectiveRank!;
 
       final user = authProvider.currentUserProfile;
@@ -74,7 +75,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Access Error: No troop assigned. Please contact an administrator.'),
+              content: const Text(
+                'Access Error: No troop assigned. Please contact an administrator.',
+              ),
               backgroundColor: colorScheme.tertiary,
               duration: const Duration(seconds: 5),
             ),
@@ -93,7 +96,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   void _errorHandler() {
     if (!mounted || _userProvider == null) return;
-    
+
     if (_userProvider!.hasError && _userProvider!.users.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -110,7 +113,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       context.read<UserManagementProvider>().loadMoreUsers();
     }
   }
@@ -124,7 +128,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     // The role context will be cleared when needed (e.g., when navigating to the page again)
     super.dispose();
   }
-  
+
   /// Debounced search handler to avoid filtering on every keystroke
   void _onSearchChanged(String query, UserManagementProvider provider) {
     _debounceTimer?.cancel();
@@ -145,7 +149,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             builder: (context, provider, _) {
               return IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: provider.isLoadingUsers ? null : () => provider.refresh(forceRefresh: true),
+                onPressed: provider.isLoadingUsers
+                    ? null
+                    : () => provider.refresh(forceRefresh: true),
                 tooltip: 'Refresh',
               );
             },
@@ -171,33 +177,45 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 }
 
                 if (provider.users.isEmpty) {
-                  return _buildEmptyState(context, provider, isInitialState: true);
+                  return _buildEmptyState(
+                    context,
+                    provider,
+                    isInitialState: true,
+                  );
                 }
-                
+
                 final filteredUsers = provider.filteredUsers;
-                
+
                 if (filteredUsers.isEmpty) {
-                  return _buildEmptyState(context, provider, isInitialState: false);
+                  return _buildEmptyState(
+                    context,
+                    provider,
+                    isInitialState: false,
+                  );
                 }
 
                 return Column(
                   children: [
-                    _buildUserCountBadge(provider.filteredUsers.length, provider.users.length, theme),
+                    _buildUserCountBadge(
+                      provider.filteredUsers.length,
+                      provider.users.length,
+                      theme,
+                    ),
                     Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: filteredUsers.length + (provider.hasMoreUsers ? 1 : 0),
+                        itemCount:
+                            filteredUsers.length +
+                            (provider.hasMoreUsers ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == filteredUsers.length) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 32),
-                              child: Center(
-                                child: CircularProgressIndicator(),
-                              ),
+                              child: Center(child: CircularProgressIndicator()),
                             );
                           }
-                          
+
                           final user = filteredUsers[index];
                           return UserCard(
                             key: ValueKey(user.id),
@@ -216,7 +234,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
   }
-  
+
   /// Build search bar and filter dropdowns
   Widget _buildSearchAndFilters(BuildContext context) {
     final theme = Theme.of(context);
@@ -225,7 +243,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     // Use effective rank (accounts for role context)
     final effectiveRank = _effectiveRank ?? authProvider.currentUserRoleRank;
     final isSystemAdmin = effectiveRank >= 90;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
@@ -308,14 +326,14 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Filter dropdowns - responsive layout
           LayoutBuilder(
             builder: (context, constraints) {
               // Use vertical layout for narrow screens
               final useVerticalLayout = constraints.maxWidth < 500;
-              
-                if (useVerticalLayout) {
+
+              if (useVerticalLayout) {
                 return Column(
                   children: [
                     _buildRoleFilter(theme, provider, constraints.maxWidth),
@@ -329,12 +347,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 return Row(
                   children: [
                     Expanded(
-                      child: _buildRoleFilter(theme, provider, constraints.maxWidth / 2),
+                      child: _buildRoleFilter(
+                        theme,
+                        provider,
+                        constraints.maxWidth / 2,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     if (isSystemAdmin)
                       Expanded(
-                        child: _buildTroopFilter(theme, provider, constraints.maxWidth / 2),
+                        child: _buildTroopFilter(
+                          theme,
+                          provider,
+                          constraints.maxWidth / 2,
+                        ),
                       ),
                   ],
                 );
@@ -345,27 +371,58 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
   }
-  
+
   /// Build role filter dropdown
-  Widget _buildRoleFilter(ThemeData theme, UserManagementProvider provider, double availableWidth) {
+  Widget _buildRoleFilter(
+    ThemeData theme,
+    UserManagementProvider provider,
+    double availableWidth,
+  ) {
     // Adjust UI based on available width
     final isNarrow = availableWidth < 250;
-    final contentPadding = isNarrow 
+    final contentPadding = isNarrow
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
-    
+
     // Get effective user rank (accounts for role context)
     final authProvider = context.read<AuthProvider>();
     final effectiveRank = _effectiveRank ?? authProvider.currentUserRoleRank;
     final isTroopLeader = effectiveRank >= 60 && effectiveRank < 90;
-    
+
     // Filter roles based on effective user rank
     // Troop leaders (60-89) can only see/assign roles with rank 1-40
     // System admins (90+) can see all roles
     final availableRoles = isTroopLeader
-        ? provider.roles.where((role) => role.rank > 0 && role.rank <= 40).toList()
+        ? provider.roles
+              .where((role) => role.rank > 0 && role.rank <= 40)
+              .toList()
         : provider.roles;
-    
+
+    final dedupedRoleMap = <String, Role>{};
+    for (final role in availableRoles) {
+      dedupedRoleMap.putIfAbsent(role.id, () => role);
+    }
+    final dedupedRoles = dedupedRoleMap.values.toList()
+      ..sort((a, b) => a.rank.compareTo(b.rank));
+
+    final selectedRoleFilter = provider.selectedRoleFilter;
+    final selectedMatches = selectedRoleFilter == null
+        ? 0
+        : dedupedRoles.where((role) => role.id == selectedRoleFilter).length;
+    final dropdownSelectedValue = selectedMatches == 1
+        ? selectedRoleFilter
+        : null;
+
+    if (selectedRoleFilter != null && dropdownSelectedValue == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final currentProvider = context.read<UserManagementProvider>();
+        if (currentProvider.selectedRoleFilter != null) {
+          currentProvider.setRoleFilter(null);
+        }
+      });
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
@@ -378,7 +435,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ],
       ),
       child: DropdownButtonFormField<String?>(
-        initialValue: provider.selectedRoleFilter,
+        initialValue: dropdownSelectedValue,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: isNarrow ? null : 'Filter by Role',
@@ -409,10 +466,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 2,
-            ),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
           ),
           contentPadding: contentPadding,
         ),
@@ -428,21 +482,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
-                  child: Text(
-                    'All Roles',
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text('All Roles', overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
           ),
-          ...availableRoles.map((role) {
+          ...dedupedRoles.map((role) {
             return DropdownMenuItem<String>(
               value: role.id,
-              child: Text(
-                role.name,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(role.name, overflow: TextOverflow.ellipsis),
             );
           }),
         ],
@@ -450,17 +498,38 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
   }
-  
+
   /// Build troop filter dropdown
-  Widget _buildTroopFilter(ThemeData theme, UserManagementProvider provider, double availableWidth) {
+  Widget _buildTroopFilter(
+    ThemeData theme,
+    UserManagementProvider provider,
+    double availableWidth,
+  ) {
     final troops = provider.availableTroops;
-    
+    final selectedTroopFilter = provider.selectedTroopFilter;
+    final selectedTroopMatches = selectedTroopFilter == null
+        ? 0
+        : troops.where((troop) => troop['id'] == selectedTroopFilter).length;
+    final dropdownSelectedTroop = selectedTroopMatches == 1
+        ? selectedTroopFilter
+        : null;
+
+    if (selectedTroopFilter != null && dropdownSelectedTroop == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final currentProvider = context.read<UserManagementProvider>();
+        if (currentProvider.selectedTroopFilter != null) {
+          currentProvider.setTroopFilter(null);
+        }
+      });
+    }
+
     // Adjust UI based on available width
     final isNarrow = availableWidth < 250;
-    final contentPadding = isNarrow 
+    final contentPadding = isNarrow
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
-    
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
@@ -473,7 +542,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ],
       ),
       child: DropdownButtonFormField<String?>(
-        initialValue: provider.selectedTroopFilter,
+        initialValue: dropdownSelectedTroop,
         isExpanded: true,
         decoration: InputDecoration(
           labelText: isNarrow ? null : 'Filter by Troop',
@@ -504,10 +573,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 2,
-            ),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
           ),
           contentPadding: contentPadding,
         ),
@@ -523,10 +589,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
-                  child: Text(
-                    'All Troops',
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text('All Troops', overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
@@ -534,10 +597,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ...troops.map((troop) {
             return DropdownMenuItem<String>(
               value: troop['id'],
-              child: Text(
-                troop['name']!,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(troop['name']!, overflow: TextOverflow.ellipsis),
             );
           }),
         ],
@@ -545,11 +605,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
   }
-  
+
   /// Build user count badge showing filtered/total users
-  Widget _buildUserCountBadge(int filteredCount, int totalCount, ThemeData theme) {
+  Widget _buildUserCountBadge(
+    int filteredCount,
+    int totalCount,
+    ThemeData theme,
+  ) {
     final isFiltered = filteredCount < totalCount;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -557,7 +621,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isFiltered 
+              color: isFiltered
                   ? theme.colorScheme.primaryContainer
                   : theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
@@ -568,17 +632,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 Icon(
                   isFiltered ? Icons.filter_alt : Icons.group,
                   size: 16,
-                  color: isFiltered 
+                  color: isFiltered
                       ? theme.colorScheme.onPrimaryContainer
                       : theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  isFiltered 
+                  isFiltered
                       ? 'Showing $filteredCount of $totalCount users'
                       : '$totalCount users',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: isFiltered 
+                    color: isFiltered
                         ? theme.colorScheme.onPrimaryContainer
                         : theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
@@ -597,7 +661,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
               icon: const Icon(Icons.clear, size: 16),
               label: const Text('Clear'),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -608,7 +675,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
-  Future<void> _showEditDialog(BuildContext context, ManagedUserProfile profile) async {
+  Future<void> _showEditDialog(
+    BuildContext context,
+    ManagedUserProfile profile,
+  ) async {
     await showDialog(
       context: context,
       builder: (dialogContext) => UserEditDialog(profile: profile),
@@ -616,16 +686,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   /// Build context-aware empty state
-  /// 
+  ///
   /// Shows different messages and CTAs based on whether the empty state is due to
   /// no users existing (initial state) or active filters returning no results
-  Widget _buildEmptyState(BuildContext context, UserManagementProvider provider, {required bool isInitialState}) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    UserManagementProvider provider, {
+    required bool isInitialState,
+  }) {
     final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final hasAdminPermission = authProvider.currentUserRoleRank >= 60;
-    
+
     // Check if any filters are active
-    final hasActiveFilters = provider.searchQuery.isNotEmpty ||
+    final hasActiveFilters =
+        provider.searchQuery.isNotEmpty ||
         provider.selectedRoleFilter != null ||
         provider.selectedTroopFilter != null;
 
@@ -637,10 +712,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.groups_outlined,
-                size: 100,
-              ),
+              const Icon(Icons.groups_outlined, size: 100),
               const SizedBox(height: 24),
               Text(
                 'No users in your troop yet',
@@ -685,10 +757,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.filter_alt_off,
-                size: 100,
-              ),
+              const Icon(Icons.filter_alt_off, size: 100),
               const SizedBox(height: 24),
               Text(
                 'No users match your filters',

@@ -26,8 +26,8 @@ class PatrolsManagementProvider with ChangeNotifier {
   PatrolsManagementProvider({
     PatrolsManagementService? service,
     required AuthProvider authProvider,
-  })  : _service = service ?? PatrolsManagementService.instance(),
-        _authProvider = authProvider {
+  }) : _service = service ?? PatrolsManagementService.instance(),
+       _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
   }
 
@@ -38,11 +38,35 @@ class PatrolsManagementProvider with ChangeNotifier {
   }
 
   void _onAuthChanged() {
+    _troops = [];
     _patrols = [];
     _troopMembers = [];
     _selectedTroopId = null;
     _error = null;
     notifyListeners();
+  }
+
+  void _setTroops(List<Map<String, dynamic>> troops) {
+    final deduped = <String, Map<String, dynamic>>{};
+    for (final troop in troops) {
+      final troopId = troop['id']?.toString();
+      if (troopId == null || troopId.isEmpty) continue;
+      deduped.putIfAbsent(troopId, () => troop);
+    }
+
+    _troops = deduped.values.toList()
+      ..sort(
+        (a, b) => (a['name']?.toString() ?? '').toLowerCase().compareTo(
+          (b['name']?.toString() ?? '').toLowerCase(),
+        ),
+      );
+
+    if (_selectedTroopId != null &&
+        !_troops.any((troop) => troop['id'] == _selectedTroopId)) {
+      _selectedTroopId = null;
+      _patrols = [];
+      _troopMembers = [];
+    }
   }
 
   void setRoleContext(String roleName) {
@@ -103,19 +127,25 @@ class PatrolsManagementProvider with ChangeNotifier {
   }
 
   List<TroopMember> get unassignedMembers {
-    final items = _troopMembers.where((member) => member.patrolId == null).toList();
-    items.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    final items = _troopMembers
+        .where((member) => member.patrolId == null)
+        .toList();
+    items.sort(
+      (a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+    );
     return items;
   }
 
   List<PatrolWithMembers> get patrolsWithMembers {
-    final membersById = {
-      for (final member in _troopMembers) member.id: member,
-    };
+    final membersById = {for (final member in _troopMembers) member.id: member};
 
     final result = _patrols.map((patrol) {
-      final assigned = _troopMembers.where((member) => member.patrolId == patrol.id).toList()
-        ..sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+      final assigned =
+          _troopMembers.where((member) => member.patrolId == patrol.id).toList()
+            ..sort(
+              (a, b) =>
+                  a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()),
+            );
 
       final leader = patrol.patrolLeaderProfileId != null
           ? membersById[patrol.patrolLeaderProfileId!]
@@ -138,7 +168,10 @@ class PatrolsManagementProvider with ChangeNotifier {
       );
     }).toList();
 
-    result.sort((a, b) => a.patrol.name.toLowerCase().compareTo(b.patrol.name.toLowerCase()));
+    result.sort(
+      (a, b) =>
+          a.patrol.name.toLowerCase().compareTo(b.patrol.name.toLowerCase()),
+    );
     return result;
   }
 
@@ -184,7 +217,10 @@ class PatrolsManagementProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _troops = await _authProvider.getTroops(forceRefresh: forceRefresh);
+      final fetchedTroops = await _authProvider.getTroops(
+        forceRefresh: forceRefresh,
+      );
+      _setTroops(fetchedTroops);
     } catch (e) {
       _error = 'Unable to load troops';
       debugPrint('❌ loadTroops failed: $e');
@@ -195,6 +231,10 @@ class PatrolsManagementProvider with ChangeNotifier {
   }
 
   Future<void> setSelectedTroop(String troopId) async {
+    if (!_troops.any((troop) => troop['id'] == troopId)) {
+      debugPrint('⚠️ setSelectedTroop ignored unknown troopId=$troopId');
+      return;
+    }
     if (_selectedTroopId == troopId) return;
     _selectedTroopId = troopId;
     notifyListeners();
@@ -400,8 +440,5 @@ class _MutationContext {
   final UserProfile user;
   final String troopId;
 
-  const _MutationContext({
-    required this.user,
-    required this.troopId,
-  });
+  const _MutationContext({required this.user, required this.troopId});
 }

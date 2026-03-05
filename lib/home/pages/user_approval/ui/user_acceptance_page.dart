@@ -13,14 +13,14 @@ import '../../../../auth/models/role.dart';
 import 'package:intl/intl.dart';
 
 /// User Acceptance Page
-/// 
+///
 /// Admin page for reviewing and approving/rejecting new user registrations
 /// Shows pending profiles with detailed review capabilities
-/// 
+///
 /// Access levels:
 /// - System Admin (100) and Moderator (90): See ALL pending profiles
 /// - Troop Head (70) and Troop Leader (60): See ONLY their troop's pending profiles
-/// 
+///
 class UserAcceptancePage extends StatefulWidget {
   const UserAcceptancePage({super.key});
 
@@ -38,32 +38,38 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      
+
       final authProvider = context.read<AuthProvider>();
       final adminProvider = context.read<AdminProvider>();
       _adminProvider = adminProvider;
-      
+
       // Resolve selected role from global app state.
       final String? roleContext = authProvider.selectedRoleName;
-      
+
       // SECURITY: Determine effective rank based on role context
       int effectiveRank;
       if (roleContext != null) {
         effectiveRank = authProvider.getRankForRole(roleContext);
-        debugPrint('🎯 User Acceptance accessed with role context: $roleContext (rank $effectiveRank)');
+        debugPrint(
+          '🎯 User Acceptance accessed with role context: $roleContext (rank $effectiveRank)',
+        );
         // Set role context in provider for filtering
         adminProvider.setRoleContext(roleContext);
       } else {
         effectiveRank = authProvider.currentUserRoleRank;
-        debugPrint('🎯 User Acceptance accessed with default role (rank $effectiveRank)');
+        debugPrint(
+          '🎯 User Acceptance accessed with default role (rank $effectiveRank)',
+        );
         adminProvider.clearRoleContext();
       }
-      
+
       final user = authProvider.currentUserProfile;
-      
+
       // Allow: System Admin (100), Moderator (90), Troop Head (70), Troop Leader (60)
       if (effectiveRank < 60) {
-        debugPrint('❌ SECURITY: Unauthorized access attempt. Effective rank: $effectiveRank');
+        debugPrint(
+          '❌ SECURITY: Unauthorized access attempt. Effective rank: $effectiveRank',
+        );
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -73,28 +79,36 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
         );
         return;
       }
-      
+
       // Additional check: Troop-scoped roles (60-70) must have a troop assigned
       // Only validate if user is accessing as a troop-scoped role
       if (effectiveRank >= 60 && effectiveRank < 90) {
         if (user?.managedTroopId == null) {
-          debugPrint('⚠️ WARNING: Accessing as troop-scoped role (rank $effectiveRank) but no troop assigned');
+          debugPrint(
+            '⚠️ WARNING: Accessing as troop-scoped role (rank $effectiveRank) but no troop assigned',
+          );
           debugPrint('   User profile managedTroopId: ${user?.managedTroopId}');
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Access Error: No troop assigned. Please contact an administrator.'),
+              content: Text(
+                'Access Error: No troop assigned. Please contact an administrator.',
+              ),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 5),
             ),
           );
           return;
         }
-        debugPrint('✅ Troop-scoped access validated. Managed troop: ${user?.managedTroopId}');
+        debugPrint(
+          '✅ Troop-scoped access validated. Managed troop: ${user?.managedTroopId}',
+        );
       }
-      
+
       // Authorized - load scoped data based on effective role
-      debugPrint('✅ User authorized for User Acceptance (effective rank $effectiveRank)');
+      debugPrint(
+        '✅ User authorized for User Acceptance (effective rank $effectiveRank)',
+      );
       adminProvider.loadPendingProfiles();
       adminProvider.loadRoles();
 
@@ -105,8 +119,9 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
 
   void _errorHandler() {
     if (!mounted || _adminProvider == null) return;
-    
-    if (_adminProvider!.hasError && _adminProvider!.pendingProfiles.isNotEmpty) {
+
+    if (_adminProvider!.hasError &&
+        _adminProvider!.pendingProfiles.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_adminProvider!.error!),
@@ -122,11 +137,12 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       context.read<AdminProvider>().loadMorePendingProfiles();
     }
   }
-  
+
   @override
   void dispose() {
     _adminProvider?.removeListener(_errorHandler);
@@ -140,7 +156,7 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     // Resolve selected role from global app state.
     final authProvider = context.watch<AuthProvider>();
     final String? roleContext = authProvider.selectedRoleName;
@@ -166,13 +182,15 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
         children: [
           // Show current admin scope (system-wide or troop-specific)
           const AdminScopeBanner(),
-          
+
           Expanded(
             child: Consumer<AdminProvider>(
               builder: (context, provider, _) {
                 // Loading state
                 if (provider.isLoadingPending) {
-                  return const LoadingView(message: 'Loading pending profiles...');
+                  return const LoadingView(
+                    message: 'Loading pending profiles...',
+                  );
                 }
 
                 // Error state
@@ -193,11 +211,15 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
     );
   }
 
-  Widget _buildProfilesList(AdminProvider provider, ColorScheme colorScheme, ThemeData theme) {
+  Widget _buildProfilesList(
+    AdminProvider provider,
+    ColorScheme colorScheme,
+    ThemeData theme,
+  ) {
     final authProvider = context.watch<AuthProvider>();
     final user = authProvider.currentUserProfile;
     final isTroopScoped = user?.isTroopScoped ?? false;
-    
+
     // Empty state
     if (provider.pendingProfiles.isEmpty) {
       return Center(
@@ -210,10 +232,7 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
               color: colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            Text(
-              'All Caught Up!',
-              style: theme.textTheme.headlineMedium,
-            ),
+            Text('All Caught Up!', style: theme.textTheme.headlineMedium),
             const SizedBox(height: 8),
             Text(
               isTroopScoped
@@ -251,14 +270,14 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
-            itemCount: provider.pendingProfiles.length + (provider.hasMorePending ? 1 : 0),
+            itemCount:
+                provider.pendingProfiles.length +
+                (provider.hasMorePending ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == provider.pendingProfiles.length) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  child: Center(child: CircularProgressIndicator()),
                 );
               }
 
@@ -275,7 +294,10 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
   }
 
   /// Show detailed profile review dialog
-  Future<void> _showProfileDetailsDialog(BuildContext context, PendingProfile profile) async {
+  Future<void> _showProfileDetailsDialog(
+    BuildContext context,
+    PendingProfile profile,
+  ) async {
     await showDialog(
       context: context,
       builder: (dialogContext) => _ProfileDetailsDialog(profile: profile),
@@ -288,10 +310,7 @@ class _ProfileCard extends StatelessWidget {
   final PendingProfile profile;
   final VoidCallback onTap;
 
-  const _ProfileCard({
-    required this.profile,
-    required this.onTap,
-  });
+  const _ProfileCard({required this.profile, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -319,7 +338,7 @@ class _ProfileCard extends StatelessWidget {
                         : null,
                     child: profile.photoUrl == null
                         ? Text(
-                            profile.fullName.isNotEmpty 
+                            profile.fullName.isNotEmpty
                                 ? profile.fullName[0].toUpperCase()
                                 : '?',
                             style: theme.textTheme.titleLarge,
@@ -365,10 +384,7 @@ class _ProfileCard extends StatelessWidget {
               ),
               if (profile.phone != null) ...[
                 const SizedBox(height: 8),
-                _InfoRow(
-                  icon: Icons.phone_outlined,
-                  label: profile.phone!,
-                ),
+                _InfoRow(icon: Icons.phone_outlined, label: profile.phone!),
               ],
               if (profile.signupTroopName != null) ...[
                 const SizedBox(height: 8),
@@ -400,10 +416,7 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-  });
+  const _InfoRow({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -411,18 +424,9 @@ class _InfoRow extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: theme.textTheme.bodySmall?.color,
-        ),
+        Icon(icon, size: 16, color: theme.textTheme.bodySmall?.color),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: theme.textTheme.bodySmall,
-          ),
-        ),
+        Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
       ],
     );
   }
@@ -455,7 +459,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     super.initState();
     _generationController.text = widget.profile.generation ?? '';
     _selectedTroopId = widget.profile.signupTroopId;
-    
+
     // Load profile details
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -539,7 +543,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                   }
 
                   // Initialize selected roles with profile's current roles (only once)
-                  if (!_rolesInitialized && provider.selectedProfileRoles.isNotEmpty) {
+                  if (!_rolesInitialized &&
+                      provider.selectedProfileRoles.isNotEmpty) {
                     _rolesInitialized = true;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
@@ -552,12 +557,14 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                   }
 
                   // Initialize troop context from existing role assignments (only once)
-                  if (!_troopContextInitialized && provider.selectedProfileTroopContext != null) {
+                  if (!_troopContextInitialized &&
+                      provider.selectedProfileTroopContext != null) {
                     _troopContextInitialized = true;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
                         setState(() {
-                          _selectedTroopId = provider.selectedProfileTroopContext;
+                          _selectedTroopId =
+                              provider.selectedProfileTroopContext;
                         });
                       }
                     });
@@ -565,10 +572,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
                   // Initialize comment field with existing comment if any
                   // Since each profile has only ONE approval record, just get the first one
-                  if (!_commentInitialized && provider.selectedProfileApprovals.isNotEmpty) {
+                  if (!_commentInitialized &&
+                      provider.selectedProfileApprovals.isNotEmpty) {
                     _commentInitialized = true;
                     // Get the single approval record for this profile
-                    final existingRecord = provider.selectedProfileApprovals.first;
+                    final existingRecord =
+                        provider.selectedProfileApprovals.first;
                     if (existingRecord.comments != null) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (mounted) {
@@ -588,9 +597,15 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                           context,
                           title: 'Personal Information',
                           children: [
-                            _buildDetailRow('Full Name', widget.profile.fullName),
+                            _buildDetailRow(
+                              'Full Name',
+                              widget.profile.fullName,
+                            ),
                             if (widget.profile.nameAr != null)
-                              _buildDetailRow('Arabic Name', widget.profile.nameAr!),
+                              _buildDetailRow(
+                                'Arabic Name',
+                                widget.profile.nameAr!,
+                              ),
                             if (widget.profile.email != null)
                               _buildDetailRow('Email', widget.profile.email!),
                             if (widget.profile.phone != null)
@@ -603,7 +618,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                             if (widget.profile.gender != null)
                               _buildDetailRow('Gender', widget.profile.gender!),
                             if (widget.profile.address != null)
-                              _buildDetailRow('Address', widget.profile.address!),
+                              _buildDetailRow(
+                                'Address',
+                                widget.profile.address!,
+                              ),
                           ],
                         ),
 
@@ -615,26 +633,42 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                           title: 'Scout Information',
                           children: [
                             if (widget.profile.scoutOrgId != null)
-                              _buildDetailRow('Scout Org ID', widget.profile.scoutOrgId!),
+                              _buildDetailRow(
+                                'Scout Org ID',
+                                widget.profile.scoutOrgId!,
+                              ),
                             if (widget.profile.scoutCode != null)
-                              _buildDetailRow('Scout Code', widget.profile.scoutCode!),
+                              _buildDetailRow(
+                                'Scout Code',
+                                widget.profile.scoutCode!,
+                              ),
                             if (widget.profile.signupTroopName != null)
-                              _buildDetailRow('Signup Troop', widget.profile.signupTroopName!),
+                              _buildDetailRow(
+                                'Signup Troop',
+                                widget.profile.signupTroopName!,
+                              ),
                           ],
                         ),
 
                         const SizedBox(height: 20),
 
                         // Medical information
-                        if (widget.profile.medicalNotes != null || widget.profile.allergies != null) ...[
+                        if (widget.profile.medicalNotes != null ||
+                            widget.profile.allergies != null) ...[
                           _buildDetailSection(
                             context,
                             title: 'Medical Information',
                             children: [
                               if (widget.profile.medicalNotes != null)
-                                _buildDetailRow('Medical Notes', widget.profile.medicalNotes!),
+                                _buildDetailRow(
+                                  'Medical Notes',
+                                  widget.profile.medicalNotes!,
+                                ),
                               if (widget.profile.allergies != null)
-                                _buildDetailRow('Allergies', widget.profile.allergies!),
+                                _buildDetailRow(
+                                  'Allergies',
+                                  widget.profile.allergies!,
+                                ),
                             ],
                           ),
                           const SizedBox(height: 20),
@@ -679,7 +713,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                           ),
                           if (_showApprovalHistory) ...[
                             const SizedBox(height: 12),
-                            _buildApprovalHistory(provider.selectedProfileApprovals, theme),
+                            _buildApprovalHistory(
+                              provider.selectedProfileApprovals,
+                              theme,
+                            ),
                           ],
                         ],
                       ],
@@ -709,7 +746,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                       // Add Comment button
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: provider.isProcessing ? null : _handleAddComment,
+                          onPressed: provider.isProcessing
+                              ? null
+                              : _handleAddComment,
                           icon: const Icon(Icons.comment),
                           label: const Text('Add Comment'),
                           style: OutlinedButton.styleFrom(
@@ -724,7 +763,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                       // Accept button
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: provider.isProcessing ? null : _handleAccept,
+                          onPressed: provider.isProcessing
+                              ? null
+                              : _handleAccept,
                           icon: provider.isProcessing
                               ? SizedBox(
                                   width: 16,
@@ -794,10 +835,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ],
       ),
@@ -806,7 +844,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
   Widget _buildGenerationInput(ThemeData theme) {
     final colorScheme = theme.colorScheme;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -832,9 +870,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         const SizedBox(height: 4),
         Text(
           'Required - Enter the generation for this user',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.error,
-          ),
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.error),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -853,7 +889,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
   Widget _buildRoleDropdown(ThemeData theme, AdminProvider provider) {
     final colorScheme = theme.colorScheme;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -882,8 +918,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               ? 'Required - Select one or more roles to assign to this user'
               : 'Required - User has ${provider.selectedProfileRoles.length} role(s) already assigned (checked below)',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: provider.selectedProfileRoles.isEmpty 
-                ? colorScheme.error 
+            color: provider.selectedProfileRoles.isEmpty
+                ? colorScheme.error
                 : colorScheme.primary,
           ),
         ),
@@ -900,13 +936,16 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         else
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: colorScheme.outline.withValues(alpha: 0.3),
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               children: provider.assignableRoles.map((role) {
                 final isSelected = _selectedRoles.contains(role);
-                final wasAlreadyAssigned = provider.selectedProfileRoles.contains(role);
+                final wasAlreadyAssigned = provider.selectedProfileRoles
+                    .contains(role);
                 return CheckboxListTile(
                   value: isSelected,
                   onChanged: (bool? value) {
@@ -985,9 +1024,26 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final requiresTroopContext = _selectedRoles.any(
       (role) => role.rank == 60 || role.rank == 70,
     );
-    final initialTroopId = _troops.any((troop) => troop['id'] == _selectedTroopId)
+    final troopsById = <String, Map<String, dynamic>>{};
+    for (final troop in _troops) {
+      final troopId = troop['id']?.toString();
+      if (troopId == null || troopId.isEmpty) continue;
+      troopsById.putIfAbsent(troopId, () => troop);
+    }
+    final dropdownTroops = troopsById.values.toList();
+    final initialTroopId =
+        _selectedTroopId != null && troopsById.containsKey(_selectedTroopId)
         ? _selectedTroopId
         : null;
+
+    if (_selectedTroopId != null && initialTroopId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedTroopId = null;
+        });
+      });
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1019,7 +1075,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               ? 'Required for Troop Head/Leader roles'
               : 'Optional - Set troop context for troop-scoped roles (rank 60/70)',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: requiresTroopContext ? colorScheme.error : colorScheme.onSurface.withValues(alpha: 0.7),
+            color: requiresTroopContext
+                ? colorScheme.error
+                : colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 8),
@@ -1035,7 +1093,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            items: _troops.map((troop) {
+            items: dropdownTroops.map((troop) {
               return DropdownMenuItem<String>(
                 value: troop['id'] as String,
                 child: Text(
@@ -1050,8 +1108,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                 debugPrint('🏕️ Troop dropdown changed to: $newValue');
               });
             },
-            validator: (value) =>
-                requiresTroopContext && value == null ? 'Please select a troop' : null,
+            validator: (value) => requiresTroopContext && value == null
+                ? 'Please select a troop'
+                : null,
           ),
       ],
     );
@@ -1104,13 +1163,19 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               OutlinedButton.icon(
                 onPressed: () {
                   // Refresh the provider
-                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                  final adminProvider = Provider.of<AdminProvider>(
+                    context,
+                    listen: false,
+                  );
                   adminProvider.loadRoles();
                 },
                 icon: const Icon(Icons.refresh, size: 20),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1119,7 +1184,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                 icon: const Icon(Icons.email_outlined, size: 20),
                 label: const Text('Contact Support'),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ],
@@ -1131,14 +1199,16 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
   /// Open email client to contact support
   Future<void> _contactSupport() async {
-    final emailAddress = dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support@example.com';
+    final emailAddress =
+        dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support@example.com';
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUserProfile;
-    
+
     final uri = Uri(
       scheme: 'mailto',
       path: emailAddress,
-      query: 'subject=MAS App - No Roles Available&body=Hello,%0A%0AI am unable to see assignable roles in the User Acceptance page.%0A%0AUser: ${user?.fullName ?? 'Unknown'}%0AEmail: ${user?.email ?? 'Not set'}%0A%0APlease help me resolve this issue.%0A%0AThank you.',
+      query:
+          'subject=MAS App - No Roles Available&body=Hello,%0A%0AI am unable to see assignable roles in the User Acceptance page.%0A%0AUser: ${user?.fullName ?? 'Unknown'}%0AEmail: ${user?.email ?? 'Not set'}%0A%0APlease help me resolve this issue.%0A%0AThank you.',
     );
 
     try {
@@ -1148,7 +1218,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Could not open email client. Please email: $emailAddress'),
+              content: Text(
+                'Could not open email client. Please email: $emailAddress',
+              ),
               duration: const Duration(seconds: 5),
             ),
           );
@@ -1200,9 +1272,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
   }
 
-  Widget _buildApprovalHistory(List<ProfileApproval> approvals, ThemeData theme) {
+  Widget _buildApprovalHistory(
+    List<ProfileApproval> approvals,
+    ThemeData theme,
+  ) {
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
@@ -1213,15 +1288,15 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         physics: const NeverScrollableScrollPhysics(),
         itemCount: approvals.length,
         separatorBuilder: (_, index) => Divider(
-          height: 1, 
+          height: 1,
           color: colorScheme.outline.withValues(alpha: 0.3),
         ),
         itemBuilder: (context, index) {
           final approval = approvals[index];
-          final statusColor = approval.status 
+          final statusColor = approval.status
               ? theme.colorScheme.primary
               : theme.colorScheme.error;
-              
+
           return ListTile(
             dense: true,
             leading: Icon(
@@ -1258,7 +1333,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   Future<void> _handleAccept() async {
     // Validate role selection
     if (_selectedRoles.isEmpty) {
-      _showErrorDialog('Please select at least one role before accepting the profile');
+      _showErrorDialog(
+        'Please select at least one role before accepting the profile',
+      );
       return;
     }
 
@@ -1266,7 +1343,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final requiresTroopContext = _selectedRoles.any(
       (role) => role.rank == 60 || role.rank == 70,
     );
-    if (adminProvider.isEffectiveSystemWideAccess && requiresTroopContext && _selectedTroopId == null) {
+    if (adminProvider.isEffectiveSystemWideAccess &&
+        requiresTroopContext &&
+        _selectedTroopId == null) {
       _showErrorDialog('Please select a troop for Troop Head/Leader roles');
       return;
     }
@@ -1274,17 +1353,19 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     // Validate generation
     final generation = _generationController.text.trim();
     if (generation.isEmpty) {
-      _showErrorDialog('Please enter a generation before accepting the profile');
+      _showErrorDialog(
+        'Please enter a generation before accepting the profile',
+      );
       return;
     }
 
     final selectedTroopName = _selectedTroopId == null
         ? null
-        : _troops
-            .firstWhere(
-              (troop) => troop['id'] == _selectedTroopId,
-              orElse: () => const {'name': 'Selected Troop'},
-            )['name'] as String?;
+        : _troops.firstWhere(
+                (troop) => troop['id'] == _selectedTroopId,
+                orElse: () => const {'name': 'Selected Troop'},
+              )['name']
+              as String?;
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -1295,7 +1376,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           'Are you sure you want to accept ${widget.profile.fullName}\'s registration?\n\n'
           'Roles (${_selectedRoles.length}): ${_selectedRoles.map((r) => r.name).join(', ')}\n'
           'Generation: $generation'
-          '${selectedTroopName != null ? '\nTroop Context: $selectedTroopName' : ''}'
+          '${selectedTroopName != null ? '\nTroop Context: $selectedTroopName' : ''}',
         ),
         actions: [
           TextButton(
@@ -1317,8 +1398,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     final authProvider = context.read<AuthProvider>();
 
     final adminProfile = authProvider.currentUserProfile;
-    debugPrint('🔍 Accept - Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}');
-    
+    debugPrint(
+      '🔍 Accept - Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}',
+    );
+
     final adminProfileId = adminProfile?.id;
     if (adminProfileId == null || adminProfileId.isEmpty) {
       debugPrint('❌ Admin profile ID is null or empty');
@@ -1327,11 +1410,17 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       return;
     }
 
-    final troopContextToSend = adminProvider.isEffectiveSystemWideAccess ? _selectedTroopId : null;
-    debugPrint('🏕️ Sending troopContextId to acceptProfile: $troopContextToSend');
-    debugPrint('   isEffectiveSystemWideAccess: ${adminProvider.isEffectiveSystemWideAccess}');
+    final troopContextToSend = adminProvider.isEffectiveSystemWideAccess
+        ? _selectedTroopId
+        : null;
+    debugPrint(
+      '🏕️ Sending troopContextId to acceptProfile: $troopContextToSend',
+    );
+    debugPrint(
+      '   isEffectiveSystemWideAccess: ${adminProvider.isEffectiveSystemWideAccess}',
+    );
     debugPrint('   _selectedTroopId: $_selectedTroopId');
-    
+
     final success = await adminProvider.acceptProfile(
       profileId: widget.profile.id,
       approvedBy: adminProfileId,
@@ -1360,7 +1449,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     debugPrint('🔘 Add Comment button pressed');
     final comments = _commentsController.text.trim();
     debugPrint('📝 Comment text: "$comments"');
-    
+
     if (comments.isEmpty) {
       debugPrint('⚠️ Comment is empty, showing error');
       _showErrorDialog('Please enter a comment before saving');
@@ -1399,13 +1488,15 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
     if (!context.mounted) return;
 
-    debugPrint('🔄 Proceeding with add comment...'); 
+    debugPrint('🔄 Proceeding with add comment...');
     final authProvider = context.read<AuthProvider>();
     final adminProvider = context.read<AdminProvider>();
 
     final adminProfile = authProvider.currentUserProfile;
-    debugPrint('🔍 Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}');
-    
+    debugPrint(
+      '🔍 Admin Profile: id=${adminProfile?.id}, userId=${adminProfile?.userId}',
+    );
+
     final adminProfileId = adminProfile?.id;
     if (adminProfileId == null || adminProfileId.isEmpty) {
       debugPrint('❌ Admin profile ID is null or empty');
@@ -1415,7 +1506,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     }
 
     debugPrint('📤 Adding comment with approvedBy: $adminProfileId');
-    
+
     final success = await adminProvider.addComment(
       profileId: widget.profile.id,
       approvedBy: adminProfileId,
@@ -1428,12 +1519,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
     if (success) {
       debugPrint('✅ Comment added successfully');
-      Navigator.pop(context);  // Close the dialog
+      Navigator.pop(context); // Close the dialog
       _showSnackBar('Comment added - Profile remains pending');
     } else {
       debugPrint('❌ Comment failed: ${adminProvider.error}');
       _showErrorDialog(
-        adminProvider.error ?? 'Failed to add comment. Please try again.'
+        adminProvider.error ?? 'Failed to add comment. Please try again.',
       );
     }
   }
@@ -1453,7 +1544,8 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         _troops
           ..clear()
           ..addAll(troops);
-        if (_selectedTroopId != null && _troops.every((troop) => troop['id'] != _selectedTroopId)) {
+        if (_selectedTroopId != null &&
+            _troops.every((troop) => troop['id'] != _selectedTroopId)) {
           _selectedTroopId = null;
         }
         _isLoadingTroops = false;
@@ -1483,10 +1575,9 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     }
   }
 
-
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    
+
     // Use root scaffold messenger to show above dialog
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1501,13 +1592,16 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   /// Show error dialog that appears on top of everything
   void _showErrorDialog(String message) {
     if (!mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(width: 8),
             const Text('Validation Error'),
           ],
@@ -1523,4 +1617,3 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
   }
 }
-

@@ -142,7 +142,8 @@ class RoleAssignmentSection extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               border: Border.all(
-                  color: colorScheme.outline.withValues(alpha: 0.3)),
+                color: colorScheme.outline.withValues(alpha: 0.3),
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -175,8 +176,9 @@ class RoleAssignmentSection extends StatelessWidget {
                             Text(
                               role.description!,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.7),
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
                               ),
                             ),
                           // Show troop context info for non-selected roles
@@ -185,7 +187,9 @@ class RoleAssignmentSection extends StatelessWidget {
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: colorScheme.secondaryContainer
                                     .withValues(alpha: 0.5),
@@ -203,11 +207,11 @@ class RoleAssignmentSection extends StatelessWidget {
                                   Flexible(
                                     child: Text(
                                       'Current Troop: ${assignment!.troopContextName}',
-                                      style:
-                                          theme.textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.secondary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: colorScheme.secondary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -229,8 +233,7 @@ class RoleAssignmentSection extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     'Requires troop assignment (see below)',
-                                    style:
-                                        theme.textTheme.labelSmall?.copyWith(
+                                    style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.tertiary,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -253,8 +256,7 @@ class RoleAssignmentSection extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     'Currently assigned',
-                                    style:
-                                        theme.textTheme.labelSmall?.copyWith(
+                                    style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.primary,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -328,6 +330,24 @@ class RoleAssignmentSection extends StatelessWidget {
     ColorScheme colorScheme,
     double screenWidth,
   ) {
+    final troopsById = <String, Map<String, dynamic>>{};
+    for (final troop in troops) {
+      final troopId = troop['id']?.toString();
+      if (troopId == null || troopId.isEmpty) continue;
+      troopsById.putIfAbsent(troopId, () => troop);
+    }
+    final dropdownTroops = troopsById.values.toList();
+    final dropdownSelectedTroopId =
+        selectedTroopId != null && troopsById.containsKey(selectedTroopId)
+        ? selectedTroopId
+        : null;
+
+    if (selectedTroopId != null && dropdownSelectedTroopId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onTroopContextChanged(role.id, null);
+      });
+    }
+
     if (isLoadingTroops) {
       return const SizedBox(
         height: 40,
@@ -341,7 +361,7 @@ class RoleAssignmentSection extends StatelessWidget {
       );
     }
 
-    if (troops.isEmpty) {
+    if (dropdownTroops.isEmpty) {
       return Container(
         padding: EdgeInsets.all(screenWidth < 600 ? 8 : 12),
         decoration: BoxDecoration(
@@ -418,7 +438,7 @@ class RoleAssignmentSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: selectedTroopId,
+            initialValue: dropdownSelectedTroopId,
             isExpanded: true, // Allow text to expand and truncate properly
             decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(
@@ -430,8 +450,9 @@ class RoleAssignmentSection extends StatelessWidget {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
-                  color:
-                      selectedTroopId == null ? colorScheme.error : colorScheme.outline,
+                  color: selectedTroopId == null
+                      ? colorScheme.error
+                      : colorScheme.outline,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
@@ -464,7 +485,7 @@ class RoleAssignmentSection extends StatelessWidget {
               ),
               overflow: TextOverflow.ellipsis,
             ),
-            items: troops.map((troop) {
+            items: dropdownTroops.map((troop) {
               return DropdownMenuItem<String>(
                 value: troop['id'] as String,
                 child: Text(
@@ -489,7 +510,8 @@ class RoleAssignmentSection extends StatelessWidget {
                   )['name']
                   .toString();
               debugPrint(
-                  '🔄 Troop context updated: ${role.name} -> $troopName');
+                '🔄 Troop context updated: ${role.name} -> $troopName',
+              );
             },
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -503,11 +525,7 @@ class RoleAssignmentSection extends StatelessWidget {
               padding: EdgeInsets.only(top: 8, left: screenWidth < 600 ? 2 : 4),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 14,
-                    color: colorScheme.error,
-                  ),
+                  Icon(Icons.error_outline, size: 14, color: colorScheme.error),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(

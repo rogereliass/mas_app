@@ -20,7 +20,7 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Text controllers for all fields
   final _firstNameController = TextEditingController();
   final _middleNameController = TextEditingController();
@@ -31,12 +31,12 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   // State variables
   DateTime? _selectedBirthdate;
   String? _selectedGender;
-  String? _selectedTroopId;  // Store the UUID of selected troop
-  List<Map<String, dynamic>> _troops = [];  // List of {id, name}
+  String? _selectedTroopId; // Store the UUID of selected troop
+  List<Map<String, dynamic>> _troops = []; // List of {id, name}
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
@@ -66,19 +66,37 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final troops = await authProvider.getTroops();
-      
+      final dedupedTroopsById = <String, Map<String, dynamic>>{};
+      for (final troop in troops) {
+        final troopId = troop['id']?.toString();
+        if (troopId == null || troopId.isEmpty) continue;
+        dedupedTroopsById.putIfAbsent(troopId, () => troop);
+      }
+      final dedupedTroops = dedupedTroopsById.values.toList()
+        ..sort(
+          (a, b) => (a['name']?.toString() ?? '').toLowerCase().compareTo(
+            (b['name']?.toString() ?? '').toLowerCase(),
+          ),
+        );
+
       if (mounted) {
-        if (troops.isEmpty) {
+        if (dedupedTroops.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to load troops from database. Please check your connection.'),
+              content: Text(
+                'Failed to load troops from database. Please check your connection.',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 4),
             ),
           );
         }
         setState(() {
-          _troops = troops;
+          _troops = dedupedTroops;
+          if (_selectedTroopId != null &&
+              !_troops.any((troop) => troop['id'] == _selectedTroopId)) {
+            _selectedTroopId = null;
+          }
         });
       }
     } catch (e) {
@@ -242,17 +260,20 @@ class _RegisterPageState extends State<RegisterPage> {
       // Prepare metadata matching exact Supabase profiles table columns
       final metadata = {
         'first_name': _firstNameController.text.trim(),
-        'middle_name': _middleNameController.text.trim().isEmpty ? null : _middleNameController.text.trim(),
+        'middle_name': _middleNameController.text.trim().isEmpty
+            ? null
+            : _middleNameController.text.trim(),
         'last_name': _lastNameController.text.trim(),
         'name_ar': _arabicNameController.text.trim(),
         'birthdate': intl.DateFormat('yyyy-MM-dd').format(_selectedBirthdate!),
-        'gender': _selectedGender!.toLowerCase(), // 'male' or 'female' for gender_enum
+        'gender': _selectedGender!
+            .toLowerCase(), // 'male' or 'female' for gender_enum
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
-        'signup_troop': _selectedTroopId,  // Store the troop UUID
-        'generation': 'U',  // Default generation until assigned by leader
+        'signup_troop': _selectedTroopId, // Store the troop UUID
+        'generation': 'U', // Default generation until assigned by leader
         'signup_completed': true,
-        'email': _emailController.text.trim(),  // Email is required
+        'email': _emailController.text.trim(), // Email is required
       };
 
       debugPrint('=== STARTING REGISTRATION ===');
@@ -309,12 +330,18 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final troopsById = <String, Map<String, dynamic>>{
+      for (final troop in _troops)
+        if (troop['id'] != null) troop['id'].toString(): troop,
+    };
+    final dropdownTroops = troopsById.values.toList();
+    final dropdownSelectedTroopId =
+        _selectedTroopId != null && troopsById.containsKey(_selectedTroopId)
+        ? _selectedTroopId
+        : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Create Account'), centerTitle: true),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -399,7 +426,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: Text(
                       _selectedBirthdate == null
                           ? 'Select your birthdate'
-                          : intl.DateFormat('dd MMM yyyy').format(_selectedBirthdate!),
+                          : intl.DateFormat(
+                              'dd MMM yyyy',
+                            ).format(_selectedBirthdate!),
                       style: TextStyle(
                         color: _selectedBirthdate == null
                             ? Colors.grey[600]
@@ -426,7 +455,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           'Gender',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -448,16 +479,18 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: _selectedGender == 'Male'
-                                        ? AppColors.primaryBlue.withValues(alpha: 0.1)
+                                        ? AppColors.primaryBlue.withValues(
+                                            alpha: 0.1,
+                                          )
                                         : theme.brightness == Brightness.dark
-                                            ? AppColors.cardDark
-                                            : AppColors.cardLight,
+                                        ? AppColors.cardDark
+                                        : AppColors.cardLight,
                                     border: Border.all(
                                       color: _selectedGender == 'Male'
                                           ? AppColors.primaryBlue
                                           : theme.brightness == Brightness.dark
-                                              ? Colors.grey.shade700
-                                              : Colors.grey.shade300,
+                                          ? Colors.grey.shade700
+                                          : Colors.grey.shade300,
                                       width: _selectedGender == 'Male' ? 2 : 1,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
@@ -476,14 +509,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                       const SizedBox(width: 12),
                                       Text(
                                         'Male',
-                                        style: theme.textTheme.bodyLarge?.copyWith(
-                                          fontWeight: _selectedGender == 'Male'
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
-                                          color: _selectedGender == 'Male'
-                                              ? AppColors.primaryBlue
-                                              : null,
-                                        ),
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight:
+                                                  _selectedGender == 'Male'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                              color: _selectedGender == 'Male'
+                                                  ? AppColors.primaryBlue
+                                                  : null,
+                                            ),
                                       ),
                                     ],
                                   ),
@@ -507,17 +542,21 @@ class _RegisterPageState extends State<RegisterPage> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: _selectedGender == 'Female'
-                                        ? AppColors.primaryBlue.withValues(alpha: 0.1)
+                                        ? AppColors.primaryBlue.withValues(
+                                            alpha: 0.1,
+                                          )
                                         : theme.brightness == Brightness.dark
-                                            ? AppColors.cardDark
-                                            : AppColors.cardLight,
+                                        ? AppColors.cardDark
+                                        : AppColors.cardLight,
                                     border: Border.all(
                                       color: _selectedGender == 'Female'
                                           ? AppColors.primaryBlue
                                           : theme.brightness == Brightness.dark
-                                              ? Colors.grey.shade700
-                                              : Colors.grey.shade300,
-                                      width: _selectedGender == 'Female' ? 2 : 1,
+                                          ? Colors.grey.shade700
+                                          : Colors.grey.shade300,
+                                      width: _selectedGender == 'Female'
+                                          ? 2
+                                          : 1,
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -535,14 +574,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                       const SizedBox(width: 12),
                                       Text(
                                         'Female',
-                                        style: theme.textTheme.bodyLarge?.copyWith(
-                                          fontWeight: _selectedGender == 'Female'
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
-                                          color: _selectedGender == 'Female'
-                                              ? AppColors.primaryBlue
-                                              : null,
-                                        ),
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontWeight:
+                                                  _selectedGender == 'Female'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                              color: _selectedGender == 'Female'
+                                                  ? AppColors.primaryBlue
+                                                  : null,
+                                            ),
                                       ),
                                     ],
                                   ),
@@ -608,14 +649,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 // Troop Dropdown
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedTroopId,
+                  initialValue: dropdownSelectedTroopId,
                   decoration: InputDecoration(
                     labelText: 'Signup Troop',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  items: _troops.map((troop) {
+                  items: dropdownTroops.map((troop) {
                     return DropdownMenuItem<String>(
                       value: troop['id'] as String,
                       child: Text(troop['name'] as String),
@@ -739,12 +780,11 @@ class _RegisterPageState extends State<RegisterPage> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
   }
 }
-

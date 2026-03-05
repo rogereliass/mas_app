@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:masapp/core/constants/app_colors.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/core/widgets/error_view.dart';
+import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 import 'package:masapp/meetings/pages/attendance/logic/attendance_provider.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
 import 'package:masapp/meetings/pages/attendance/ui/components/attendance_row.dart';
@@ -34,8 +35,10 @@ class _AttendanceTabState extends State<AttendanceTab> {
       final troopId = widget.troopId;
       final seasonId = widget.seasonId;
       if (troopId != null && seasonId != null) {
-        Provider.of<AttendanceProvider>(context, listen: false)
-            .loadMeetings(troopId: troopId, seasonId: seasonId);
+        Provider.of<AttendanceProvider>(
+          context,
+          listen: false,
+        ).loadMeetings(troopId: troopId, seasonId: seasonId);
       }
     });
   }
@@ -51,8 +54,10 @@ class _AttendanceTabState extends State<AttendanceTab> {
       if (troopId != null && seasonId != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          Provider.of<AttendanceProvider>(context, listen: false)
-              .loadMeetings(troopId: troopId, seasonId: seasonId);
+          Provider.of<AttendanceProvider>(
+            context,
+            listen: false,
+          ).loadMeetings(troopId: troopId, seasonId: seasonId);
         });
       }
     }
@@ -102,9 +107,7 @@ class _AttendanceTabState extends State<AttendanceTab> {
                   provider: provider,
                 ),
                 // Member list
-                Expanded(
-                  child: _buildMemberList(context, provider),
-                ),
+                Expanded(child: _buildMemberList(context, provider)),
                 // Keep the full-width save button for clarity on larger devices.
                 if (provider.isEditor && provider.hasUnsavedChanges)
                   _SaveButton(provider: provider),
@@ -176,8 +179,9 @@ class _FloatingSaveFab extends StatelessWidget {
     return FloatingActionButton.small(
       onPressed: provider.isSaving ? null : () => provider.saveChanges(),
       backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
-      foregroundColor:
-          isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary,
+      foregroundColor: isDark
+          ? AppColors.textPrimaryLight
+          : theme.colorScheme.onPrimary,
       tooltip: modified > 0 ? 'Save ($modified)' : 'Save',
       elevation: 6,
       child: provider.isSaving
@@ -317,8 +321,16 @@ class _MeetingDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cardColor =
-        isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
+    final cardColor = isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
+    final meetingsById = <String, Meeting>{
+      for (final meeting in provider.meetings) meeting.id: meeting,
+    };
+    final dropdownMeetings = meetingsById.values.toList();
+    final selectedMeetingId = provider.selectedMeetingId;
+    final dropdownSelectedMeetingId =
+        selectedMeetingId != null && meetingsById.containsKey(selectedMeetingId)
+        ? selectedMeetingId
+        : null;
 
     return Material(
       elevation: 2,
@@ -327,14 +339,16 @@ class _MeetingDropdown extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: DropdownButtonFormField<String>(
-          initialValue: provider.selectedMeetingId,
+          initialValue: dropdownSelectedMeetingId,
           isExpanded: true,
           itemHeight: 56,
           decoration: InputDecoration(
             hintText: 'Select meeting',
             prefixIcon: Icon(Icons.event, color: theme.colorScheme.primary),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -342,42 +356,43 @@ class _MeetingDropdown extends StatelessWidget {
             filled: true,
             fillColor: cardColor,
           ),
-        selectedItemBuilder: (context) {
-          return provider.meetings.map((m) {
-            return Align(
-              alignment: Alignment.centerLeft,
+          selectedItemBuilder: (context) {
+            return dropdownMeetings.map((m) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  provider.selectedMeeting?.title ?? m.title,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            }).toList();
+          },
+          items: dropdownMeetings.map((m) {
+            return DropdownMenuItem<String>(
+              value: m.id,
               child: Text(
-                provider.selectedMeeting?.title ?? m.title,
+                '${m.title} • ${m.formattedDate}',
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: theme.textTheme.bodyMedium,
               ),
             );
-          }).toList();
-        },
-        items: provider.meetings.map((m) {
-          return DropdownMenuItem<String>(
-            value: m.id,
-            child: Text(
-              '${m.title} • ${m.formattedDate}',
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: theme.textTheme.bodyMedium,
-            ),
-          );
-        }).toList(),
-        onChanged: (value) {
-          if (value == null) return;
-          if (provider.hasUnsavedChanges) {
-            _confirmDiscardAndSwitch(context, provider, value);
-          } else {
-            provider.selectMeeting(value);
-          }
-        },
+          }).toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            if (provider.hasUnsavedChanges) {
+              _confirmDiscardAndSwitch(context, provider, value);
+            } else {
+              provider.selectMeeting(value);
+            }
+          },
+        ),
       ),
-    ));
+    );
   }
 
   Future<void> _confirmDiscardAndSwitch(
@@ -439,17 +454,15 @@ class _PatrolSection extends StatelessWidget {
           margin: const EdgeInsets.only(top: 20, bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer
-                .withValues(alpha: isDark ? 0.18 : 0.28),
+            color: theme.colorScheme.primaryContainer.withValues(
+              alpha: isDark ? 0.18 : 0.28,
+            ),
             borderRadius: const BorderRadius.only(
               topRight: Radius.circular(12),
               bottomRight: Radius.circular(12),
             ),
             border: Border(
-              left: BorderSide(
-                color: theme.colorScheme.primary,
-                width: 4,
-              ),
+              left: BorderSide(color: theme.colorScheme.primary, width: 4),
             ),
           ),
           child: Row(
@@ -476,8 +489,7 @@ class _PatrolSection extends StatelessWidget {
               const SizedBox(width: 8),
               // Member count chip
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
@@ -527,8 +539,7 @@ class _PatrolSection extends StatelessWidget {
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        insetPadding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -683,17 +694,22 @@ class _SaveButton extends StatelessWidget {
           maxLines: 1,
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
-          foregroundColor:
-              isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary,
-          disabledBackgroundColor: (isDark ? AppColors.goldAccent : AppColors.primaryBlue)
-              .withValues(alpha: 0.5),
+          backgroundColor: isDark
+              ? AppColors.goldAccent
+              : AppColors.primaryBlue,
+          foregroundColor: isDark
+              ? AppColors.textPrimaryLight
+              : theme.colorScheme.onPrimary,
+          disabledBackgroundColor:
+              (isDark ? AppColors.goldAccent : AppColors.primaryBlue)
+                  .withValues(alpha: 0.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(vertical: 14),
-          textStyle: theme.textTheme.labelLarge
-              ?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

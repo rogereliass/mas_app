@@ -34,8 +34,8 @@ class MeetingsProvider with ChangeNotifier {
   MeetingsProvider({
     MeetingsService? service,
     required AuthProvider authProvider,
-  })  : _service = service ?? MeetingsService.instance(),
-        _authProvider = authProvider {
+  }) : _service = service ?? MeetingsService.instance(),
+       _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
   }
 
@@ -48,11 +48,34 @@ class MeetingsProvider with ChangeNotifier {
   /// Reset transient state whenever the authenticated user changes.
   void _onAuthChanged() {
     _meetings = [];
+    _troops = [];
     _activeSeason = null;
     _selectedTroopId = null;
     _noActiveSeason = false;
     _error = null;
     notifyListeners();
+  }
+
+  void _setTroops(List<Map<String, dynamic>> troops) {
+    final deduped = <String, Map<String, dynamic>>{};
+    for (final troop in troops) {
+      final troopId = troop['id']?.toString();
+      if (troopId == null || troopId.isEmpty) continue;
+      deduped.putIfAbsent(troopId, () => troop);
+    }
+
+    _troops = deduped.values.toList()
+      ..sort(
+        (a, b) => (a['name']?.toString() ?? '').toLowerCase().compareTo(
+          (b['name']?.toString() ?? '').toLowerCase(),
+        ),
+      );
+
+    if (_selectedTroopId != null &&
+        !_troops.any((troop) => troop['id'] == _selectedTroopId)) {
+      _selectedTroopId = null;
+      _meetings = [];
+    }
   }
 
   /// Called by [ProxyProvider] on every ancestor rebuild.
@@ -119,7 +142,8 @@ class MeetingsProvider with ChangeNotifier {
       _activeSeason = season;
 
       if (isAdmin) {
-        _troops = await _service.fetchTroops();
+        final fetchedTroops = await _service.fetchTroops();
+        _setTroops(fetchedTroops);
         _isLoading = false;
         notifyListeners();
         // Admin still needs to selectTroop() before meetings load.
@@ -161,6 +185,12 @@ class MeetingsProvider with ChangeNotifier {
 
   /// Admin-only: sets the active troop and reloads meetings.
   void selectTroop(String troopId) {
+    if (!_troops.any((troop) => troop['id'] == troopId)) {
+      debugPrint(
+        'MeetingsProvider.selectTroop: ignoring unknown troopId=$troopId',
+      );
+      return;
+    }
     if (_selectedTroopId == troopId) return;
     _selectedTroopId = troopId;
     _meetings = [];
@@ -176,8 +206,10 @@ class MeetingsProvider with ChangeNotifier {
     required DateTime startsAt,
     required DateTime endsAt,
     String? description,
+    int? price,
   }) async {
-    if (_isCreating || effectiveTroopId == null || activeSeasonId == null) return;
+    if (_isCreating || effectiveTroopId == null || activeSeasonId == null)
+      return;
 
     final createdByProfileId = _authProvider.currentUserProfile?.id;
     if (createdByProfileId == null) {
@@ -200,6 +232,7 @@ class MeetingsProvider with ChangeNotifier {
         startsAt: startsAt,
         endsAt: endsAt,
         description: description,
+        price: price,
         createdByProfileId: createdByProfileId,
       );
       _meetings = [..._meetings, newMeeting]

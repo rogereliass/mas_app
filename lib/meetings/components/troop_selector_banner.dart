@@ -21,6 +21,17 @@ class TroopSelectorBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bgColor = isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
+    final troopsById = <String, Map<String, dynamic>>{};
+    for (final troop in troops) {
+      final troopId = troop['id']?.toString();
+      if (troopId == null || troopId.isEmpty) continue;
+      troopsById.putIfAbsent(troopId, () => troop);
+    }
+    final dropdownTroops = troopsById.values.toList();
+    final dropdownSelectedTroopId =
+        selectedTroopId != null && troopsById.containsKey(selectedTroopId)
+        ? selectedTroopId
+        : null;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -63,7 +74,7 @@ class TroopSelectorBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          troops.isEmpty
+          dropdownTroops.isEmpty
               ? Center(
                   child: SizedBox(
                     width: 24,
@@ -77,7 +88,7 @@ class TroopSelectorBanner extends StatelessWidget {
                   ),
                 )
               : DropdownButtonFormField<String>(
-                  initialValue: selectedTroopId,
+                  initialValue: dropdownSelectedTroopId,
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Troop',
@@ -99,7 +110,7 @@ class TroopSelectorBanner extends StatelessWidget {
                     ),
                   ),
                   selectedItemBuilder: (context) {
-                    return troops.map((troop) {
+                    return dropdownTroops.map((troop) {
                       return Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -113,7 +124,7 @@ class TroopSelectorBanner extends StatelessWidget {
                       );
                     }).toList();
                   },
-                  items: troops.map((troop) {
+                  items: dropdownTroops.map((troop) {
                     return DropdownMenuItem<String>(
                       value: troop['id'] as String?,
                       child: Text(
@@ -125,8 +136,10 @@ class TroopSelectorBanner extends StatelessWidget {
                   }).toList(),
                   onChanged: (value) {
                     if (value != null) {
-                      Provider.of<MeetingsProvider>(context, listen: false)
-                          .selectTroop(value);
+                      Provider.of<MeetingsProvider>(
+                        context,
+                        listen: false,
+                      ).selectTroop(value);
                     }
                   },
                 ),

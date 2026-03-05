@@ -1,5 +1,5 @@
 /// Model representing a user profile pending approval
-/// 
+///
 /// Contains all profile information needed for admin review
 class PendingProfile {
   final String id;
@@ -54,8 +54,11 @@ class PendingProfile {
 
   /// Get full name
   String get fullName {
-    final parts = [firstName, middleName, lastName]
-        .where((part) => part != null && part.isNotEmpty);
+    final parts = [
+      firstName,
+      middleName,
+      lastName,
+    ].where((part) => part != null && part.isNotEmpty);
     return parts.join(' ');
   }
 
@@ -74,36 +77,53 @@ class PendingProfile {
   /// Create PendingProfile from Supabase JSON
   /// Expects joined data with troops table
   factory PendingProfile.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) => value is String ? value : null;
+    DateTime? asDateTime(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    final id = asString(json['id']);
+    final createdAt = asDateTime(json['created_at']);
+    if (id == null || id.isEmpty) {
+      throw ArgumentError(
+        'PendingProfile id is required but was null or invalid',
+      );
+    }
+    if (createdAt == null) {
+      throw ArgumentError(
+        'PendingProfile created_at is required but was null or invalid',
+      );
+    }
+
     return PendingProfile(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      firstName: json['first_name'] as String,
-      lastName: json['last_name'] as String,
-      middleName: json['middle_name'] as String?,
-      nameAr: json['name_ar'] as String?,
-      scoutOrgId: json['scout_org_id'] as String?,
-      scoutCode: json['scout_code'] as String?,
-      birthdate: json['birthdate'] != null
-          ? DateTime.parse(json['birthdate'] as String)
-          : null,
-      phone: json['phone'] as String?,
-      email: json['email'] as String?,
-      photoUrl: json['photo_url'] as String?,
-      gender: json['gender'] as String?,
-      generation: json['generation'] as String?,
-      address: json['address'] as String?,
-      medicalNotes: json['medical_notes'] as String?,
-      allergies: json['allergies'] as String?,
-      signupTroopId: json['signup_troop'] as String?,
+      id: id,
+      userId: asString(json['user_id']) ?? '',
+      firstName: asString(json['first_name']) ?? 'Unknown',
+      lastName: asString(json['last_name']) ?? '',
+      middleName: asString(json['middle_name']),
+      nameAr: asString(json['name_ar']),
+      scoutOrgId: asString(json['scout_org_id']),
+      scoutCode: asString(json['scout_code']),
+      birthdate: asDateTime(json['birthdate']),
+      phone: asString(json['phone']),
+      email: asString(json['email']),
+      photoUrl: asString(json['photo_url']),
+      gender: asString(json['gender']),
+      generation: asString(json['generation']),
+      address: asString(json['address']),
+      medicalNotes: asString(json['medical_notes']),
+      allergies: asString(json['allergies']),
+      signupTroopId: asString(json['signup_troop']),
       signupTroopName: json['troops'] != null && json['troops'] is Map
-          ? json['troops']['name'] as String?
+          ? asString(json['troops']['name'])
           : null,
       signupCompleted: json['signup_completed'] as bool? ?? false,
       approved: json['approved'] as bool? ?? false,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
+      createdAt: createdAt,
+      updatedAt: asDateTime(json['updated_at']),
     );
   }
 

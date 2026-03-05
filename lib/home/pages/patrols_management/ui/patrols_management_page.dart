@@ -37,7 +37,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     final authProvider = context.read<AuthProvider>();
 
     // Wait until profile is loaded
-    if (authProvider.profileLoading || authProvider.currentUserProfile == null) {
+    if (authProvider.profileLoading ||
+        authProvider.currentUserProfile == null) {
       // Re-listen so we retry when auth state changes
       authProvider.addListener(_onAuthChanged);
       return;
@@ -49,8 +50,10 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     // Skip re-init if nothing has changed
     if (_initialized && resolvedRole == _lastResolvedRole) return;
 
-    final patrolsProvider =
-        Provider.of<PatrolsManagementProvider>(context, listen: false);
+    final patrolsProvider = Provider.of<PatrolsManagementProvider>(
+      context,
+      listen: false,
+    );
 
     _roleContext = resolvedRole;
     _lastResolvedRole = resolvedRole;
@@ -60,7 +63,7 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       _effectiveRank = selectedRank > 0
           ? selectedRank
           : authProvider.currentUserRoleRank;
-      
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         patrolsProvider.setRoleContext(resolvedRole);
@@ -117,7 +120,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
   void _onAuthChanged() {
     if (!mounted) return;
     final authProvider = context.read<AuthProvider>();
-    if (!authProvider.profileLoading && authProvider.currentUserProfile != null) {
+    if (!authProvider.profileLoading &&
+        authProvider.currentUserProfile != null) {
       authProvider.removeListener(_onAuthChanged);
       _tryInitialize();
     }
@@ -164,7 +168,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
                   icon: const Icon(Icons.refresh),
                   onPressed: provider.isLoading
                       ? null
-                      : () => provider.loadPatrolsAndMembers(forceRefresh: true),
+                      : () =>
+                            provider.loadPatrolsAndMembers(forceRefresh: true),
                 );
               },
             ),
@@ -181,7 +186,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
                     return const EmptyView(
                       icon: Icons.groups_3_outlined,
                       title: 'Select a troop',
-                      message: 'Choose a troop first to view and manage patrols.',
+                      message:
+                          'Choose a troop first to view and manage patrols.',
                     );
                   }
 
@@ -192,7 +198,8 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
                   if (provider.hasError) {
                     return ErrorView(
                       message: provider.error ?? 'Unknown error occurred',
-                      onRetry: () => provider.loadPatrolsAndMembers(forceRefresh: true),
+                      onRetry: () =>
+                          provider.loadPatrolsAndMembers(forceRefresh: true),
                     );
                   }
 
@@ -214,7 +221,9 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
             }
 
             return FloatingActionButton.extended(
-              onPressed: provider.isProcessing ? null : () => _showCreatePatrolDialog(context),
+              onPressed: provider.isProcessing
+                  ? null
+                  : () => _showCreatePatrolDialog(context),
               icon: const Icon(Icons.add),
               label: const Text('Create Patrol'),
             );
@@ -240,12 +249,17 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
 
         final troops = provider.troops;
         final selectedTroopId = provider.selectedTroopId;
+        final dropdownSelectedTroopId =
+            selectedTroopId != null &&
+                troops.any((troop) => troop['id'] == selectedTroopId)
+            ? selectedTroopId
+            : null;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: DropdownButtonFormField<String>(
-            key: ValueKey(selectedTroopId ?? 'none'),
-            initialValue: selectedTroopId,
+            key: ValueKey(dropdownSelectedTroopId ?? 'none'),
+            initialValue: dropdownSelectedTroopId,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Troop *',
@@ -324,7 +338,9 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
           child: ListTile(
             title: Text(
@@ -375,7 +391,10 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     );
   }
 
-  Future<void> _showEditPatrolDialog(BuildContext context, Patrol patrol) async {
+  Future<void> _showEditPatrolDialog(
+    BuildContext context,
+    Patrol patrol,
+  ) async {
     final provider = context.read<PatrolsManagementProvider>();
 
     final result = await showDialog<PatrolFormResult>(
@@ -408,7 +427,10 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     );
   }
 
-  Future<void> _showManageMembersDialog(BuildContext context, Patrol patrol) async {
+  Future<void> _showManageMembersDialog(
+    BuildContext context,
+    Patrol patrol,
+  ) async {
     final provider = context.read<PatrolsManagementProvider>();
     final patrolNameById = {
       for (final item in provider.patrols) item.id: item.name,
@@ -476,12 +498,17 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
             return AlertDialog(
               title: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded,
-                      color: theme.colorScheme.error, size: 22),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: theme.colorScheme.error,
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('Delete Patrol?',
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      'Delete Patrol?',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -507,8 +534,11 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
                       hintText: patrol.name,
                       border: const OutlineInputBorder(),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      errorText: confirmController.text.isNotEmpty &&
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      errorText:
+                          confirmController.text.isNotEmpty &&
                               confirmController.text != patrol.name
                           ? 'Name does not match'
                           : null,
@@ -533,8 +563,9 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
                   style: FilledButton.styleFrom(
                     backgroundColor: theme.colorScheme.error,
                     foregroundColor: theme.colorScheme.onError,
-                    disabledBackgroundColor:
-                        theme.colorScheme.error.withValues(alpha: 0.3),
+                    disabledBackgroundColor: theme.colorScheme.error.withValues(
+                      alpha: 0.3,
+                    ),
                   ),
                   child: const Text('Delete'),
                 ),
@@ -557,7 +588,6 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
       errorMessage: provider.error ?? 'Unable to delete patrol',
     );
   }
-
 
   void _showResultSnackBar(
     BuildContext context, {
@@ -623,8 +653,11 @@ class _AssignInlineButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.add_link_outlined,
-                size: 18, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.add_link_outlined,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(width: 4),
             Text(
               'Assign',
@@ -635,8 +668,11 @@ class _AssignInlineButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 2),
-            Icon(Icons.arrow_drop_down,
-                size: 16, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ],
         ),
       ),

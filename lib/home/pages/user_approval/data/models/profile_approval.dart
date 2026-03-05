@@ -1,5 +1,5 @@
 /// Model representing a profile approval/rejection record
-/// 
+///
 /// Corresponds to the profiles_approvals table
 class ProfileApproval {
   final int id;
@@ -26,24 +26,55 @@ class ProfileApproval {
   /// Create ProfileApproval from Supabase JSON
   /// Expects joined data with approver profile
   factory ProfileApproval.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) => value is String ? value : null;
+    DateTime? asDateTime(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
     String? approverName;
     if (json['approver'] != null && json['approver'] is Map) {
       final approver = json['approver'] as Map<String, dynamic>;
-      final firstName = approver['first_name'] as String?;
-      final lastName = approver['last_name'] as String?;
+      final firstName = asString(approver['first_name']);
+      final lastName = asString(approver['last_name']);
       if (firstName != null && lastName != null) {
         approverName = '$firstName $lastName';
       }
     }
 
+    final idValue = json['id'];
+    final parsedId = idValue is int
+        ? idValue
+        : int.tryParse('${idValue ?? ''}');
+    final profileId = asString(json['profile_id']);
+    final createdAt = asDateTime(json['created_at']);
+
+    if (parsedId == null) {
+      throw ArgumentError(
+        'ProfileApproval id is required but was null or invalid',
+      );
+    }
+    if (profileId == null || profileId.isEmpty) {
+      throw ArgumentError(
+        'ProfileApproval profile_id is required but was null or invalid',
+      );
+    }
+    if (createdAt == null) {
+      throw ArgumentError(
+        'ProfileApproval created_at is required but was null or invalid',
+      );
+    }
+
     return ProfileApproval(
-      id: json['id'] as int,
-      profileId: json['profile_id'] as String,
-      approvedBy: json['approved_by'] as String?,
+      id: parsedId,
+      profileId: profileId,
+      approvedBy: asString(json['approved_by']),
       approvedByName: approverName,
-      comments: json['comments'] as String?,
+      comments: asString(json['comments']),
       status: json['status'] as bool,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: createdAt,
     );
   }
 

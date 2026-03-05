@@ -304,6 +304,12 @@ To prevent overflows in Dialogs (especially with keyboards open):
 - Use `Dialog` widget with a constrained `BoxConstraints(maxWidth: ...)` instead of `AlertDialog` for more premium/custom control.
 - Avoid hardcoded heights inside flex parents; use `mainAxisSize: MainAxisSize.min` for vertical columns.
 
+### 2.2 **Modal Error Handling (Required)**
+When a dialog/modal is open:
+- **Never** show errors using `ScaffoldMessenger`/`SnackBar` (they can render behind the modal).
+- Show validation and submit errors **inside the modal** using field validators (`errorText`) or an inline error container.
+- Keep the modal open on errors so the user can correct fields immediately.
+
 ### 3. **Text Overflow Protection**
 ALWAYS add overflow handling to text widgets in constrained spaces:
 

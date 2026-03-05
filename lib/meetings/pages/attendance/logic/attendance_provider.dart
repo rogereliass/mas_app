@@ -54,9 +54,9 @@ class AttendanceProvider with ChangeNotifier {
     AttendanceService? attendanceService,
     MeetingsService? meetingsService,
     required AuthProvider authProvider,
-  })  : _attendanceService = attendanceService ?? AttendanceService.instance(),
-        _meetingsService = meetingsService ?? MeetingsService.instance(),
-        _authProvider = authProvider {
+  }) : _attendanceService = attendanceService ?? AttendanceService.instance(),
+       _meetingsService = meetingsService ?? MeetingsService.instance(),
+       _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
   }
 
@@ -130,10 +130,7 @@ class AttendanceProvider with ChangeNotifier {
   String? notesFor(String profileId) {
     if (_localNotes.containsKey(profileId)) return _localNotes[profileId];
     try {
-      return _members
-          .firstWhere((m) => m.profileId == profileId)
-          .record
-          ?.notes;
+      return _members.firstWhere((m) => m.profileId == profileId).record?.notes;
     } catch (_) {
       return null;
     }
@@ -158,7 +155,13 @@ class AttendanceProvider with ChangeNotifier {
         troopId: troopId,
       );
 
-      if (fetched.isEmpty) {
+      final dedupedMeetingsById = <String, Meeting>{
+        for (final meeting in fetched) meeting.id: meeting,
+      };
+      final normalizedMeetings = dedupedMeetingsById.values.toList()
+        ..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
+
+      if (normalizedMeetings.isEmpty) {
         _noMeetings = true;
         _meetings = [];
         _isLoading = false;
@@ -166,8 +169,8 @@ class AttendanceProvider with ChangeNotifier {
         return;
       }
 
-      _meetings = fetched;
-      _selectedMeetingId = _pickBestMeeting(fetched);
+      _meetings = normalizedMeetings;
+      _selectedMeetingId = _pickBestMeeting(normalizedMeetings);
       _isLoading = false;
       notifyListeners();
 
@@ -187,6 +190,12 @@ class AttendanceProvider with ChangeNotifier {
   /// If there are unsaved changes the UI should guard against navigation
   /// using [hasUnsavedChanges] before calling this.
   Future<void> selectMeeting(String meetingId) async {
+    if (!_meetings.any((meeting) => meeting.id == meetingId)) {
+      debugPrint(
+        'AttendanceProvider.selectMeeting: ignoring unknown meetingId=$meetingId',
+      );
+      return;
+    }
     if (_selectedMeetingId == meetingId) return;
     _selectedMeetingId = meetingId;
     _clearMemberState();
@@ -212,15 +221,18 @@ class AttendanceProvider with ChangeNotifier {
   Future<void> updateNotes(String profileId, String? notes) async {
     final recordId = _recordIdByProfileId[profileId];
     if (recordId == null) {
-      debugPrint('AttendanceProvider.updateNotes: no recordId for $profileId — skipped');
+      debugPrint(
+        'AttendanceProvider.updateNotes: no recordId for $profileId — skipped',
+      );
       return;
     }
     await _attendanceService.updateAttendanceNotes(
       recordId: recordId,
       notes: notes,
     );
-    _localNotes[profileId] =
-        (notes?.trim().isEmpty ?? true) ? null : notes!.trim();
+    _localNotes[profileId] = (notes?.trim().isEmpty ?? true)
+        ? null
+        : notes!.trim();
     notifyListeners();
   }
 
@@ -240,22 +252,25 @@ class AttendanceProvider with ChangeNotifier {
         if (recordId == null) {
           // Shouldn't happen after lazy-fill, but skip gracefully.
           debugPrint(
-              'AttendanceProvider.saveChanges: no recordId for $profileId — skipping');
+            'AttendanceProvider.saveChanges: no recordId for $profileId — skipping',
+          );
           continue;
         }
 
         final status = _localAttendance[profileId];
         if (status == null) continue;
 
-        changedRecords.add(AttendanceRecord(
-          id: recordId,
-          meetingId: _selectedMeetingId!,
-          profileId: profileId,
-          status: status,
-          markedByProfileId: currentUserProfileId,
-          markedAt: DateTime.now(),
-          notes: null,
-        ));
+        changedRecords.add(
+          AttendanceRecord(
+            id: recordId,
+            meetingId: _selectedMeetingId!,
+            profileId: profileId,
+            status: status,
+            markedByProfileId: currentUserProfileId,
+            markedAt: DateTime.now(),
+            notes: null,
+          ),
+        );
       }
 
       await _attendanceService.batchUpdateAttendance(changedRecords);
@@ -294,8 +309,7 @@ class AttendanceProvider with ChangeNotifier {
 
     try {
       // Determine the troop for the selected meeting.
-      final meeting =
-          _meetings.firstWhere((m) => m.id == _selectedMeetingId);
+      final meeting = _meetings.firstWhere((m) => m.id == _selectedMeetingId);
       // Always use troop_context (managedTroopId) as the source of truth.
       // For editors/admins the troop comes from the meeting row itself;
       // for regular members it comes from their own profile_roles troop_context.
@@ -314,8 +328,9 @@ class AttendanceProvider with ChangeNotifier {
       final currentUserProfileId = _authProvider.currentUserProfile?.id;
 
       // Fetch troop members; regular members only see themselves.
-      final memberProfileIdFilter =
-          isRegularMember ? currentUserProfileId : null;
+      final memberProfileIdFilter = isRegularMember
+          ? currentUserProfileId
+          : null;
 
       final fetchedMembers = await _attendanceService.fetchTroopMembers(
         troopId: troopId,
@@ -323,18 +338,12 @@ class AttendanceProvider with ChangeNotifier {
       );
 
       // Fetch existing attendance records for this meeting.
-      List<AttendanceRecord> records =
-          await _attendanceService.fetchAttendanceForMeeting(
-        _selectedMeetingId!,
-      );
+      List<AttendanceRecord> records = await _attendanceService
+          .fetchAttendanceForMeeting(_selectedMeetingId!);
 
       // Build lookup maps from existing records.
-      _recordIdByProfileId = {
-        for (final r in records) r.profileId: r.id,
-      };
-      _localAttendance = {
-        for (final r in records) r.profileId: r.status,
-      };
+      _recordIdByProfileId = {for (final r in records) r.profileId: r.id};
+      _localAttendance = {for (final r in records) r.profileId: r.status};
       _originalAttendance = Map.from(_localAttendance);
       _modifiedProfileIds.clear();
 
@@ -357,9 +366,7 @@ class AttendanceProvider with ChangeNotifier {
             _selectedMeetingId!,
           );
 
-          _recordIdByProfileId = {
-            for (final r in records) r.profileId: r.id,
-          };
+          _recordIdByProfileId = {for (final r in records) r.profileId: r.id};
 
           // Default new records to absent in local/original maps.
           for (final id in missingProfileIds) {
@@ -370,9 +377,7 @@ class AttendanceProvider with ChangeNotifier {
       }
 
       // Attach latest AttendanceRecord to each MemberWithAttendance.
-      final recordByProfileId = {
-        for (final r in records) r.profileId: r,
-      };
+      final recordByProfileId = {for (final r in records) r.profileId: r};
       _members = fetchedMembers
           .map((m) => m.copyWith(record: recordByProfileId[m.profileId]))
           .toList();
@@ -404,11 +409,15 @@ class AttendanceProvider with ChangeNotifier {
 
     // Sort each patrol group alphabetically.
     for (final list in groups.values) {
-      list.sort((a, b) =>
-          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+      list.sort(
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+      );
     }
-    unassigned.sort((a, b) =>
-        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+    unassigned.sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
 
     _patrolGroups = groups;
     _unassignedMembers = unassigned;
@@ -439,19 +448,22 @@ class AttendanceProvider with ChangeNotifier {
     // Prefer today's meeting.
     for (final m in meetings) {
       final d = DateTime(
-          m.meetingDate.year, m.meetingDate.month, m.meetingDate.day);
+        m.meetingDate.year,
+        m.meetingDate.month,
+        m.meetingDate.day,
+      );
       if (d == todayDate) return m.id;
     }
 
     // Next upcoming meeting (closest future date).
-    final upcoming = meetings
-        .where((m) {
-          final d = DateTime(
-              m.meetingDate.year, m.meetingDate.month, m.meetingDate.day);
-          return d.isAfter(todayDate);
-        })
-        .toList()
-      ..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
+    final upcoming = meetings.where((m) {
+      final d = DateTime(
+        m.meetingDate.year,
+        m.meetingDate.month,
+        m.meetingDate.day,
+      );
+      return d.isAfter(todayDate);
+    }).toList()..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
 
     if (upcoming.isNotEmpty) return upcoming.first.id;
 
