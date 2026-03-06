@@ -8,6 +8,7 @@ import 'package:masapp/meetings/components/troop_selector_banner.dart';
 import 'package:masapp/meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'package:masapp/meetings/pages/meeting_creation/ui/components/meeting_card.dart';
 import 'package:masapp/meetings/pages/meeting_creation/ui/components/create_meeting_dialog.dart';
+import 'package:masapp/meetings/pages/meeting_creation/ui/components/edit_meeting_dialog.dart';
 
 /// The "Management" tab shown inside MeetingsPage's TabBarView.
 /// Allows editors to view and schedule meetings for the active season.
@@ -41,7 +42,9 @@ class ManagementTab extends StatelessWidget {
                 selectedTroopId: provider.selectedTroopId,
               ),
               const Expanded(
-                child: LoadingView(message: 'Select a troop above to continue...'),
+                child: LoadingView(
+                  message: 'Select a troop above to continue...',
+                ),
               ),
             ],
           );
@@ -151,6 +154,23 @@ class _MeetingsList extends StatelessWidget {
               return MeetingCard(
                 key: ValueKey(meeting.id),
                 meeting: meeting,
+                isDeleting: provider.isDeletingMeeting(meeting.id),
+                onEdit: provider.canEdit
+                    ? () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => EditMeetingDialog(meeting: meeting),
+                        );
+                      }
+                    : null,
+                onDelete: provider.canEdit
+                    ? () => _confirmDeleteMeeting(
+                        context,
+                        provider,
+                        meeting.id,
+                        meeting.title,
+                      )
+                    : null,
               );
             },
           ),
@@ -212,8 +232,9 @@ class _CreateMeetingButton extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final bgColor = isDark ? AppColors.goldAccent : AppColors.primaryBlue;
-    final fgColor =
-        isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary;
+    final fgColor = isDark
+        ? AppColors.textPrimaryLight
+        : theme.colorScheme.onPrimary;
 
     return SizedBox(
       width: double.infinity,
@@ -237,10 +258,96 @@ class _CreateMeetingButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(vertical: 14),
-          textStyle:
-              theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
+  }
+}
+
+Future<void> _confirmDeleteMeeting(
+  BuildContext context,
+  MeetingsProvider provider,
+  String meetingId,
+  String meetingTitle,
+) async {
+  final normalizedMeetingTitle = meetingTitle.trim().isNotEmpty
+      ? meetingTitle.trim()
+      : 'this meeting';
+
+  final confirmDelete = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final theme = Theme.of(ctx);
+      final isDark = theme.brightness == Brightness.dark;
+
+      return Dialog(
+        backgroundColor: isDark
+            ? AppColors.cardDarkElevated
+            : AppColors.cardLight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Delete Meeting',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Are you sure you want to delete "$normalizedMeetingTitle"? This will remove all corresponding attendance records. This action cannot be undone.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: theme.colorScheme.onError,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  if (confirmDelete == true) {
+    await provider.deleteMeeting(meetingId);
+    if (!context.mounted) return;
+    if (provider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to delete meeting.')),
+      );
+      provider.clearError();
+    }
   }
 }

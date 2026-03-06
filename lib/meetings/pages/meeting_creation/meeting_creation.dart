@@ -5,3 +5,4 @@ export 'logic/meetings_provider.dart';
 export 'ui/management_tab.dart';
 export 'ui/components/meeting_card.dart';
 export 'ui/components/create_meeting_dialog.dart';
+export 'ui/components/edit_meeting_dialog.dart';

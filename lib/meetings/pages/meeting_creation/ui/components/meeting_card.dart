@@ -7,19 +7,29 @@ import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart'
 /// A card displaying summary information for a single [Meeting].
 class MeetingCard extends StatelessWidget {
   final Meeting meeting;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final bool isDeleting;
 
-  const MeetingCard({super.key, required this.meeting});
+  const MeetingCard({
+    super.key,
+    required this.meeting,
+    this.onEdit,
+    this.onDelete,
+    this.isDeleting = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final cardColor =
-        isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
+    final cardColor = isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
     final accentColor = isDark ? AppColors.goldAccent : AppColors.primaryBlue;
-    final secondaryTextColor =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final secondaryTextColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final hasPositivePrice = (meeting.price ?? 0) > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -78,12 +88,14 @@ class MeetingCard extends StatelessWidget {
                     theme: theme,
                   ),
                 ],
-                // Price row (optional) - always show in EGP
-                if (meeting.price != null) ...[
+                // Price row (optional) - show only when strictly positive
+                if (hasPositivePrice) ...[
                   const SizedBox(height: 3),
                   _MetaRow(
                     icon: Icons.attach_money,
-                    label: NumberFormat.currency(symbol: 'EGP ').format(meeting.price!),
+                    label: NumberFormat.currency(
+                      symbol: 'EGP ',
+                    ).format(meeting.price!),
                     secondaryColor: secondaryTextColor,
                     theme: theme,
                     maxLines: 1,
@@ -104,6 +116,46 @@ class MeetingCard extends StatelessWidget {
               ],
             ),
           ),
+          if (isDeleting)
+            const Padding(
+              padding: EdgeInsets.only(left: 8, top: 2),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: 'Edit meeting',
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: secondaryTextColor,
+                      ),
+                      onPressed: onEdit,
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      tooltip: 'Delete meeting',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: AppColors.error,
+                      ),
+                      onPressed: onDelete,
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -144,9 +196,7 @@ class _MetaRow extends StatelessWidget {
             label,
             maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: secondaryColor,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: secondaryColor),
           ),
         ),
       ],

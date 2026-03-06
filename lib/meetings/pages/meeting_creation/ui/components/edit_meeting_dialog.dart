@@ -2,44 +2,147 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:masapp/core/constants/app_colors.dart';
+import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 import 'package:masapp/meetings/pages/meeting_creation/logic/meetings_provider.dart';
 
-/// Dialog for scheduling a new meeting.
-/// Uses a [Dialog] widget (not AlertDialog) with constrained max width.
-class CreateMeetingDialog extends StatefulWidget {
-  const CreateMeetingDialog({super.key});
+/// Dialog for editing an existing [Meeting].
+///
+/// Mirrors [CreateMeetingDialog] UX but starts prefilled and keeps the
+/// save action disabled until changes are detected.
+class EditMeetingDialog extends StatefulWidget {
+  final Meeting meeting;
+
+  const EditMeetingDialog({super.key, required this.meeting});
 
   @override
-  State<CreateMeetingDialog> createState() => _CreateMeetingDialogState();
+  State<EditMeetingDialog> createState() => _EditMeetingDialogState();
 }
 
-class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
+class _EditMeetingDialogState extends State<EditMeetingDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  String? _modalError;
+
+  final _dateDisplayController = TextEditingController();
+  final _startTimeDisplayController = TextEditingController();
+  final _endTimeDisplayController = TextEditingController();
 
   DateTime? _meetingDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
-  // Display controllers for the read-only date/time fields
-  final _dateDisplayController = TextEditingController();
-  final _startTimeDisplayController = TextEditingController();
-  final _endTimeDisplayController = TextEditingController();
+  late final String _initialTitle;
+  late final String _initialLocation;
+  late final String? _initialDescription;
+  late final int? _initialPrice;
+  late final DateTime? _initialMeetingDate;
+  late final TimeOfDay? _initialStartTime;
+  late final TimeOfDay? _initialEndTime;
+
+  bool _hasChanges = false;
+  String? _modalError;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFromMeeting();
+    _titleController.addListener(_onFormChanged);
+    _locationController.addListener(_onFormChanged);
+    _descriptionController.addListener(_onFormChanged);
+    _priceController.addListener(_onFormChanged);
+  }
 
   @override
   void dispose() {
+    _titleController.removeListener(_onFormChanged);
+    _locationController.removeListener(_onFormChanged);
+    _descriptionController.removeListener(_onFormChanged);
+    _priceController.removeListener(_onFormChanged);
     _titleController.dispose();
     _locationController.dispose();
     _descriptionController.dispose();
+    _priceController.dispose();
     _dateDisplayController.dispose();
     _startTimeDisplayController.dispose();
     _endTimeDisplayController.dispose();
-    _priceController.dispose();
     super.dispose();
+  }
+
+  void _initializeFromMeeting() {
+    final meeting = widget.meeting;
+
+    _initialTitle = meeting.title.trim();
+    _initialLocation = (meeting.location ?? '').trim();
+    _initialDescription = _normalizeOptionalText(meeting.description);
+    _initialPrice = _normalizeModelPrice(meeting.price);
+    _initialMeetingDate = DateTime(
+      meeting.meetingDate.year,
+      meeting.meetingDate.month,
+      meeting.meetingDate.day,
+    );
+    _initialStartTime = meeting.startsAt != null
+        ? TimeOfDay.fromDateTime(meeting.startsAt!)
+        : null;
+    _initialEndTime = meeting.endsAt != null
+        ? TimeOfDay.fromDateTime(meeting.endsAt!)
+        : null;
+
+    _meetingDate = _initialMeetingDate;
+    _startTime = _initialStartTime;
+    _endTime = _initialEndTime;
+
+    _titleController.text = meeting.title;
+    _locationController.text = meeting.location ?? '';
+    _descriptionController.text = meeting.description ?? '';
+    _priceController.text = _initialPrice?.toString() ?? '';
+    _dateDisplayController.text = _meetingDate != null
+        ? _formatDate(_meetingDate!)
+        : '';
+    _startTimeDisplayController.text = _startTime != null
+        ? _formatTime(_startTime!)
+        : '';
+    _endTimeDisplayController.text = _endTime != null
+        ? _formatTime(_endTime!)
+        : '';
+  }
+
+  void _onFormChanged() {
+    final hasChanges = _computeHasChanges();
+    if (hasChanges != _hasChanges && mounted) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
+  }
+
+  bool _computeHasChanges() {
+    final currentTitle = _titleController.text.trim();
+    final currentLocation = _locationController.text.trim();
+    final currentDescription = _normalizeOptionalText(
+      _descriptionController.text,
+    );
+
+    final rawPrice = _priceController.text.trim();
+    final parsedPrice = _parsePrice(rawPrice);
+    final isInvalidPrice = rawPrice.isNotEmpty && parsedPrice == null;
+
+    final titleChanged = currentTitle != _initialTitle;
+    final locationChanged = currentLocation != _initialLocation;
+    final descriptionChanged = currentDescription != _initialDescription;
+    final priceChanged = isInvalidPrice || parsedPrice != _initialPrice;
+    final meetingDateChanged = !_sameDate(_meetingDate, _initialMeetingDate);
+    final startChanged = !_sameTime(_startTime, _initialStartTime);
+    final endChanged = !_sameTime(_endTime, _initialEndTime);
+
+    return titleChanged ||
+        locationChanged ||
+        descriptionChanged ||
+        priceChanged ||
+        meetingDateChanged ||
+        startChanged ||
+        endChanged;
   }
 
   String _formatDate(DateTime date) {
@@ -61,11 +164,26 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   }
 
   String _formatTime(TimeOfDay time) {
-    // Convert TimeOfDay to a 12-hour string like '6:00 PM'.
     final hour12 = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final min = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour12:$min $period';
+  }
+
+  DateTime _combine(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  int? _normalizeModelPrice(double? value) {
+    if (value == null) return null;
+    if (value % 1 != 0) return null;
+    return value.toInt();
+  }
+
+  String? _normalizeOptionalText(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   int? _parsePrice(String? input) {
@@ -77,7 +195,17 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     return int.tryParse(normalized);
   }
 
-  String _mapCreateError(String rawError) {
+  bool _sameDate(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return a == b;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _sameTime(TimeOfDay? a, TimeOfDay? b) {
+    if (a == null || b == null) return a == b;
+    return a.hour == b.hour && a.minute == b.minute;
+  }
+
+  String _mapUpdateError(String rawError) {
     final lower = rawError.toLowerCase();
     if (lower.contains('smallint') ||
         lower.contains('22p02') ||
@@ -89,7 +217,7 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
         lower.contains('greater than 0')) {
       return 'Price must be a whole number between 1 and 32,767 EGP.';
     }
-    return 'Failed to create meeting. Please review the form and try again.';
+    return 'Failed to update meeting. Please review the form and try again.';
   }
 
   Future<void> _pickDate() async {
@@ -97,13 +225,15 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _meetingDate ?? now,
-      firstDate: DateTime(now.year - 1),
+      firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 5),
     );
+
     if (picked != null && mounted) {
       setState(() {
         _meetingDate = picked;
         _dateDisplayController.text = _formatDate(picked);
+        _hasChanges = _computeHasChanges();
       });
     }
   }
@@ -113,10 +243,12 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
       context: context,
       initialTime: _startTime ?? const TimeOfDay(hour: 18, minute: 0),
     );
+
     if (picked != null && mounted) {
       setState(() {
         _startTime = picked;
         _startTimeDisplayController.text = _formatTime(picked);
+        _hasChanges = _computeHasChanges();
       });
     }
   }
@@ -124,65 +256,45 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   Future<void> _pickEndTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          _endTime ??
-          (_startTime != null
-              ? TimeOfDay(
-                  hour: (_startTime!.hour + 2) % 24,
-                  minute: _startTime!.minute,
-                )
-              : const TimeOfDay(hour: 20, minute: 0)),
+      initialTime: _endTime ?? const TimeOfDay(hour: 20, minute: 0),
     );
+
     if (picked != null && mounted) {
       setState(() {
         _endTime = picked;
         _endTimeDisplayController.text = _formatTime(picked);
+        _hasChanges = _computeHasChanges();
       });
     }
   }
 
-  DateTime _combine(DateTime date, TimeOfDay time) {
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
-  }
-
   Future<void> _submit(MeetingsProvider provider) async {
-    // Dismiss keyboard
     FocusScope.of(context).unfocus();
 
-    // Validate form fields (this triggers field-level validators which
-    // render red borders / helper text). If invalid, abort — do not use
-    // SnackBar for validation failures because the dialog can obscure it.
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
+    if (!_hasChanges) return;
 
     setState(() {
       _modalError = null;
     });
 
-    // At this point validators guarantee non-null values
-    final startsAt = _combine(_meetingDate!, _startTime!);
-    final endsAt = _combine(_meetingDate!, _endTime!);
-
-    // Parse optional price (validated by form)
-    final price = _parsePrice(_priceController.text);
-
-    await provider.createMeeting(
+    await provider.updateMeeting(
+      meetingId: widget.meeting.id,
       title: _titleController.text.trim(),
       location: _locationController.text.trim(),
       meetingDate: _meetingDate!,
-      startsAt: startsAt,
-      endsAt: endsAt,
-      description: _descriptionController.text.trim().isNotEmpty
-          ? _descriptionController.text.trim()
-          : null,
-      price: price,
+      startsAt: _combine(_meetingDate!, _startTime!),
+      endsAt: _combine(_meetingDate!, _endTime!),
+      description: _normalizeOptionalText(_descriptionController.text),
+      price: _parsePrice(_priceController.text),
     );
 
     if (!mounted) return;
 
     if (provider.error != null) {
       setState(() {
-        _modalError = _mapCreateError(provider.error!);
+        _modalError = _mapUpdateError(provider.error!);
       });
       provider.clearError();
       return;
@@ -216,9 +328,8 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title
                       Text(
-                        'Schedule Meeting',
+                        'Edit Meeting',
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -241,36 +352,26 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                         ),
                       ],
                       const SizedBox(height: 20),
-
-                      // Meeting Title field
                       _buildTextField(
-                        context: context,
                         controller: _titleController,
                         label: 'Meeting Title',
                         hint: 'e.g. Weekly Troop Meeting',
-                        isDark: isDark,
                         theme: theme,
                         validator: (v) => (v?.trim().isEmpty ?? true)
                             ? 'Please enter a meeting title'
                             : null,
                       ),
                       const SizedBox(height: 14),
-
-                      // Location field
                       _buildTextField(
-                        context: context,
                         controller: _locationController,
                         label: 'Location',
                         hint: 'e.g. Community Hall',
-                        isDark: isDark,
                         theme: theme,
                         validator: (v) => (v?.trim().isEmpty ?? true)
                             ? 'Please enter a location'
                             : null,
                       ),
                       const SizedBox(height: 14),
-
-                      // Date field (read-only, tap to pick)
                       TextFormField(
                         controller: _dateDisplayController,
                         readOnly: true,
@@ -279,29 +380,16 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                           label: 'Date',
                           hint: 'Select date',
                           suffixIcon: Icons.calendar_today_outlined,
-                          isDark: isDark,
                           theme: theme,
                         ),
                         validator: (_) {
                           if (_meetingDate == null) {
                             return 'Please select a date';
                           }
-                          final now = DateTime.now();
-                          final selected = DateTime(
-                            _meetingDate!.year,
-                            _meetingDate!.month,
-                            _meetingDate!.day,
-                          );
-                          final today = DateTime(now.year, now.month, now.day);
-                          if (selected.isBefore(today)) {
-                            return 'Date cannot be in the past';
-                          }
                           return null;
                         },
                       ),
                       const SizedBox(height: 14),
-
-                      // Start time & End time in a row
                       Row(
                         children: [
                           Expanded(
@@ -313,7 +401,6 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                                 label: 'Start Time',
                                 hint: '6:00 PM',
                                 suffixIcon: Icons.access_time_outlined,
-                                isDark: isDark,
                                 theme: theme,
                               ),
                               validator: (_) => _startTime == null
@@ -331,7 +418,6 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                                 label: 'End Time',
                                 hint: '8:00 PM',
                                 suffixIcon: Icons.access_time_outlined,
-                                isDark: isDark,
                                 theme: theme,
                               ),
                               validator: (_) {
@@ -360,15 +446,12 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      // Price field (optional)
                       TextFormField(
                         controller: _priceController,
                         keyboardType: TextInputType.number,
                         decoration: _inputDecoration(
                           label: 'Price (optional)',
                           hint: '5',
-                          isDark: isDark,
                           theme: theme,
                         ),
                         validator: (v) {
@@ -387,32 +470,26 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                         },
                       ),
                       const SizedBox(height: 14),
-
-                      // Description field (optional)
                       _buildTextField(
-                        context: context,
                         controller: _descriptionController,
                         label: 'Description (optional)',
                         hint: 'Any additional details...',
-                        isDark: isDark,
                         theme: theme,
                         maxLines: 3,
                       ),
                       const SizedBox(height: 24),
-
-                      // Action buttons
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           TextButton(
-                            onPressed: provider.isCreating
+                            onPressed: provider.isUpdating
                                 ? null
                                 : () => Navigator.of(context).pop(),
                             child: const Text('Cancel'),
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton(
-                            onPressed: provider.isCreating
+                            onPressed: (provider.isUpdating || !_hasChanges)
                                 ? null
                                 : () => _submit(provider),
                             style: ElevatedButton.styleFrom(
@@ -422,6 +499,16 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                               foregroundColor: isDark
                                   ? AppColors.textPrimaryLight
                                   : theme.colorScheme.onPrimary,
+                              disabledBackgroundColor:
+                                  (isDark
+                                          ? AppColors.goldAccent
+                                          : AppColors.primaryBlue)
+                                      .withValues(alpha: 0.45),
+                              disabledForegroundColor:
+                                  (isDark
+                                          ? AppColors.textPrimaryLight
+                                          : theme.colorScheme.onPrimary)
+                                      .withValues(alpha: 0.8),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -430,7 +517,7 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                                 vertical: 12,
                               ),
                             ),
-                            child: provider.isCreating
+                            child: provider.isUpdating
                                 ? SizedBox(
                                     width: 18,
                                     height: 18,
@@ -439,7 +526,7 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
                                       color: AppColors.textPrimaryLight,
                                     ),
                                   )
-                                : const Text('Submit'),
+                                : const Text('Save Changes'),
                           ),
                         ],
                       ),
@@ -455,11 +542,9 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   }
 
   Widget _buildTextField({
-    required BuildContext context,
     required TextEditingController controller,
     required String label,
     required String hint,
-    required bool isDark,
     required ThemeData theme,
     String? Function(String?)? validator,
     int maxLines = 1,
@@ -468,12 +553,7 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
       controller: controller,
       maxLines: maxLines,
       textCapitalization: TextCapitalization.sentences,
-      decoration: _inputDecoration(
-        label: label,
-        hint: hint,
-        isDark: isDark,
-        theme: theme,
-      ),
+      decoration: _inputDecoration(label: label, hint: hint, theme: theme),
       validator: validator,
     );
   }
@@ -481,7 +561,6 @@ class _CreateMeetingDialogState extends State<CreateMeetingDialog> {
   InputDecoration _inputDecoration({
     required String label,
     required String hint,
-    required bool isDark,
     required ThemeData theme,
     IconData? suffixIcon,
   }) {

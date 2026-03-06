@@ -24,9 +24,12 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
-add UI save button in attendance - PROMPTED
-meetings dropdown view UI - PROMPTED
-CRUD for meeting Management
+
+- POINTS SYSTEM
+- add ttl caching for attendance & points
+- Scout View for WHOLE Meeting tab
+- Homepage for scout
+- re-design profiles tab to handle all data & QR
 
 ---------------------------------------------------------
 

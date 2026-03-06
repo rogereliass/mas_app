@@ -98,8 +98,8 @@ class MeetingsService {
     int? price,
   }) async {
     try {
-      if (price != null && (price < 0 || price > 32767)) {
-        throw Exception('Meeting price must be between 0 and 32767.');
+      if (price != null && (price <= 0 || price > 32767)) {
+        throw Exception('Meeting price must be between 1 and 32767.');
       }
 
       final payload = <String, dynamic>{
@@ -125,6 +125,56 @@ class MeetingsService {
       return Meeting.fromJson(result);
     } catch (e) {
       throw Exception('MeetingsService.createMeeting: $e');
+    }
+  }
+
+  /// Updates an existing meeting row and returns the updated [Meeting].
+  Future<Meeting> updateMeeting({
+    required String meetingId,
+    required String title,
+    required String location,
+    required DateTime meetingDate,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    String? description,
+    int? price,
+  }) async {
+    try {
+      if (price != null && (price <= 0 || price > 32767)) {
+        throw Exception('Meeting price must be between 1 and 32767.');
+      }
+
+      final payload = <String, dynamic>{
+        'title': title,
+        'location': location,
+        'meeting_date': meetingDate.toIso8601String().substring(0, 10),
+        'starts_at': startsAt.toIso8601String(),
+        'ends_at': endsAt.toIso8601String(),
+        'description': (description?.trim().isEmpty ?? true)
+            ? null
+            : description!.trim(),
+        'price': price,
+      };
+
+      final result = await _supabase
+          .from('meetings')
+          .update(payload)
+          .eq('id', meetingId)
+          .select()
+          .single();
+
+      return Meeting.fromJson(result);
+    } catch (e) {
+      throw Exception('MeetingsService.updateMeeting: $e');
+    }
+  }
+
+  /// Deletes a meeting row by [meetingId].
+  Future<void> deleteMeeting(String meetingId) async {
+    try {
+      await _supabase.from('meetings').delete().eq('id', meetingId);
+    } catch (e) {
+      throw Exception('MeetingsService.deleteMeeting: $e');
     }
   }
 }

@@ -95,32 +95,18 @@ class _AttendanceTabState extends State<AttendanceTab> {
           return const _NoMeetingsView();
         }
 
-        return Stack(
+        return Column(
           children: [
-            Column(
-              children: [
-                // Meeting selector dropdown.
-                // ValueKey forces a fresh FormField state whenever the provider
-                // itself changes the selection (e.g. auto-select on load/reload).
-                _MeetingDropdown(
-                  key: ValueKey(provider.selectedMeetingId),
-                  provider: provider,
-                ),
-                // Member list
-                Expanded(child: _buildMemberList(context, provider)),
-                // Keep the full-width save button for clarity on larger devices.
-                if (provider.isEditor && provider.hasUnsavedChanges)
-                  _SaveButton(provider: provider),
-              ],
+            // Meeting selector dropdown.
+            // ValueKey forces a fresh FormField state whenever the provider
+            // itself changes the selection (e.g. auto-select on load/reload).
+            _MeetingDropdown(
+              key: ValueKey(provider.selectedMeetingId),
+              provider: provider,
             ),
-
-            // Small chic floating save button for quick manual saves.
-            if (provider.isEditor && provider.hasUnsavedChanges)
-              Positioned(
-                right: 20,
-                bottom: 28,
-                child: _FloatingSaveFab(provider: provider),
-              ),
+            if (provider.isEditor) _AttendanceActions(provider: provider),
+            // Member list
+            Expanded(child: _buildMemberList(context, provider)),
           ],
         );
       },
@@ -162,35 +148,138 @@ class _AttendanceTabState extends State<AttendanceTab> {
 }
 
 // ---------------------------------------------------------------------------
-// Small floating save FAB for quick manual saves
+// Attendance actions below dropdown (scan + manual save)
 // ---------------------------------------------------------------------------
 
-class _FloatingSaveFab extends StatelessWidget {
+class _AttendanceActions extends StatelessWidget {
   final AttendanceProvider provider;
 
-  const _FloatingSaveFab({required this.provider});
+  const _AttendanceActions({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 500;
+          final scanButton = _ScanQrCodesButton(provider: provider);
+          final saveButton = _SaveAttendanceButton(provider: provider);
+
+          if (isNarrow) {
+            return Column(
+              children: [
+                SizedBox(width: double.infinity, child: scanButton),
+                const SizedBox(height: 10),
+                SizedBox(width: double.infinity, child: saveButton),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: scanButton),
+              const SizedBox(width: 12),
+              Expanded(child: saveButton),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ScanQrCodesButton extends StatelessWidget {
+  final AttendanceProvider provider;
+
+  const _ScanQrCodesButton({required this.provider});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final modified = provider.modifiedCount;
 
-    return FloatingActionButton.small(
-      onPressed: provider.isSaving ? null : () => provider.saveChanges(),
-      backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
-      foregroundColor: isDark
-          ? AppColors.textPrimaryLight
-          : theme.colorScheme.onPrimary,
-      tooltip: modified > 0 ? 'Save ($modified)' : 'Save',
-      elevation: 6,
-      child: provider.isSaving
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+    return OutlinedButton.icon(
+      onPressed: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('QR scanning will be added soon.')),
+        );
+      },
+      icon: const Icon(Icons.qr_code_scanner_outlined, size: 18),
+      label: const Text('Scan QR Codes'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isDark
+            ? AppColors.textPrimaryDark
+            : AppColors.textPrimaryLight,
+        side: BorderSide(
+          color: isDark ? AppColors.dividerDark : AppColors.divider,
+        ),
+        backgroundColor: isDark
+            ? AppColors.surfaceDark
+            : AppColors.surfaceLight,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _SaveAttendanceButton extends StatelessWidget {
+  final AttendanceProvider provider;
+
+  const _SaveAttendanceButton({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return ElevatedButton.icon(
+      onPressed: (provider.isSaving || !provider.hasUnsavedChanges)
+          ? null
+          : () => provider.saveChanges(),
+      icon: provider.isSaving
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: isDark
+                    ? AppColors.textPrimaryLight
+                    : theme.colorScheme.onPrimary,
+              ),
             )
-          : const Icon(Icons.save),
+          : const Icon(Icons.save_outlined, size: 18),
+      label: Text(
+        provider.isSaving
+            ? 'Saving...'
+            : provider.hasUnsavedChanges
+            ? 'Save Attendance (${provider.modifiedCount})'
+            : 'Save Attendance',
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
+        foregroundColor: isDark
+            ? AppColors.textPrimaryLight
+            : theme.colorScheme.onPrimary,
+        disabledBackgroundColor:
+            (isDark ? AppColors.goldAccent : AppColors.primaryBlue).withValues(
+              alpha: 0.45,
+            ),
+        disabledForegroundColor:
+            (isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary)
+                .withValues(alpha: 0.85),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -322,6 +411,13 @@ class _MeetingDropdown extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cardColor = isDark ? AppColors.cardDarkElevated : AppColors.cardLight;
+    final textColor = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final borderColor = isDark ? AppColors.dividerDark : AppColors.divider;
     final meetingsById = <String, Meeting>{
       for (final meeting in provider.meetings) meeting.id: meeting,
     };
@@ -334,37 +430,59 @@ class _MeetingDropdown extends StatelessWidget {
 
     return Material(
       elevation: 2,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(18),
       color: cardColor,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
         child: DropdownButtonFormField<String>(
           initialValue: dropdownSelectedMeetingId,
           isExpanded: true,
-          itemHeight: 56,
+          itemHeight: 58,
+          iconEnabledColor: theme.colorScheme.primary,
+          dropdownColor: isDark ? AppColors.cardDark : AppColors.cardLight,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+          ),
+          menuMaxHeight: 320,
           decoration: InputDecoration(
             hintText: 'Select meeting',
             prefixIcon: Icon(Icons.event, color: theme.colorScheme.primary),
+            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: secondaryTextColor,
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 10,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary,
+                width: 1.5,
+              ),
             ),
             filled: true,
-            fillColor: cardColor,
+            fillColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
           ),
           selectedItemBuilder: (context) {
             return dropdownMeetings.map((m) {
               return Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  provider.selectedMeeting?.title ?? m.title,
+                  '${m.title} • ${m.formattedDate}',
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: theme.textTheme.bodyMedium?.copyWith(
+                    color: textColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -378,7 +496,7 @@ class _MeetingDropdown extends StatelessWidget {
                 '${m.title} • ${m.formattedDate}',
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
               ),
             );
           }).toList(),
@@ -651,67 +769,5 @@ class _PatrolSection extends StatelessWidget {
         // Swallow: defensive - controller may already be disposed by framework.
       }
     });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Save button
-// ---------------------------------------------------------------------------
-
-class _SaveButton extends StatelessWidget {
-  final AttendanceProvider provider;
-
-  const _SaveButton({required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final modifiedCount = provider.modifiedCount;
-
-    return Container(
-      width: double.infinity,
-      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: ElevatedButton.icon(
-        onPressed: provider.isSaving ? null : () => provider.saveChanges(),
-        icon: provider.isSaving
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.textPrimaryLight,
-                ),
-              )
-            : const Icon(Icons.save_outlined),
-        label: Text(
-          provider.isSaving
-              ? 'Saving...'
-              : 'Save Changes ($modifiedCount unsaved)',
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isDark
-              ? AppColors.goldAccent
-              : AppColors.primaryBlue,
-          foregroundColor: isDark
-              ? AppColors.textPrimaryLight
-              : theme.colorScheme.onPrimary,
-          disabledBackgroundColor:
-              (isDark ? AppColors.goldAccent : AppColors.primaryBlue)
-                  .withValues(alpha: 0.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          textStyle: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
   }
 }

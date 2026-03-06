@@ -26,6 +26,8 @@ class MeetingsProvider with ChangeNotifier {
 
   bool _isLoading = false;
   bool _isCreating = false;
+  bool _isUpdating = false;
+  final Set<String> _deletingMeetingIds = {};
   String? _error;
   bool _noActiveSeason = false;
 
@@ -88,12 +90,16 @@ class MeetingsProvider with ChangeNotifier {
 
   bool get isLoading => _isLoading;
   bool get isCreating => _isCreating;
+  bool get isUpdating => _isUpdating;
   String? get error => _error;
   bool get noActiveSeason => _noActiveSeason;
   List<Meeting> get meetings => List.unmodifiable(_meetings);
   List<Map<String, dynamic>> get troops => List.unmodifiable(_troops);
   Map<String, dynamic>? get activeSeason => _activeSeason;
   String? get selectedTroopId => _selectedTroopId;
+
+  bool isDeletingMeeting(String meetingId) =>
+      _deletingMeetingIds.contains(meetingId);
 
   /// Users with rank >= 60 (Troop Leader, Troop Head, Admin) may create/edit.
   /// Uses globally selected role context from AuthProvider.
@@ -208,8 +214,9 @@ class MeetingsProvider with ChangeNotifier {
     String? description,
     int? price,
   }) async {
-    if (_isCreating || effectiveTroopId == null || activeSeasonId == null)
+    if (_isCreating || effectiveTroopId == null || activeSeasonId == null) {
       return;
+    }
 
     final createdByProfileId = _authProvider.currentUserProfile?.id;
     if (createdByProfileId == null) {
@@ -242,6 +249,78 @@ class MeetingsProvider with ChangeNotifier {
       _error = e.toString();
     } finally {
       _isCreating = false;
+      notifyListeners();
+    }
+  }
+
+  /// Updates an existing meeting and refreshes it in local state.
+  Future<void> updateMeeting({
+    required String meetingId,
+    required String title,
+    required String location,
+    required DateTime meetingDate,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    String? description,
+    int? price,
+  }) async {
+    if (!canEdit || _isUpdating) return;
+    if (!_meetings.any((m) => m.id == meetingId)) {
+      _error = 'Could not update meeting: meeting not found.';
+      notifyListeners();
+      return;
+    }
+
+    _isUpdating = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updatedMeeting = await _service.updateMeeting(
+        meetingId: meetingId,
+        title: title,
+        location: location,
+        meetingDate: meetingDate,
+        startsAt: startsAt,
+        endsAt: endsAt,
+        description: description,
+        price: price,
+      );
+
+      _meetings =
+          _meetings
+              .map(
+                (meeting) => meeting.id == meetingId ? updatedMeeting : meeting,
+              )
+              .toList()
+            ..sort((a, b) => a.meetingDate.compareTo(b.meetingDate));
+    } catch (e, st) {
+      debugPrint('MeetingsProvider.updateMeeting error: $e\n$st');
+      _error = e.toString();
+    } finally {
+      _isUpdating = false;
+      notifyListeners();
+    }
+  }
+
+  /// Deletes a meeting and removes it from local state.
+  Future<void> deleteMeeting(String meetingId) async {
+    if (!canEdit || _deletingMeetingIds.contains(meetingId)) return;
+
+    _deletingMeetingIds.add(meetingId);
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _service.deleteMeeting(meetingId);
+      _meetings = _meetings
+          .where((meeting) => meeting.id != meetingId)
+          .toList();
+    } catch (e, st) {
+      debugPrint('MeetingsProvider.deleteMeeting error: $e\n$st');
+      _error = e.toString();
+    } finally {
+      _deletingMeetingIds.remove(meetingId);
       notifyListeners();
     }
   }
