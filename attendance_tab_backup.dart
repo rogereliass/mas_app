@@ -810,24 +810,23 @@ class _ScoutAttendanceView extends StatelessWidget {
       return const _NoMeetingsView();
     }
 
-    // Make the entire view scrollable
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100), // Padding only at the bottom for scroll
-      itemCount: provider.myLogs.length + 1, // +1 for the stats card at the top
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _ScoutStatsCard(provider: provider);
-        }
-        
-        final log = provider.myLogs[index - 1]; // Offset index
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _LogCard(
-            key: ValueKey(log.meeting.id),
-            log: log,
+    return Column(
+      children: [
+        _ScoutStatsCard(provider: provider),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+            itemCount: provider.myLogs.length,
+            itemBuilder: (context, index) {
+              final log = provider.myLogs[index];
+              return _LogCard(
+                key: ValueKey(log.meeting.id),
+                log: log,
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
@@ -849,155 +848,128 @@ class _ScoutStatsCard extends StatelessWidget {
     final unrecorded = provider.scoutUnrecordedCount;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : AppColors.primaryBlue).withValues(alpha: isDark ? 0.3 : 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: (isDark ? Colors.black : const Color(0xFFE0E0E0)) // AppColors.divider fallback
+                .withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          BoxShadow(
-            color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.5),
-            blurRadius: 0,
-            spreadRadius: 1,
-            offset: const Offset(0, 0),
-          )
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Attendance Insights',
+                'Attendance Overview',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  fontWeight: FontWeight.bold,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Total: $total',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
+              Text(
+                ' Meetings',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          
-          // Detailed Breakdown Rows (Big circle removed)
-          _buildStatRow(context, 'Present', present, total, AppColors.success, Icons.check_circle_rounded),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Absent', absent, total, AppColors.error, Icons.cancel_rounded),
+          // Horizontal Segmentation Bar
+          Container(
+            height: 16,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: isDark ? AppColors.dividerDark : AppColors.divider,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Row(
+              children: [
+                if (present > 0)
+                  Expanded(
+                    flex: present,
+                    child: Container(color: AppColors.success),
+                  ),
+                if (lateCount > 0)
+                  Expanded(
+                    flex: lateCount,
+                    child: Container(color: AppColors.warning),
+                  ),
+                if (absent > 0)
+                  Expanded(
+                    flex: absent,
+                    child: Container(color: AppColors.error),
+                  ),
+                if (excused > 0)
+                  Expanded(
+                    flex: excused,
+                    child: Container(color: AppColors.info),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Late', lateCount, total, AppColors.warning, Icons.watch_later_rounded),
-          const SizedBox(height: 16),
-          _buildStatRow(context, 'Excused', excused, total, AppColors.info, Icons.info_rounded),
-          const SizedBox(height: 16),
-          _buildStatRow(context, 'Unrecorded', unrecorded, total, isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, Icons.help_rounded),
+          // Legend
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  if (present > 0) _StatBadge(label: 'Present ()', color: AppColors.success),
+                  if (lateCount > 0) _StatBadge(label: 'Late ()', color: AppColors.warning),
+                  if (absent > 0) _StatBadge(label: 'Absent ()', color: AppColors.error),
+                  if (excused > 0) _StatBadge(label: 'Excused ()', color: AppColors.info),
+                  if (unrecorded > 0)
+                    _StatBadge(
+                      label: 'Unrecorded ()',
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.divider,
+                    ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStatRow(BuildContext context, String label, int count, int total, Color color, IconData icon) {
-    if (total == 0) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    final double fraction = count / total;
-    final int percentage = (fraction * 100).round();
+class _StatBadge extends StatelessWidget {
+  final String label;
+  final Color color;
 
+  const _StatBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Icon Box
         Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color, size: 24),
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
-        const SizedBox(width: 16),
-        
-        // Label & Bar
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  Text(
-                    '$count ($percentage%)',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: color,
-                    ),
-                  ),
-                ],
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 8),
-              // Linear Progress Bar
-              Container(
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.dividerDark : AppColors.divider,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                alignment: Alignment.centerLeft,
-                // Smooth load-in animation
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: fraction),
-                  duration: const Duration(milliseconds: 1200),
-                  curve: Curves.easeOutQuart,
-                  builder: (context, value, _) {
-                    return FractionallySizedBox(
-                      widthFactor: value,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            )
-                          ]
-                        ),
-                      ),
-                    );
-                  }
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );

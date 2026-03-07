@@ -48,6 +48,16 @@ class AttendanceProvider with ChangeNotifier {
   String? _error;
   bool _noMeetings = false;
 
+  // -- Scout Personal Logs --
+  List<MyAttendanceLog> _myLogs = [];
+  List<MyAttendanceLog> get myLogs => _myLogs;
+
+  int get scoutPresentCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.present).length;
+  int get scoutAbsentCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.absent).length;
+  int get scoutLateCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.late).length;
+  int get scoutExcusedCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.excused).length;
+  int get scoutUnrecordedCount => _myLogs.where((l) => !l.isRecorded).length;
+
   // ── Constructor / lifecycle ────────────────────────────────────────────────
 
   AttendanceProvider({
@@ -150,6 +160,22 @@ class AttendanceProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      // If user is not an editor (e.g., Scout/Rover rank), fetch their personal logs
+      if (!isEditor) {
+        final profileId = _authProvider.currentUserProfile?.id;
+        if (profileId != null) {
+          _myLogs = await _attendanceService.fetchMyAttendanceForSeason(
+            profileId: profileId,
+            troopId: troopId,
+            seasonId: seasonId,
+          );
+          _meetings = _myLogs.map((log) => log.meeting).toList();
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+      }
+
       final fetched = await _meetingsService.fetchMeetings(
         seasonId: seasonId,
         troopId: troopId,

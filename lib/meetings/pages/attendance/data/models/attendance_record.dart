@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 // ---------------------------------------------------------------------------
 // AttendanceStatus enum
@@ -175,4 +176,20 @@ class MemberWithAttendance {
   @override
   String toString() =>
       'MemberWithAttendance(profileId: $profileId, displayName: $displayName)';
+}
+
+// ---------------------------------------------------------------------------
+// MyAttendanceLog (For Scout Dashboard)
+// ---------------------------------------------------------------------------
+
+class MyAttendanceLog {
+  final Meeting meeting;
+  final AttendanceRecord? record;
+
+  const MyAttendanceLog({
+    required this.meeting,
+    this.record,
+  });
+
+  bool get isRecorded => record != null;
 }

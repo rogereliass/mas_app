@@ -26,12 +26,11 @@ Act as a senior production software engineer and review this implementation to e
 
 - clean copilot instructions
 
-- Scout View for WHOLE Meeting tab - check if already done.
 - add ttl caching for attendance & points
 - Homepage for scout
 - re-design profiles tab to handle all data & QR
 - role management for system admin
--add switch troop in meeting tab for admins
+- add switch troop in meeting tab for admins
 
 ---------------------------------------------------------
 

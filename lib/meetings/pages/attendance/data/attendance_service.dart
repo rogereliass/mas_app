@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
+import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 /// Service responsible for all Supabase operations related to attendance.
 class AttendanceService {
@@ -179,6 +180,61 @@ class AttendanceService {
       );
     } catch (e) {
       throw Exception('AttendanceService.batchUpdateAttendance: $e');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Scout Dashboard
+  // -------------------------------------------------------------------------
+
+  /// Fetches an optimized list of a specific user's attendance for a season.
+  /// Combines meetings data and attendance records.
+  Future<List<MyAttendanceLog>> fetchMyAttendanceForSeason({
+    required String profileId,
+    required String troopId,
+    required String seasonId,
+  }) async {
+    try {
+      // 1) Fetch all meetings for the troop and season in descending order
+      final meetingsResponse = await _supabase
+          .from('meetings')
+          .select()
+          .eq('troop_id', troopId)
+          .eq('season_id', seasonId)
+          .order('meeting_date', ascending: false);
+
+      final List<Meeting> meetings = (meetingsResponse as List)
+          .map((row) => Meeting.fromJson(row))
+          .toList();
+
+      if (meetings.isEmpty) return [];
+
+      final List<String> meetingIds = meetings.map((m) => m.id).toList();
+
+      // 2) Fetch attendance records for this profile ID within these meetings
+      final attendanceResponse = await _supabase
+          .from('attendance')
+          .select()
+          .eq('profile_id', profileId)
+          .inFilter('meeting_id', meetingIds);
+
+      final List<AttendanceRecord> records = (attendanceResponse as List)
+          .map((row) => AttendanceRecord.fromJson(row))
+          .toList();
+
+      // Map for O(1) lookups
+      final recordMap = {for (var r in records) r.meetingId: r};
+
+      // 3) Merge into logs
+      return meetings.map((meeting) {
+        return MyAttendanceLog(
+          meeting: meeting,
+          record: recordMap[meeting.id],
+        );
+      }).toList();
+      
+    } catch (e) {
+      throw Exception('AttendanceService.fetchMyAttendanceForSeason: $e');
     }
   }
 }
