@@ -90,6 +90,9 @@ class _PointsTabState extends State<PointsTab> {
                 onManageCategories: provider.canManageCategories
                     ? () => _showCategoryManagerSheet(provider)
                     : null,
+                onTogglePointsVisibility: provider.canTogglePointsVisibility
+                    ? () => provider.togglePointsVisibility()
+                    : null,
               ),
             Expanded(child: _buildPointsContent(context, provider)),
           ],
@@ -101,6 +104,10 @@ class _PointsTabState extends State<PointsTab> {
   Widget _buildPointsContent(BuildContext context, PointsProvider provider) {
     if (provider.isLoadingPoints) {
       return const LoadingView(message: 'Loading meeting points...');
+    }
+
+    if (provider.troopPointsHidden && provider.isReadOnlyMember) {
+      return const _PointsHiddenView();
     }
 
     if (provider.points.isEmpty) {
@@ -238,119 +245,233 @@ class _PointsActions extends StatelessWidget {
   final PointsProvider provider;
   final VoidCallback onAddPoint;
   final VoidCallback? onManageCategories;
+  final Future<void> Function()? onTogglePointsVisibility;
 
   const _PointsActions({
     required this.provider,
     required this.onAddPoint,
     this.onManageCategories,
+    this.onTogglePointsVisibility,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final showManage = onManageCategories != null;
+    final showToggle = onTogglePointsVisibility != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final addButton = ElevatedButton.icon(
-            onPressed: provider.isSubmitting ? null : onAddPoint,
-            icon: provider.isCreatingPoint
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                  )
-                : const Icon(Icons.add_circle_outline, size: 18),
-            label: Text(
-              provider.isCreatingPoint ? 'Adding...' : 'Add Point',
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+      child: Column(
+        children: [
+          if (showManage || showToggle)
+            _buildManageAndVisibilityRow(
+              context,
+              showManage: showManage,
+              showToggle: showToggle,
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark
-                  ? AppColors.goldAccent
-                  : AppColors.primaryBlue,
-              foregroundColor: isDark
-                  ? AppColors.textPrimaryLight
-                  : theme.colorScheme.onPrimary,
-              disabledBackgroundColor:
-                  (isDark ? AppColors.goldAccent : AppColors.primaryBlue)
-                      .withValues(alpha: 0.45),
-              disabledForegroundColor:
-                  (isDark
-                          ? AppColors.textPrimaryLight
-                          : theme.colorScheme.onPrimary)
-                      .withValues(alpha: 0.85),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              textStyle: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          );
-
-          final manageButton = OutlinedButton.icon(
-            onPressed: provider.isSubmitting ? null : onManageCategories,
-            icon: provider.isCreatingCategory
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
-                  )
-                : const Icon(Icons.tune_outlined, size: 18),
-            label: Text(
-              provider.isCreatingCategory ? 'Saving...' : 'Manage Categories',
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          );
-
-          final showManage = onManageCategories != null;
-
-          if (constraints.maxWidth < 500) {
-            if (!showManage) {
-              return SizedBox(width: double.infinity, child: addButton);
-            }
-
-            return Column(
-              children: [
-                SizedBox(width: double.infinity, child: addButton),
-                const SizedBox(height: 8),
-                SizedBox(width: double.infinity, child: manageButton),
-              ],
-            );
-          }
-
-          if (!showManage) {
-            return Row(children: [Expanded(child: addButton)]);
-          }
-
-          return Row(
-            children: [
-              Expanded(child: addButton),
-              const SizedBox(width: 10),
-              Expanded(child: manageButton),
-            ],
-          );
-        },
+          if (showManage || showToggle) const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: _buildAddButton(theme, isDark),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildAddButton(ThemeData theme, bool isDark) {
+    return ElevatedButton.icon(
+      onPressed: provider.isSubmitting ? null : onAddPoint,
+      icon: provider.isCreatingPoint
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.onPrimary,
+              ),
+            )
+          : const Icon(Icons.add_circle_outline, size: 18),
+      label: Text(provider.isCreatingPoint ? 'Adding Point...' : 'Add Point'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
+        foregroundColor: isDark
+            ? AppColors.textPrimaryLight
+            : theme.colorScheme.onPrimary,
+        disabledBackgroundColor:
+            (isDark ? AppColors.goldAccent : AppColors.primaryBlue).withValues(
+              alpha: 0.45,
+            ),
+        disabledForegroundColor:
+            (isDark ? AppColors.textPrimaryLight : theme.colorScheme.onPrimary)
+                .withValues(alpha: 0.85),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildManageAndVisibilityRow(
+    BuildContext context, {
+    required bool showManage,
+    required bool showToggle,
+  }) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: theme.colorScheme.onSurface,
+      letterSpacing: -0.2, // slightly tighter to fit more text
+    );
+
+    final manageButton = _buildTopActionCard(
+      context,
+      enabled: !provider.isSubmitting,
+      onTap: provider.isSubmitting ? null : onManageCategories,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (provider.isCreatingCategory)
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            )
+          else
+            Icon(
+              Icons.tune_outlined,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              provider.isCreatingCategory ? 'Saving...' : 'Categories',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: labelStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final toggleEnabled =
+        onTogglePointsVisibility != null && !provider.isSubmitting;
+
+    final toggleVisibilityCard = _buildTopActionCard(
+      context,
+      enabled: toggleEnabled,
+      onTap: !toggleEnabled
+          ? null
+          : () {
+              onTogglePointsVisibility!.call();
+            },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            provider.troopPointsHidden
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            size: 16,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              provider.troopPointsHidden ? 'Hidden' : 'Visible',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: labelStyle,
+            ),
+          ),
+          const SizedBox(width: 2),
+          if (provider.isTogglingPointsVisibility)
+            Container(
+              margin: const EdgeInsets.only(left: 6, right: 6),
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            )
+          else
+            Transform.scale(
+              scale: 0.75, // Scale down the switch heavily so it fits nice
+              child: Switch.adaptive(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                value: !provider.troopPointsHidden,
+                onChanged:
+                    onTogglePointsVisibility == null || provider.isSubmitting
+                    ? null
+                    : (_) async {
+                        await onTogglePointsVisibility!.call();
+                      },
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (showManage && showToggle) {
+      return Row(
+        children: [
+          Expanded(child: manageButton),
+          const SizedBox(width: 10),
+          Expanded(child: toggleVisibilityCard),
+        ],
+      );
+    }
+
+    if (showManage) {
+      return SizedBox(width: double.infinity, child: manageButton);
+    }
+
+    return SizedBox(width: double.infinity, child: toggleVisibilityCard);
+  }
+
+  Widget _buildTopActionCard(
+    BuildContext context, {
+    required Widget child,
+    required bool enabled,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+
+    final card = Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          height: 48, // Fixed exact height for both cards
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.35),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+
+    if (enabled) return card;
+    return Opacity(opacity: 0.68, child: card);
   }
 }
 
@@ -498,6 +619,69 @@ class _NoPointsView extends StatelessWidget {
             color: isDark
                 ? AppColors.textSecondaryDark
                 : AppColors.textSecondaryLight,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PointsHiddenView extends StatelessWidget {
+  const _PointsHiddenView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.28),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.overlay.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.visibility_off_outlined,
+                size: 52,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Points are currently hidden by troop leadership.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'النقاط مخفية حاليا من قبل قيادة الفرقة.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ],
           ),
         ),
       ),

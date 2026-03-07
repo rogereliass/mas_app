@@ -58,6 +58,44 @@ class PointsService {
     }
   }
 
+  Future<bool> fetchTroopPointsHidden({required String troopId}) async {
+    try {
+      _assertTroopContextAvailable(troopId);
+
+      final row = await _supabase
+          .from('troops')
+          .select('id, points_hidden')
+          .eq('id', troopId)
+          .maybeSingle();
+
+      if (row == null) {
+        throw Exception('Troop not found for visibility settings.');
+      }
+
+      return row['points_hidden'] as bool? ?? false;
+    } catch (e) {
+      throw Exception('PointsService.fetchTroopPointsHidden: $e');
+    }
+  }
+
+  Future<void> updateTroopPointsVisibility({
+    required int actorRoleRank,
+    required String troopId,
+    required bool pointsHidden,
+  }) async {
+    try {
+      _assertCanManage(actorRoleRank);
+      _assertTroopContextAvailable(troopId);
+
+      await _supabase
+          .from('troops')
+          .update({'points_hidden': pointsHidden})
+          .eq('id', troopId);
+    } catch (e) {
+      throw Exception('PointsService.updateTroopPointsVisibility: $e');
+    }
+  }
+
   Future<PointCategory> createTroopCategory({
     required int actorRoleRank,
     required String troopId,

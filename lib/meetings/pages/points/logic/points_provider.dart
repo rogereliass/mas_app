@@ -26,6 +26,8 @@ class PointsProvider with ChangeNotifier {
   bool _isLoadingMeetings = false;
   bool _isLoadingPoints = false;
   bool _isLoadingLookups = false;
+  bool _isTogglingPointsVisibility = false;
+  bool _troopPointsHidden = false;
   bool _isCreatingPoint = false;
   final Set<String> _updatingPointIds = {};
   bool _isCreatingCategory = false;
@@ -53,7 +55,10 @@ class PointsProvider with ChangeNotifier {
   bool get isLoadingMeetings => _isLoadingMeetings;
   bool get isLoadingPoints => _isLoadingPoints;
   bool get isLoadingLookups => _isLoadingLookups;
+  bool get isTogglingPointsVisibility => _isTogglingPointsVisibility;
+  bool get troopPointsHidden => _troopPointsHidden;
   bool get isSubmitting =>
+      _isTogglingPointsVisibility ||
       _isCreatingPoint ||
       _updatingPointIds.isNotEmpty ||
       _isCreatingCategory ||
@@ -74,6 +79,7 @@ class PointsProvider with ChangeNotifier {
 
   bool get canManagePoints => _authProvider.selectedRoleRank >= 60;
   bool get canManageCategories => _authProvider.selectedRoleRank >= 60;
+  bool get canTogglePointsVisibility => _authProvider.selectedRoleRank >= 60;
   bool get isSystemAdmin => _authProvider.selectedRoleRank >= 90;
   bool get isReadOnlyMember => _authProvider.selectedRoleRank < 60;
 
@@ -104,6 +110,7 @@ class PointsProvider with ChangeNotifier {
     _meetings = [];
     _points = [];
     _selectedMeetingId = null;
+    _troopPointsHidden = false;
     notifyListeners();
 
     try {
@@ -127,6 +134,9 @@ class PointsProvider with ChangeNotifier {
 
       _meetings = normalizedMeetings;
       _selectedMeetingId = _pickBestMeeting(normalizedMeetings);
+
+      await _loadTroopVisibility(troopId);
+
       _isLoadingMeetings = false;
       notifyListeners();
 
@@ -292,6 +302,42 @@ class PointsProvider with ChangeNotifier {
     }
   }
 
+  Future<void> togglePointsVisibility() async {
+    if (!canTogglePointsVisibility) {
+      throw Exception(
+        'You do not have permission to update points visibility.',
+      );
+    }
+    if (_isTogglingPointsVisibility) return;
+
+    final troopId = _activeTroopId;
+    if (troopId == null || troopId.isEmpty) {
+      throw Exception('Could not determine troop context for this action.');
+    }
+
+    final nextHiddenState = !_troopPointsHidden;
+
+    _isTogglingPointsVisibility = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _service.updateTroopPointsVisibility(
+        actorRoleRank: _authProvider.selectedRoleRank,
+        troopId: troopId,
+        pointsHidden: nextHiddenState,
+      );
+      _troopPointsHidden = nextHiddenState;
+    } catch (e, st) {
+      debugPrint('PointsProvider.togglePointsVisibility error: $e\n$st');
+      _error = _formatErrorMessage(e);
+      rethrow;
+    } finally {
+      _isTogglingPointsVisibility = false;
+      notifyListeners();
+    }
+  }
+
   Future<PointCategory> createCategory({
     required String name,
     String? description,
@@ -400,6 +446,17 @@ class PointsProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _loadTroopVisibility(String troopId) async {
+    try {
+      _troopPointsHidden = await _service.fetchTroopPointsHidden(
+        troopId: troopId,
+      );
+    } catch (e, st) {
+      debugPrint('PointsProvider._loadTroopVisibility error: $e\n$st');
+      _troopPointsHidden = false;
+    }
+  }
+
   void _upsertCategoryInCache({
     required String troopId,
     required PointCategory category,
@@ -430,6 +487,8 @@ class PointsProvider with ChangeNotifier {
     _isLoadingMeetings = false;
     _isLoadingPoints = false;
     _isLoadingLookups = false;
+    _isTogglingPointsVisibility = false;
+    _troopPointsHidden = false;
     _isCreatingPoint = false;
     _updatingPointIds.clear();
     _isCreatingCategory = false;
