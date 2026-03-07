@@ -7,3 +7,4 @@ export 'pages/meeting_creation/logic/meetings_provider.dart';
 export 'pages/attendance/logic/attendance_provider.dart';
 export 'pages/meeting_creation/data/models/meeting.dart';
 export 'pages/attendance/data/models/attendance_record.dart';
+export 'pages/points/points.dart';

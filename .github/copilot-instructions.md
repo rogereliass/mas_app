@@ -58,6 +58,27 @@ await roleRepo.canCurrentUserAccess(minRank)
 ```
 **Rule**: Filter files/folders client-side BEFORE displaying. Public content (min_rank=0) always visible.
 
+### Role Definitions & Rankings
+
+The app uses the following canonical roles and numeric rankings (0-100). Use these identifiers when assigning roles, checking access, or filtering content by `min_rank`.
+
+| Role Key | Display Name | Rank |
+|---|---:|---:|
+| system_admin | System Admin | 100 |
+| system_moderator | System Moderator | 90 |
+| leadership | Leadership | 80 |
+| clan_leader | Clan Leader | 75 |
+| troop_head | Troop Head | 70 |
+| troop_leader | Troop Leader | 60 |
+| rover | Rover | 50 |
+| patrol_leader | Patrol Leader | 30 |
+| patrol_assistant_1 | Patrol Assistant 1 | 25 |
+| patrol_assistant_2 | Patrol Assistant 2 | 20 |
+| scouts | Scout | 10 |
+| public | Public | 0 |
+
+Keep this list authoritative — update here when adding new roles so other developers and automation reference the correct canonical values.
+
 ### 2. Supabase Integration
 All data fetching happens in `data/` layer repositories/services:
 ```dart

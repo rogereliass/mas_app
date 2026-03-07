@@ -114,10 +114,12 @@ class MeetingsProvider with ChangeNotifier {
 
   /// The troop this provider operates on:
   /// - Admin: explicitly selected [_selectedTroopId] (may be null until chosen)
-  /// - All other roles: their [managedTroopId] (troop_context from profile_roles)
+  /// - Troop-scoped roles: [managedTroopId] (troop_context from profile_roles)
+  /// - Regular members: fallback to [signupTroopId] for read-only meeting views
   String? get effectiveTroopId {
     if (isAdmin) return _selectedTroopId;
-    return _authProvider.currentUserProfile?.managedTroopId;
+    final profile = _authProvider.currentUserProfile;
+    return profile?.managedTroopId ?? profile?.signupTroopId;
   }
 
   String? get activeSeasonId => _activeSeason?['id'] as String?;

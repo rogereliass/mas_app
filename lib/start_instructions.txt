@@ -24,12 +24,12 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
-
-- POINTS SYSTEM
+- clean copilot instructions
+- Scout View for WHOLE Meeting tab - check if already done.
 - add ttl caching for attendance & points
-- Scout View for WHOLE Meeting tab
 - Homepage for scout
 - re-design profiles tab to handle all data & QR
+- role management for system admin
 
 ---------------------------------------------------------
 
@@ -48,9 +48,9 @@ Troop Head/Leader:
 -✅User Management (assign to patrols,& roles) [filtered by their troop]
 -✅Patrols View (manage patrol members/leaders ,filter by,)
 -Meeting Manager Tab (CRUD for meetings of their troop).
-    - 🏗️Meeting Creation
+    - ✅Meeting Creation
     - 🏗️Attendance + Stats?
-    - Points System
+    - 🏗️Points System
 - 🏗️Homepage Stats for Meeting/Attendance/Scoring
 - Eftekad Module
 -
