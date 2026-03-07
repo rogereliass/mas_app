@@ -9,6 +9,10 @@ class AppColors {
   static const Color goldAccent = Color(0xFFC5A059); // Muted, elegant gold - Primary/Accent
   static const Color sectionHeaderGray = Color(0xFF94A3B8); // Slate 400 - Secondary Text
   
+  // Leaderboard Header Themes (Royal/Gold Complement)
+  static const Color leaderboardHeaderStart = Color(0xFF1E3A8A); // Royal Navy Blue
+  static const Color leaderboardHeaderEnd = Color(0xFF0F172A); // Very dark navy / scoutEliteNavy
+
   // Primary colors (Mapped to Design System)
   static const Color primaryBlue =Color.fromARGB(255, 39, 92, 249); 
   static const Color accentBlue = Color.fromARGB(255, 69, 141, 255); 
@@ -57,6 +61,11 @@ class AppColors {
   static const Color folderIconColor = goldAccent;
   static const Color folderBackgroundLight = Color(0xFFE8E4D0);
   static const Color folderBackgroundDark = Color(0xFF334155); // Slate 700 (Lighter than card)
+  
+  // Ranking & Medal Colors
+  static const Color rankGold = Color(0xFFD4AF37); // Rich metallic Gold
+  static const Color rankSilver = Color(0xFF94A3B8); // Slate 400 / Silver
+  static const Color rankBronze = Color(0xFFB87333); // Classic deeper Bronze
   
   // File type colors
   static const Color fileTypePdf = Color(0xFFE53E3E);

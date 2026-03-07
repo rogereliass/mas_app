@@ -4,10 +4,12 @@ import 'package:masapp/auth/logic/auth_provider.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 import '../data/models/patrol_option.dart';
+import '../data/models/patrol_points_summary.dart';
 import '../data/models/point_category.dart';
 import '../data/models/point_entry.dart';
 import '../data/models/point_form_data.dart';
 import '../data/points_service.dart';
+import 'points_summary_aggregator.dart';
 
 /// Provider for Meetings Points tab.
 class PointsProvider with ChangeNotifier {
@@ -17,6 +19,7 @@ class PointsProvider with ChangeNotifier {
   List<Meeting> _meetings = [];
   String? _selectedMeetingId;
   List<PointEntry> _points = [];
+  PointsSummaryAggregate? _cachedSelectedMeetingSummary;
 
   final Map<String, List<PatrolOption>> _patrolsByTroop = {};
   final Map<String, List<PointCategory>> _categoriesByTroop = {};
@@ -76,6 +79,14 @@ class PointsProvider with ChangeNotifier {
   List<Meeting> get meetings => List.unmodifiable(_meetings);
   List<PointEntry> get points => List.unmodifiable(_points);
   String? get selectedMeetingId => _selectedMeetingId;
+  PointsSummaryAggregate get selectedMeetingPatrolSummary {
+    final cached = _cachedSelectedMeetingSummary;
+    if (cached != null) return cached;
+
+    final aggregate = PointsSummaryAggregator.aggregatePatrolScores(_points);
+    _cachedSelectedMeetingSummary = aggregate;
+    return aggregate;
+  }
 
   bool get canManagePoints => _authProvider.selectedRoleRank >= 60;
   bool get canManageCategories => _authProvider.selectedRoleRank >= 60;
@@ -109,6 +120,7 @@ class PointsProvider with ChangeNotifier {
     _noMeetings = false;
     _meetings = [];
     _points = [];
+    _cachedSelectedMeetingSummary = null;
     _selectedMeetingId = null;
     _troopPointsHidden = false;
     notifyListeners();
@@ -164,6 +176,7 @@ class PointsProvider with ChangeNotifier {
 
     _selectedMeetingId = meetingId;
     _points = [];
+    _cachedSelectedMeetingSummary = null;
     _error = null;
     notifyListeners();
 
@@ -240,6 +253,7 @@ class PointsProvider with ChangeNotifier {
       if (_selectedMeetingId == meetingId) {
         _points = [created, ..._points]
           ..sort((a, b) => b.sortTimestamp.compareTo(a.sortTimestamp));
+        _cachedSelectedMeetingSummary = null;
       }
     } catch (e, st) {
       debugPrint('PointsProvider.createPoint error: $e\n$st');
@@ -292,6 +306,7 @@ class PointsProvider with ChangeNotifier {
       }
       nextPoints.sort((a, b) => b.sortTimestamp.compareTo(a.sortTimestamp));
       _points = nextPoints;
+      _cachedSelectedMeetingSummary = null;
     } catch (e, st) {
       debugPrint('PointsProvider.updatePoint error: $e\n$st');
       _error = _formatErrorMessage(e);
@@ -435,11 +450,13 @@ class PointsProvider with ChangeNotifier {
       );
       if (_selectedMeetingId == meetingId) {
         _points = fetched;
+        _cachedSelectedMeetingSummary = null;
       }
     } catch (e, st) {
       debugPrint('PointsProvider._loadPointsForMeeting error: $e\n$st');
       _error = _formatErrorMessage(e);
       _points = [];
+      _cachedSelectedMeetingSummary = null;
     } finally {
       _isLoadingPoints = false;
       notifyListeners();
@@ -481,6 +498,7 @@ class PointsProvider with ChangeNotifier {
     _meetings = [];
     _selectedMeetingId = null;
     _points = [];
+    _cachedSelectedMeetingSummary = null;
     _patrolsByTroop.clear();
     _categoriesByTroop.clear();
     _activeTroopId = null;

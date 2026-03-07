@@ -31,6 +31,7 @@ Act as a senior production software engineer and review this implementation to e
 - Homepage for scout
 - re-design profiles tab to handle all data & QR
 - role management for system admin
+-add switch troop in meeting tab for admins
 
 ---------------------------------------------------------
 

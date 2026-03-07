@@ -9,6 +9,7 @@ import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart'
 import '../data/models/point_entry.dart';
 import '../logic/points_provider.dart';
 import 'components/category_manager_sheet.dart';
+import 'components/patrol_score_leaderboard.dart';
 import 'components/point_card.dart';
 import 'components/point_entry_dialog.dart';
 
@@ -118,10 +119,20 @@ class _PointsTabState extends State<PointsTab> {
 
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      itemCount: provider.points.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemCount: provider.points.length + 1,
+      separatorBuilder: (_, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final entry = provider.points[index];
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: PatrolScoreLeaderboard(
+              summary: provider.selectedMeetingPatrolSummary,
+              selectedMeeting: provider.selectedMeeting,
+            ),
+          );
+        }
+        
+        final entry = provider.points[index - 1];
         return PointCard(
           key: ValueKey(entry.id),
           point: entry,
@@ -639,46 +650,109 @@ class _PointsHiddenView extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+          padding: const EdgeInsets.fromLTRB(16, 32, 16, 32),
           decoration: BoxDecoration(
             color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.28),
+              color: isDark
+                  ? const Color(0xFF4C1D95).withValues(alpha: 0.3)
+                  : const Color(0xFF4C1D95).withValues(alpha: 0.1),
+              width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.overlay.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF4C1D95).withValues(alpha: isDark ? 0.15 : 0.06),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.visibility_off_outlined,
-                size: 52,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Points are currently hidden by troop leadership.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [
+                            AppColors.leaderboardHeaderStart.withValues(alpha: 0.8),
+                            AppColors.leaderboardHeaderEnd.withValues(alpha: 0.9),
+                          ]
+                        : [
+                            AppColors.leaderboardHeaderStart.withValues(alpha: 0.9),
+                            const Color(0xFF2E1065),
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.leaderboardHeaderStart.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.lock_person_rounded,
+                  size: 48,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
               Text(
-                'النقاط مخفية حاليا من قبل قيادة الفرقة.',
+                'Shh! It\'s a secret for now! 🤫',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'سرٌ مغلق! لم يحن وقت كشف النقاط',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark 
+                      ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5) 
+                      : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'The troop leadership has hidden the points to build up the suspense. Stay tuned!',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'النقاط مخفية حالياً من قبل قيادة الفرقة لزيادة الحماس. ترقبوا!',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
