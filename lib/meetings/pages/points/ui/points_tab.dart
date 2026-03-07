@@ -522,96 +522,147 @@ class _MeetingDropdown extends StatelessWidget {
     final secondaryTextColor = isDark
         ? AppColors.textSecondaryDark
         : AppColors.textSecondaryLight;
-    final borderColor = isDark ? AppColors.dividerDark : AppColors.divider;
 
     final meetingsById = <String, Meeting>{
       for (final meeting in provider.meetings) meeting.id: meeting,
     };
-    final dropdownMeetings = meetingsById.values.toList();
+    final meetings = meetingsById.values.toList();
     final selectedMeetingId = provider.selectedMeetingId;
-    final dropdownSelectedMeetingId =
+    final validSelectedMeetingId =
         selectedMeetingId != null && meetingsById.containsKey(selectedMeetingId)
         ? selectedMeetingId
         : null;
+    final selectedMeeting = validSelectedMeetingId == null
+        ? null
+        : meetingsById[validSelectedMeetingId];
 
     return Material(
       elevation: 2,
       borderRadius: BorderRadius.circular(18),
       color: cardColor,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-        child: DropdownButtonFormField<String>(
-          initialValue: dropdownSelectedMeetingId,
-          isExpanded: true,
-          itemHeight: 58,
-          iconEnabledColor: theme.colorScheme.primary,
-          dropdownColor: isDark ? AppColors.cardDark : AppColors.cardLight,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: textColor,
-            fontWeight: FontWeight.w600,
-          ),
-          menuMaxHeight: 320,
-          decoration: InputDecoration(
-            hintText: 'Select meeting',
-            prefixIcon: Icon(Icons.event, color: theme.colorScheme.primary),
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(
-              color: secondaryTextColor,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 10,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: theme.colorScheme.primary,
-                width: 1.5,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: meetings.isEmpty
+            ? null
+            : () => _openMeetingSheet(
+                context,
+                meetings: meetings,
+                selectedMeetingId: validSelectedMeetingId,
+                onPicked: provider.selectMeeting,
               ),
-            ),
-            filled: true,
-            fillColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          ),
-          selectedItemBuilder: (context) {
-            return dropdownMeetings.map((meeting) {
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${meeting.title} | ${meeting.formattedDate}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: textColor,
-                    fontWeight: FontWeight.w600,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Icon(Icons.event_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Meeting',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: secondaryTextColor,
+                      ),
+                    ),
+                    Text(
+                      selectedMeeting == null
+                          ? 'Select meeting'
+                          : '${selectedMeeting.title} | ${selectedMeeting.formattedDate}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            }).toList();
-          },
-          items: dropdownMeetings.map((meeting) {
-            return DropdownMenuItem<String>(
-              value: meeting.id,
-              child: Text(
-                '${meeting.title} | ${meeting.formattedDate}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value == null) return;
-            provider.selectMeeting(value);
-          },
+              Icon(Icons.keyboard_arrow_down, color: theme.colorScheme.primary),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _openMeetingSheet(
+    BuildContext context, {
+    required List<Meeting> meetings,
+    required String? selectedMeetingId,
+    required Future<void> Function(String meetingId) onPicked,
+  }) async {
+    final theme = Theme.of(context);
+
+    final pickedMeetingId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select Meeting',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: meetings.length,
+                    itemBuilder: (context, index) {
+                      final meeting = meetings[index];
+                      final isSelected = meeting.id == selectedMeetingId;
+
+                      return ListTile(
+                        leading: isSelected
+                            ? Icon(
+                                Icons.check_circle,
+                                color: theme.colorScheme.primary,
+                              )
+                            : const Icon(Icons.circle_outlined),
+                        title: Text(
+                          meeting.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          meeting.formattedDate,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => Navigator.of(sheetContext).pop(meeting.id),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (pickedMeetingId == null || pickedMeetingId == selectedMeetingId) {
+      return;
+    }
+    await onPicked(pickedMeetingId);
   }
 }
 
