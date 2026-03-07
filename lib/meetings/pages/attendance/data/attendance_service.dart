@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
@@ -6,10 +9,21 @@ import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart'
 class AttendanceService {
   final SupabaseClient _supabase;
 
+  static final TtlCache<String, List<MemberWithAttendance>> _membersCache =
+      TtlCache();
+  static final TtlCache<String, List<AttendanceRecord>> _attendanceCache =
+      TtlCache();
+
   AttendanceService(this._supabase);
 
   factory AttendanceService.instance() {
     return AttendanceService(Supabase.instance.client);
+  }
+
+  /// Clears in-memory attendance caches.
+  void clearCache() {
+    _membersCache.clear();
+    _attendanceCache.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -31,62 +45,36 @@ class AttendanceService {
     required String troopId,
     String? memberProfileIdFilter,
   }) async {
+    final cacheKey = _membersCacheKey(
+      troopId: troopId,
+      memberProfileIdFilter: memberProfileIdFilter,
+    );
+    final cached = _membersCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchTroopMembers',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
+
+    final stale = _membersCache.get(cacheKey, ignoreExpiry: true);
+
     try {
-      // Step 1 – fetch approved profiles that belong to this troop.
-      // Intentionally uses signup_troop (same as PatrolsManagementService)
-      // to avoid ambiguous embedding with profile_roles.
-      var profileQuery = _supabase
-          .from('profiles')
-          .select('id, first_name, middle_name, last_name, patrol_id')
-          .eq('signup_troop', troopId)
-          .eq('approved', true)
-          .order('last_name', ascending: true)
-          .order('first_name', ascending: true);
-
-      final profileResults = await profileQuery;
-      var profiles = (profileResults as List).cast<Map<String, dynamic>>();
-
-      // Optionally narrow to a single member (e.g. regular-member self-view).
-      if (memberProfileIdFilter != null) {
-        profiles = profiles
-            .where((p) => p['id'] == memberProfileIdFilter)
-            .toList();
-        if (profiles.isEmpty) return <MemberWithAttendance>[];
-      }
-
-      // Step 2 – fetch all patrols for this troop so we can resolve names.
-      final patrolResults = await _supabase
-          .from('patrols')
-          .select('id, name')
-          .eq('troop_id', troopId);
-
-      final patrolMap = <String, String>{
-        for (final row in (patrolResults as List).cast<Map<String, dynamic>>())
-          row['id'] as String: (row['name'] as String? ?? ''),
-      };
-
-      // Step 3 – build MemberWithAttendance list.
-      return profiles.map((json) {
-        final firstName = (json['first_name'] as String? ?? '').trim();
-        final lastName  = (json['last_name']  as String? ?? '').trim();
-        final displayName =
-            [firstName, lastName].where((s) => s.isNotEmpty).join(' ');
-
-        final firstInitial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
-        final lastInitial  = lastName.isNotEmpty  ? lastName[0].toUpperCase()  : '';
-
-        final patrolId = json['patrol_id'] as String?;
-
-        return MemberWithAttendance(
-          profileId:    json['id'] as String,
-          displayName:  displayName.isNotEmpty ? displayName : 'Unnamed Member',
-          initialsName: '$firstInitial$lastInitial',
-          patrolId:     patrolId,
-          patrolName:   patrolId != null ? patrolMap[patrolId] : null,
-          record:       null,
-        );
-      }).toList();
+      return await _refreshTroopMembersCache(
+        troopId: troopId,
+        memberProfileIdFilter: memberProfileIdFilter,
+      );
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchTroopMembers',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
+        );
+        return stale;
+      }
       throw Exception('AttendanceService.fetchTroopMembers: $e');
     }
   }
@@ -98,16 +86,29 @@ class AttendanceService {
   /// Fetches all existing attendance rows for the given [meetingId].
   Future<List<AttendanceRecord>> fetchAttendanceForMeeting(
       String meetingId) async {
-    try {
-      final results = await _supabase
-          .from('attendance')
-          .select()
-          .eq('meeting_id', meetingId);
+    final cached = _attendanceCache.get(meetingId);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchAttendanceForMeeting',
+        source: 'LOCAL_CACHE_HIT',
+        scope: meetingId.trim(),
+      );
+      return cached;
+    }
 
-      return (results as List)
-          .map((row) => AttendanceRecord.fromJson(row as Map<String, dynamic>))
-          .toList();
+    final stale = _attendanceCache.get(meetingId, ignoreExpiry: true);
+
+    try {
+      return await _refreshAttendanceForMeetingCache(meetingId);
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchAttendanceForMeeting',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: meetingId.trim(),
+        );
+        return stale;
+      }
       throw Exception('AttendanceService.fetchAttendanceForMeeting: $e');
     }
   }
@@ -139,6 +140,8 @@ class AttendanceService {
       await _supabase
           .from('attendance')
           .upsert(rows, onConflict: 'meeting_id,profile_id', ignoreDuplicates: true);
+
+      _attendanceCache.invalidate(meetingId);
     } catch (e) {
       throw Exception('AttendanceService.lazyAutoFillAbsent: $e');
     }
@@ -148,6 +151,7 @@ class AttendanceService {
   /// Pass `null` or an empty string to clear the note.
   Future<void> updateAttendanceNotes({
     required String recordId,
+    String? meetingId,
     required String? notes,
   }) async {
     try {
@@ -155,6 +159,13 @@ class AttendanceService {
           .from('attendance')
           .update({'notes': (notes?.trim().isEmpty ?? true) ? null : notes!.trim()})
           .eq('id', recordId);
+
+      if (meetingId != null && meetingId.trim().isNotEmpty) {
+        _attendanceCache.invalidate(meetingId.trim());
+      } else {
+        // Fallback when caller cannot provide meeting scope.
+        _attendanceCache.clear();
+      }
     } catch (e) {
       throw Exception('AttendanceService.updateAttendanceNotes: $e');
     }
@@ -178,8 +189,157 @@ class AttendanceService {
           }).eq('id', r.id),
         ),
       );
+
+      final touchedMeetingIds = changedRecords
+          .map((record) => record.meetingId)
+          .where((id) => id.trim().isNotEmpty)
+          .toSet();
+      for (final meetingId in touchedMeetingIds) {
+        _attendanceCache.invalidate(meetingId);
+      }
     } catch (e) {
       throw Exception('AttendanceService.batchUpdateAttendance: $e');
+    }
+  }
+
+  Future<List<MemberWithAttendance>> _refreshTroopMembersCache({
+    required String troopId,
+    String? memberProfileIdFilter,
+  }) async {
+    _logDataSource(
+      operation: 'fetchTroopMembers',
+      source: 'SUPABASE',
+      scope: _membersCacheKey(
+        troopId: troopId,
+        memberProfileIdFilter: memberProfileIdFilter,
+      ),
+    );
+
+    // Step 1 – fetch approved profiles that belong to this troop.
+    // Intentionally uses signup_troop (same as PatrolsManagementService)
+    // to avoid ambiguous embedding with profile_roles.
+    var profileQuery = _supabase
+        .from('profiles')
+        .select('id, first_name, middle_name, last_name, patrol_id')
+        .eq('signup_troop', troopId)
+        .eq('approved', true)
+        .order('last_name', ascending: true)
+        .order('first_name', ascending: true);
+
+    final profileResults = await profileQuery;
+    var profiles = (profileResults as List).cast<Map<String, dynamic>>();
+
+    // Optionally narrow to a single member (e.g. regular-member self-view).
+    if (memberProfileIdFilter != null) {
+      profiles = profiles.where((p) => p['id'] == memberProfileIdFilter).toList();
+      if (profiles.isEmpty) {
+        _membersCache.set(
+          _membersCacheKey(
+            troopId: troopId,
+            memberProfileIdFilter: memberProfileIdFilter,
+          ),
+          <MemberWithAttendance>[],
+          CacheTtl.attendanceMembers,
+        );
+        return <MemberWithAttendance>[];
+      }
+    }
+
+    // Step 2 – fetch all patrols for this troop so we can resolve names.
+    final patrolResults = await _supabase
+        .from('patrols')
+        .select('id, name')
+        .eq('troop_id', troopId);
+
+    final patrolMap = <String, String>{
+      for (final row in (patrolResults as List).cast<Map<String, dynamic>>())
+        row['id'] as String: (row['name'] as String? ?? ''),
+    };
+
+    // Step 3 – build MemberWithAttendance list.
+    final members = profiles.map((json) {
+      final firstName = (json['first_name'] as String? ?? '').trim();
+      final lastName = (json['last_name'] as String? ?? '').trim();
+      final displayName =
+          [firstName, lastName].where((s) => s.isNotEmpty).join(' ');
+
+      final firstInitial = firstName.isNotEmpty ? firstName[0].toUpperCase() : '';
+      final lastInitial = lastName.isNotEmpty ? lastName[0].toUpperCase() : '';
+
+      final patrolId = json['patrol_id'] as String?;
+
+      return MemberWithAttendance(
+        profileId: json['id'] as String,
+        displayName: displayName.isNotEmpty ? displayName : 'Unnamed Member',
+        initialsName: '$firstInitial$lastInitial',
+        patrolId: patrolId,
+        patrolName: patrolId != null ? patrolMap[patrolId] : null,
+        record: null,
+      );
+    }).toList();
+
+    _membersCache.set(
+      _membersCacheKey(
+        troopId: troopId,
+        memberProfileIdFilter: memberProfileIdFilter,
+      ),
+      members,
+      CacheTtl.attendanceMembers,
+    );
+
+    return members;
+  }
+
+  Future<List<AttendanceRecord>> _refreshAttendanceForMeetingCache(
+    String meetingId,
+  ) async {
+    _logDataSource(
+      operation: 'fetchAttendanceForMeeting',
+      source: 'SUPABASE',
+      scope: meetingId.trim(),
+    );
+
+    final results = await _supabase
+        .from('attendance')
+        .select()
+        .eq('meeting_id', meetingId);
+
+    final records = (results as List)
+        .map((row) => AttendanceRecord.fromJson(row as Map<String, dynamic>))
+        .toList();
+
+    _attendanceCache.set(meetingId, records, CacheTtl.attendanceRecords);
+    return records;
+  }
+
+  String _membersCacheKey({
+    required String troopId,
+    String? memberProfileIdFilter,
+  }) {
+    final normalizedFilter = memberProfileIdFilter?.trim() ?? '';
+    return '${troopId.trim()}::$normalizedFilter';
+  }
+
+  void _logDataSource({
+    required String operation,
+    required String source,
+    required String scope,
+  }) {
+    if (!kDebugMode) return;
+    final sourceTag = _sourceTag(source);
+    debugPrint('[ATT][$sourceTag] $operation ($scope)');
+  }
+
+  String _sourceTag(String source) {
+    switch (source) {
+      case 'SUPABASE':
+        return 'API';
+      case 'LOCAL_CACHE_HIT':
+        return 'CACHE';
+      case 'OFFLINE_STALE_CACHE':
+        return 'STALE';
+      default:
+        return source;
     }
   }
 

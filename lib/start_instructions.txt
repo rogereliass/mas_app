@@ -26,8 +26,7 @@ Act as a senior production software engineer and review this implementation to e
 
 - clean copilot instructions
 
-- add ttl caching for attendance & points
-- Homepage for scout
+- Homepage for scout (Smart Stack, Swipable Cards,...)
 - re-design profiles tab to handle all data & QR
 - role management for system admin
 - add switch troop in meeting tab for admins
@@ -42,21 +41,26 @@ Admin:
 -✅Patrols View (manage patrol members/leaders ,filter by,)
 - Library Management (CRUD) for files and Folders
 - System Stats (later)
+- Role Management Page
+- Sending Notifications System
 
 
 Troop Head/Leader:
 -✅User Acceptance (after login) module [filtered by their troop]
 -✅User Management (assign to patrols,& roles) [filtered by their troop]
 -✅Patrols View (manage patrol members/leaders ,filter by,)
--Meeting Manager Tab (CRUD for meetings of their troop).
+-✅Meeting Manager Tab (CRUD for meetings of their troop).
     - ✅Meeting Creation
-    - 🏗️Attendance + Stats?
-    - 🏗️Points System
+    - ✅Attendance + Stats?
+    - ✅Points System
 - 🏗️Homepage Stats for Meeting/Attendance/Scoring
 - Eftekad Module
--
+- Sending Notifications System (Scope access & rate limit)
 
 Scouts:
--View their meetings & history
--View their attendance stats
+-✅View their meetings & history
+-✅View their attendance stats
+-✅View their troop stats
+- Home Page
+- Badges in Profile?
 

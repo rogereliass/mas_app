@@ -49,6 +49,7 @@ class MeetingsProvider with ChangeNotifier {
 
   /// Reset transient state whenever the authenticated user changes.
   void _onAuthChanged() {
+    _service.clearCache();
     _meetings = [];
     _troops = [];
     _activeSeason = null;

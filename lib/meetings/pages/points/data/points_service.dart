@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:masapp/meetings/pages/meeting_creation/data/meetings_service.dart';
@@ -12,11 +15,26 @@ class PointsService {
   final SupabaseClient _supabase;
   final MeetingsService _meetingsService;
 
+  static final TtlCache<String, List<PointEntry>> _pointsByMeetingCache =
+      TtlCache();
+  static final TtlCache<String, List<PatrolOption>> _patrolsCache = TtlCache();
+  static final TtlCache<String, List<PointCategory>> _categoriesCache =
+      TtlCache();
+  static final TtlCache<String, bool> _pointsVisibilityCache = TtlCache();
+
   PointsService(this._supabase, {MeetingsService? meetingsService})
     : _meetingsService = meetingsService ?? MeetingsService(_supabase);
 
   factory PointsService.instance() {
     return PointsService(Supabase.instance.client);
+  }
+
+  /// Clears in-memory points caches.
+  void clearCache() {
+    _pointsByMeetingCache.clear();
+    _patrolsCache.clear();
+    _categoriesCache.clear();
+    _pointsVisibilityCache.clear();
   }
 
   Future<List<Meeting>> fetchMeetings({
@@ -27,53 +45,85 @@ class PointsService {
   }
 
   Future<List<PatrolOption>> fetchPatrols({required String troopId}) async {
-    try {
-      final result = await _supabase
-          .from('patrols')
-          .select('id, troop_id, name')
-          .eq('troop_id', troopId)
-          .order('name', ascending: true);
+    final cacheKey = troopId.trim();
+    final cached = _patrolsCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchPatrols',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
 
-      return (result as List)
-          .map((row) => PatrolOption.fromJson(row as Map<String, dynamic>))
-          .toList();
+    final stale = _patrolsCache.get(cacheKey, ignoreExpiry: true);
+    try {
+      return await _refreshPatrolsCache(troopId: troopId);
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchPatrols',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
+        );
+        return stale;
+      }
       throw Exception('PointsService.fetchPatrols: $e');
     }
   }
 
   Future<List<PointCategory>> fetchCategories({required String troopId}) async {
-    try {
-      final result = await _supabase
-          .from('point_categories')
-          .select('id, slug, name, description, troop_id')
-          .or('troop_id.is.null,troop_id.eq.$troopId')
-          .order('name', ascending: true);
+    final cacheKey = troopId.trim();
+    final cached = _categoriesCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchCategories',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
 
-      return (result as List)
-          .map((row) => PointCategory.fromJson(row as Map<String, dynamic>))
-          .toList();
+    final stale = _categoriesCache.get(cacheKey, ignoreExpiry: true);
+    try {
+      return await _refreshCategoriesCache(troopId: troopId);
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchCategories',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
+        );
+        return stale;
+      }
       throw Exception('PointsService.fetchCategories: $e');
     }
   }
 
   Future<bool> fetchTroopPointsHidden({required String troopId}) async {
+    final cacheKey = troopId.trim();
+    final cached = _pointsVisibilityCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchTroopPointsHidden',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
+
+    final stale = _pointsVisibilityCache.get(cacheKey, ignoreExpiry: true);
     try {
-      _assertTroopContextAvailable(troopId);
-
-      final row = await _supabase
-          .from('troops')
-          .select('id, points_hidden')
-          .eq('id', troopId)
-          .maybeSingle();
-
-      if (row == null) {
-        throw Exception('Troop not found for visibility settings.');
-      }
-
-      return row['points_hidden'] as bool? ?? false;
+      return await _refreshTroopPointsHiddenCache(troopId: troopId);
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchTroopPointsHidden',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
+        );
+        return stale;
+      }
       throw Exception('PointsService.fetchTroopPointsHidden: $e');
     }
   }
@@ -91,6 +141,12 @@ class PointsService {
           .from('troops')
           .update({'points_hidden': pointsHidden})
           .eq('id', troopId);
+
+      _pointsVisibilityCache.set(
+        troopId.trim(),
+        pointsHidden,
+        CacheTtl.troopPointsVisibility,
+      );
     } catch (e) {
       throw Exception('PointsService.updateTroopPointsVisibility: $e');
     }
@@ -120,6 +176,8 @@ class PointsService {
           })
           .select('id, slug, name, description, troop_id')
           .single();
+
+      _categoriesCache.invalidate(troopId.trim());
 
       return PointCategory.fromJson(row);
     } catch (e) {
@@ -180,6 +238,9 @@ class PointsService {
         throw Exception('Category could not be updated.');
       }
 
+      _categoriesCache.invalidate(troopId.trim());
+      _pointsByMeetingCache.clear();
+
       return PointCategory.fromJson(row);
     } catch (e) {
       throw Exception('PointsService.updateTroopCategory: $e');
@@ -189,18 +250,32 @@ class PointsService {
   Future<List<PointEntry>> fetchPointsForMeeting({
     required String meetingId,
   }) async {
+    final cacheKey = meetingId.trim();
+    final cached = _pointsByMeetingCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchPointsForMeeting',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
+
+    final stale = _pointsByMeetingCache.get(cacheKey, ignoreExpiry: true);
     try {
-      final joinedRows = await _fetchPointsWithJoins(meetingId: meetingId);
-      return _toPointEntries(joinedRows);
-    } catch (_) {
-      try {
-        final fallbackRows = await _fetchPointsWithLookupFallback(
-          meetingId: meetingId,
+      return await _refreshPointsForMeetingCache(meetingId: meetingId);
+    } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchPointsForMeeting',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
         );
-        return _toPointEntries(fallbackRows);
-      } catch (e) {
-        throw Exception('PointsService.fetchPointsForMeeting: $e');
+        return stale;
       }
+      throw Exception(
+        'PointsService.fetchPointsForMeeting: $e',
+      );
     }
   }
 
@@ -242,6 +317,8 @@ class PointsService {
         throw Exception('Point created but id was not returned.');
       }
 
+      _pointsByMeetingCache.invalidate(meetingId.trim());
+
       return _fetchPointById(pointId);
     } catch (e) {
       throw Exception('PointsService.createPoint: $e');
@@ -282,9 +359,133 @@ class PointsService {
           .eq('id', pointId)
           .eq('meeting_id', meetingId);
 
+      _pointsByMeetingCache.invalidate(meetingId.trim());
+
       return _fetchPointById(pointId);
     } catch (e) {
       throw Exception('PointsService.updatePoint: $e');
+    }
+  }
+
+  Future<List<PatrolOption>> _refreshPatrolsCache({
+    required String troopId,
+  }) async {
+    _logDataSource(
+      operation: 'fetchPatrols',
+      source: 'SUPABASE',
+      scope: troopId.trim(),
+    );
+
+    final result = await _supabase
+        .from('patrols')
+        .select('id, troop_id, name')
+        .eq('troop_id', troopId)
+        .order('name', ascending: true);
+
+    final patrols = (result as List)
+        .map((row) => PatrolOption.fromJson(row as Map<String, dynamic>))
+        .toList();
+
+    _patrolsCache.set(troopId.trim(), patrols, CacheTtl.patrols);
+    return patrols;
+  }
+
+  Future<List<PointCategory>> _refreshCategoriesCache({
+    required String troopId,
+  }) async {
+    _logDataSource(
+      operation: 'fetchCategories',
+      source: 'SUPABASE',
+      scope: troopId.trim(),
+    );
+
+    final result = await _supabase
+        .from('point_categories')
+        .select('id, slug, name, description, troop_id')
+        .or('troop_id.is.null,troop_id.eq.$troopId')
+        .order('name', ascending: true);
+
+    final categories = (result as List)
+        .map((row) => PointCategory.fromJson(row as Map<String, dynamic>))
+        .toList();
+
+    _categoriesCache.set(troopId.trim(), categories, CacheTtl.pointCategories);
+    return categories;
+  }
+
+  Future<bool> _refreshTroopPointsHiddenCache({required String troopId}) async {
+    _logDataSource(
+      operation: 'fetchTroopPointsHidden',
+      source: 'SUPABASE',
+      scope: troopId.trim(),
+    );
+
+    _assertTroopContextAvailable(troopId);
+
+    final row = await _supabase
+        .from('troops')
+        .select('id, points_hidden')
+        .eq('id', troopId)
+        .maybeSingle();
+
+    if (row == null) {
+      throw Exception('Troop not found for visibility settings.');
+    }
+
+    final hidden = row['points_hidden'] as bool? ?? false;
+    _pointsVisibilityCache.set(
+      troopId.trim(),
+      hidden,
+      CacheTtl.troopPointsVisibility,
+    );
+    return hidden;
+  }
+
+  Future<List<PointEntry>> _refreshPointsForMeetingCache({
+    required String meetingId,
+  }) async {
+    final cacheKey = meetingId.trim();
+    _logDataSource(
+      operation: 'fetchPointsForMeeting',
+      source: 'SUPABASE',
+      scope: cacheKey,
+    );
+
+    try {
+      final joinedRows = await _fetchPointsWithJoins(meetingId: meetingId);
+      final entries = _toPointEntries(joinedRows);
+      _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      return entries;
+    } catch (_) {
+      final fallbackRows = await _fetchPointsWithLookupFallback(
+        meetingId: meetingId,
+      );
+      final entries = _toPointEntries(fallbackRows);
+      _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      return entries;
+    }
+  }
+
+  void _logDataSource({
+    required String operation,
+    required String source,
+    required String scope,
+  }) {
+    if (!kDebugMode) return;
+    final sourceTag = _sourceTag(source);
+    debugPrint('[PTS][$sourceTag] $operation ($scope)');
+  }
+
+  String _sourceTag(String source) {
+    switch (source) {
+      case 'SUPABASE':
+        return 'API';
+      case 'LOCAL_CACHE_HIT':
+        return 'CACHE';
+      case 'OFFLINE_STALE_CACHE':
+        return 'STALE';
+      default:
+        return source;
     }
   }
 

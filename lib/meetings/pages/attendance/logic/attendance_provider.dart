@@ -77,6 +77,8 @@ class AttendanceProvider with ChangeNotifier {
   }
 
   void _onAuthChanged() {
+    _attendanceService.clearCache();
+    _meetingsService.clearCache();
     _meetings = [];
     _selectedMeetingId = null;
     _noMeetings = false;
@@ -254,6 +256,7 @@ class AttendanceProvider with ChangeNotifier {
     }
     await _attendanceService.updateAttendanceNotes(
       recordId: recordId,
+      meetingId: _selectedMeetingId,
       notes: notes,
     );
     _localNotes[profileId] = (notes?.trim().isEmpty ?? true)

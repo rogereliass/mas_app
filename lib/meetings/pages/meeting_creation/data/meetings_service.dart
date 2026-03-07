@@ -1,14 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 /// Service responsible for all Supabase operations related to meetings.
 class MeetingsService {
   final SupabaseClient _supabase;
 
+  // Static cache keeps entries alive even though instance() creates a new
+  // service object at call sites.
+  static final TtlCache<String, List<Meeting>> _meetingsCache = TtlCache();
+
   MeetingsService(this._supabase);
 
   factory MeetingsService.instance() {
     return MeetingsService(Supabase.instance.client);
+  }
+
+  /// Clears in-memory meetings cache.
+  void clearCache() {
+    _meetingsCache.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -65,19 +77,30 @@ class MeetingsService {
     required String seasonId,
     required String troopId,
   }) async {
-    try {
-      final results = await _supabase
-          .from('meetings')
-          .select()
-          // TODO: Implement clan-based meeting support
-          .eq('season_id', seasonId)
-          .eq('troop_id', troopId)
-          .order('meeting_date', ascending: true);
+    final cacheKey = _meetingsCacheKey(seasonId: seasonId, troopId: troopId);
+    final cached = _meetingsCache.get(cacheKey);
+    if (cached != null) {
+      _logDataSource(
+        operation: 'fetchMeetings',
+        source: 'LOCAL_CACHE_HIT',
+        scope: cacheKey,
+      );
+      return cached;
+    }
 
-      return (results as List)
-          .map((row) => Meeting.fromJson(row as Map<String, dynamic>))
-          .toList();
+    final stale = _meetingsCache.get(cacheKey, ignoreExpiry: true);
+
+    try {
+      return await _refreshMeetingsCache(seasonId: seasonId, troopId: troopId);
     } catch (e) {
+      if (stale != null) {
+        _logDataSource(
+          operation: 'fetchMeetings',
+          source: 'OFFLINE_STALE_CACHE',
+          scope: cacheKey,
+        );
+        return stale;
+      }
       throw Exception('MeetingsService.fetchMeetings: $e');
     }
   }
@@ -122,6 +145,10 @@ class MeetingsService {
           .select()
           .single();
 
+      _meetingsCache.invalidate(
+        _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
+      );
+
       return Meeting.fromJson(result);
     } catch (e) {
       throw Exception('MeetingsService.createMeeting: $e');
@@ -163,6 +190,9 @@ class MeetingsService {
           .select()
           .single();
 
+      // Meeting can move between troop/season; clear all list caches safely.
+      _meetingsCache.clear();
+
       return Meeting.fromJson(result);
     } catch (e) {
       throw Exception('MeetingsService.updateMeeting: $e');
@@ -173,8 +203,66 @@ class MeetingsService {
   Future<void> deleteMeeting(String meetingId) async {
     try {
       await _supabase.from('meetings').delete().eq('id', meetingId);
+      _meetingsCache.clear();
     } catch (e) {
       throw Exception('MeetingsService.deleteMeeting: $e');
+    }
+  }
+
+  Future<List<Meeting>> _refreshMeetingsCache({
+    required String seasonId,
+    required String troopId,
+  }) async {
+    _logDataSource(
+      operation: 'fetchMeetings',
+      source: 'SUPABASE',
+      scope: _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
+    );
+
+    final results = await _supabase
+        .from('meetings')
+        .select()
+        // TODO: Implement clan-based meeting support
+        .eq('season_id', seasonId)
+        .eq('troop_id', troopId)
+        .order('meeting_date', ascending: true);
+
+    final meetings = (results as List)
+        .map((row) => Meeting.fromJson(row as Map<String, dynamic>))
+        .toList();
+
+    _meetingsCache.set(
+      _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
+      meetings,
+      CacheTtl.meetingsList,
+    );
+    return meetings;
+  }
+
+  String _meetingsCacheKey({required String seasonId, required String troopId}) {
+    return '${seasonId.trim()}::${troopId.trim()}';
+  }
+
+  void _logDataSource({
+    required String operation,
+    required String source,
+    required String scope,
+  }) {
+    if (!kDebugMode) return;
+    final sourceTag = _sourceTag(source);
+    debugPrint('[MTG][$sourceTag] $operation ($scope)');
+  }
+
+  String _sourceTag(String source) {
+    switch (source) {
+      case 'SUPABASE':
+        return 'API';
+      case 'LOCAL_CACHE_HIT':
+        return 'CACHE';
+      case 'OFFLINE_STALE_CACHE':
+        return 'STALE';
+      default:
+        return source;
     }
   }
 }

@@ -495,6 +495,7 @@ class PointsProvider with ChangeNotifier {
   }
 
   void _onAuthChanged() {
+    _service.clearCache();
     _meetings = [];
     _selectedMeetingId = null;
     _points = [];

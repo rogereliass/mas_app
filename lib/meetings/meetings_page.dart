@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,6 +20,7 @@ class MeetingsPage extends StatefulWidget {
 class _MeetingsPageState extends State<MeetingsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _lastTabIndex = 0;
 
   // Stored in didChangeDependencies and never accessed from dispose via context.
   MeetingsProvider? _meetingsProvider;
@@ -29,6 +31,7 @@ class _MeetingsPageState extends State<MeetingsPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(_onTabChanged);
+    _lastTabIndex = _tabController.index;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -60,14 +63,37 @@ class _MeetingsPageState extends State<MeetingsPage>
   }
 
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging) return;
+    final currentIndex = _tabController.index;
+
+    // Print once whenever tab selection actually changes (tap or swipe).
+    if (currentIndex != _lastTabIndex && !_tabController.indexIsChanging) {
+      if (kDebugMode) {
+        final tabName = _tabNameForIndex(currentIndex);
+        debugPrint('[TAB] $tabName');
+      }
+      _lastTabIndex = currentIndex;
+    }
 
     // Leaving Attendance tab.
-    if (_tabController.previousIndex == 1) {
+    if (_tabController.previousIndex == 1 &&
+        _tabController.indexIsChanging) {
       final hasUnsaved = _attendanceProvider?.hasUnsavedChanges ?? false;
       if (hasUnsaved && mounted) {
         _saveAttendanceAndNotify();
       }
+    }
+  }
+
+  String _tabNameForIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'MANAGEMENT';
+      case 1:
+        return 'ATTENDANCE';
+      case 2:
+        return 'POINTS';
+      default:
+        return 'UNKNOWN';
     }
   }
 
@@ -129,6 +155,10 @@ class _MeetingsPageState extends State<MeetingsPage>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          onTap: (index) {
+            if (!kDebugMode) return;
+            debugPrint('[TAB_TAP] ${_tabNameForIndex(index)}');
+          },
           labelColor: isDark ? AppColors.goldAccent : AppColors.primaryBlue,
           unselectedLabelColor: isDark
               ? AppColors.textSecondaryDark
