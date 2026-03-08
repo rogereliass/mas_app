@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:masapp/core/constants/app_colors.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/core/widgets/error_view.dart';
-import 'package:masapp/meetings/components/troop_selector_banner.dart';
 import 'package:masapp/meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'package:masapp/meetings/pages/meeting_creation/ui/components/meeting_card.dart';
 import 'package:masapp/meetings/pages/meeting_creation/ui/components/create_meeting_dialog.dart';
@@ -35,18 +34,8 @@ class ManagementTab extends StatelessWidget {
         }
 
         if (provider.needsTroopSelection) {
-          return Column(
-            children: [
-              TroopSelectorBanner(
-                troops: provider.troops,
-                selectedTroopId: provider.selectedTroopId,
-              ),
-              const Expanded(
-                child: LoadingView(
-                  message: 'Select a troop above to continue...',
-                ),
-              ),
-            ],
+          return const LoadingView(
+            message: 'Select a troop above to continue...',
           );
         }
 

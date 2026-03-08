@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../core/constants/app_colors.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
+import 'components/troop_selector_banner.dart';
 import 'pages/attendance/logic/attendance_provider.dart';
 import 'pages/attendance/ui/attendance_tab.dart';
 import 'pages/meeting_creation/logic/meetings_provider.dart';
@@ -175,17 +176,28 @@ class _MeetingsPageState extends State<MeetingsPage>
         children: [
           Consumer<MeetingsProvider>(
             builder: (context, meetingsProvider, _) {
-              return TabBarView(
-                controller: _tabController,
+              return Column(
                 children: [
-                  const ManagementTab(),
-                  AttendanceTab(
-                    troopId: meetingsProvider.effectiveTroopId,
-                    seasonId: meetingsProvider.activeSeasonId,
-                  ),
-                  PointsTab(
-                    troopId: meetingsProvider.effectiveTroopId,
-                    seasonId: meetingsProvider.activeSeasonId,
+                  if (meetingsProvider.isAdmin)
+                    TroopSelectorBanner(
+                      troops: meetingsProvider.troops,
+                      selectedTroopId: meetingsProvider.selectedTroopId,
+                    ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        const ManagementTab(),
+                        AttendanceTab(
+                          troopId: meetingsProvider.effectiveTroopId,
+                          seasonId: meetingsProvider.activeSeasonId,
+                        ),
+                        PointsTab(
+                          troopId: meetingsProvider.effectiveTroopId,
+                          seasonId: meetingsProvider.activeSeasonId,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               );

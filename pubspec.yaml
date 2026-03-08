@@ -74,6 +74,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   encrypt: ^5.0.3
   shared_preferences: ^2.3.2
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:

@@ -29,7 +29,6 @@ Act as a senior production software engineer and review this implementation to e
 - Homepage for scout (Smart Stack, Swipable Cards,...)
 - re-design profiles tab to handle all data & QR
 - role management for system admin
-- add switch troop in meeting tab for admins
 
 ---------------------------------------------------------
 
@@ -39,10 +38,10 @@ Admin:
 -✅User Management (tweaks)
 -✅Season Management
 -✅Patrols View (manage patrol members/leaders ,filter by,)
-- Library Management (CRUD) for files and Folders
-- System Stats (later)
 - Role Management Page
-- Sending Notifications System
+- (later) Library Management (CRUD) for files and Folders
+- (later) System Status Stats
+- (later) Sending Notifications System
 
 
 Troop Head/Leader:
@@ -55,12 +54,12 @@ Troop Head/Leader:
     - ✅Points System
 - 🏗️Homepage Stats for Meeting/Attendance/Scoring
 - Eftekad Module
-- Sending Notifications System (Scope access & rate limit)
+- (later) Sending Notifications System (Scope access & rate limit)
 
 Scouts:
 -✅View their meetings & history
 -✅View their attendance stats
 -✅View their troop stats
-- Home Page
-- Badges in Profile?
+- Home Page design
+- (later) Badges in Profile?
 
