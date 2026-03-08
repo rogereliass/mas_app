@@ -17,7 +17,9 @@ class AuthProvider with ChangeNotifier {
   final RoleRepository _roleRepository = RoleRepository();
   StreamSubscription<AuthState>? _authSubscription;
   static SharedPreferences? _cachedPrefs;
-  
+  static const int _profileLoadAttempts = 2;
+  static const Duration _profileRetryDelay = Duration(milliseconds: 700);
+
   // TTL caching for troops list
   static const Duration _troopsCacheTtl = Duration(minutes: 60);
   final TtlCache<String, List<Map<String, dynamic>>> _troopsCache = TtlCache();
@@ -39,7 +41,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> _migrateFromEncryptedStorage() async {
     try {
       final prefs = await _prefs;
-      
+
       // Check if we have the migration marker
       final migrated = prefs.getBool('_storage_migrated_v1') ?? false;
       if (migrated) {
@@ -48,7 +50,7 @@ class AuthProvider with ChangeNotifier {
       }
 
       _logDebug('🔄 Migrating from encrypted storage to plain storage...');
-      
+
       // List of keys that were previously encrypted
       final encryptedKeys = [
         'user_phone',
@@ -96,7 +98,7 @@ class AuthProvider with ChangeNotifier {
     // Pattern: long base64 string (>50 chars) without spaces
     if (value.length < 50) return false;
     if (value.contains(' ')) return false;
-    
+
     // Try to detect base64 pattern
     final base64Pattern = RegExp(r'^[A-Za-z0-9+/]+=*$');
     return base64Pattern.hasMatch(value);
@@ -121,7 +123,7 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get profileLoadError => _profileLoadError;
   bool get profileLoading => _profileLoading;
-  
+
   /// Get current user's role rank (0 if unauthenticated)
   int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
 
@@ -132,7 +134,7 @@ class AuthProvider with ChangeNotifier {
     final rank = getRankForRole(_selectedRoleName!);
     return rank > 0 ? rank : currentUserRoleRank;
   }
-  
+
   /// Get specific role by name from user's assigned roles
   Role? getRoleByName(String roleName) {
     try {
@@ -143,7 +145,7 @@ class AuthProvider with ChangeNotifier {
       return null;
     }
   }
-  
+
   /// Get rank for a specific role name (returns 0 if role not found)
   int getRankForRole(String roleName) {
     final role = getRoleByName(roleName);
@@ -155,27 +157,30 @@ class AuthProvider with ChangeNotifier {
   String? get userEmail => _currentUser?.email;
   String? get userPhone => _currentUser?.phone;
   Map<String, dynamic>? get userMetadata => _currentUser?.userMetadata;
-  
+
   /// Get full name from user profile or construct from metadata
   String? get fullName {
     // First try from loaded profile (already constructed from first_name + middle_name + last_name)
     if (_currentUserProfile?.fullName != null) {
       return _currentUserProfile!.fullName;
     }
-    
+
     // Fallback: construct from user metadata if profile not loaded
     final metadata = _currentUser?.userMetadata;
     if (metadata != null) {
       final firstName = metadata['first_name'] as String?;
       final middleName = metadata['middle_name'] as String?;
       final lastName = metadata['last_name'] as String?;
-      final parts = [firstName, middleName, lastName]
-          .where((part) => part != null && part.isNotEmpty);
+      final parts = [
+        firstName,
+        middleName,
+        lastName,
+      ].where((part) => part != null && part.isNotEmpty);
       if (parts.isNotEmpty) {
         return parts.join(' ');
       }
     }
-    
+
     return null;
   }
 
@@ -189,18 +194,22 @@ class AuthProvider with ChangeNotifier {
     _logDebug('🚀 AuthProvider Initialize');
 
     // Migrate from old encrypted storage if needed
-    _migrateFromEncryptedStorage().then((_) {
-      _logDebug('✅ Migration check complete, continuing initialization');
-    }).catchError((e) {
-      _logDebug('⚠️ Migration failed (non-fatal): $e');
-    });
+    _migrateFromEncryptedStorage()
+        .then((_) {
+          _logDebug('✅ Migration check complete, continuing initialization');
+        })
+        .catchError((e) {
+          _logDebug('⚠️ Migration failed (non-fatal): $e');
+        });
 
     // Listen to auth state changes and store subscription for cleanup
-    _authSubscription = _authRepository.authStateChanges.listen((AuthState data) async {
+    _authSubscription = _authRepository.authStateChanges.listen((
+      AuthState data,
+    ) async {
       _currentUser = data.session?.user;
-      
+
       _logDebug('🔔 Auth state changed');
-      
+
       if (_currentUser != null) {
         // Load profile and roles without intermediate notifications
         _profileLoading = true;
@@ -209,14 +218,14 @@ class AuthProvider with ChangeNotifier {
         await _saveUserData();
         _profileLoading = false;
         _logDebug('📢 Notifying listeners after auth state change');
-        
+
         // Notify listeners since user logged in
         notifyListeners();
       } else {
         _currentUserProfile = null;
         _userRoles = [];
         await _clearUserData();
-        
+
         // Notify listeners since user logged out
         notifyListeners();
       }
@@ -227,27 +236,29 @@ class AuthProvider with ChangeNotifier {
       _logDebug('👤 User already logged in, loading profile and roles...');
       // CRITICAL: Set loading flag BEFORE starting async operations to prevent race condition
       _profileLoading = true;
-      _loadUserProfile(notifyOnComplete: false).then((_) async {
-        await _loadUserRoles();
-        await _saveUserData();
-        _profileLoading = false;
-        _logDebug('📢 Notifying listeners after initial load complete');
-        notifyListeners();
-      }).catchError((e) {
-        _logDebug('❌ Error in initial load: $e');
-        _profileLoading = false;
-        // Still notify listeners so UI can show error state
-        notifyListeners();
-      });
+      _loadUserProfile(notifyOnComplete: false)
+          .then((_) async {
+            await _loadUserRoles();
+            await _saveUserData();
+            _profileLoading = false;
+            _logDebug('📢 Notifying listeners after initial load complete');
+            notifyListeners();
+          })
+          .catchError((e) {
+            _logDebug('❌ Error in initial load: $e');
+            _profileLoading = false;
+            // Still notify listeners so UI can show error state
+            notifyListeners();
+          });
     } else {
       _logDebug('⚠️ No user logged in at initialization');
     }
   }
-  
+
   /// Load user profile with role rank from database
-  /// 
+  ///
   /// [notifyOnComplete] - If false, doesn't call notifyListeners() when done
-  /// and doesn't reset _profileLoading flag. Useful during initialization when 
+  /// and doesn't reset _profileLoading flag. Useful during initialization when
   /// we want to load both profile and roles before notifying UI.
   Future<void> _loadUserProfile({bool notifyOnComplete = true}) async {
     if (_currentUser == null) {
@@ -266,10 +277,12 @@ class AuthProvider with ChangeNotifier {
     }
 
     try {
-      _currentUserProfile = await _roleRepository.getUserProfile(_currentUser!.id);
-      
-      _logDebug('📊 Profile fetch result: ${_currentUserProfile != null ? "SUCCESS" : "NULL"}');
-      
+      _currentUserProfile = await _fetchUserProfileWithRetry(_currentUser!.id);
+
+      _logDebug(
+        '📊 Profile fetch result: ${_currentUserProfile != null ? "SUCCESS" : "NULL"}',
+      );
+
       if (_currentUserProfile != null) {
         _logDebug('✅ Loaded user profile: ${_currentUserProfile!.fullName}');
         _logDebug('   First Name: ${_currentUserProfile!.firstName}');
@@ -281,21 +294,24 @@ class AuthProvider with ChangeNotifier {
         if (_currentUserProfile!.firstName == null ||
             _currentUserProfile!.lastName == null) {
           _logDebug('⚠️ WARNING: Name fields are missing in database');
-          _profileLoadError = 'Profile data is incomplete. Please contact support.';
+          _profileLoadError =
+              'Profile data is incomplete. Please contact support.';
         } else {
           _profileLoadError = null;
         }
       } else {
         _logDebug('❌ No profile found for current user');
         _currentUserProfile = null;
-        _profileLoadError = 'User profile not found in database. Please contact support or re-register.';
+        _profileLoadError =
+            'User profile not found in database. Please contact support or re-register.';
       }
     } catch (e, stackTrace) {
       _logDebug('❌ Failed to load user profile: $e');
       _logDebug('   StackTrace: $stackTrace');
       // Set profile to null and store error message
       _currentUserProfile = null;
-      _profileLoadError = 'Failed to load profile: ${e.toString()}. Please check your internet connection or contact support.';
+      _profileLoadError =
+          'Failed to load profile: ${e.toString()}. Please check your internet connection or contact support.';
     } finally {
       // Only reset loading flag and notify if we're managing it ourselves
       if (notifyOnComplete) {
@@ -305,6 +321,39 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Fetch profile with a single retry to tolerate transient startup/network issues.
+  Future<UserProfile?> _fetchUserProfileWithRetry(String userId) async {
+    Object? lastError;
+
+    for (var attempt = 1; attempt <= _profileLoadAttempts; attempt++) {
+      try {
+        final profile = await _roleRepository.getUserProfile(userId);
+        if (profile != null) {
+          return profile;
+        }
+
+        _logDebug(
+          '⚠️ Profile fetch returned null (attempt $attempt/$_profileLoadAttempts)',
+        );
+      } catch (e) {
+        lastError = e;
+        _logDebug(
+          '⚠️ Profile fetch failed (attempt $attempt/$_profileLoadAttempts): $e',
+        );
+      }
+
+      if (attempt < _profileLoadAttempts) {
+        await Future.delayed(_profileRetryDelay);
+      }
+    }
+
+    if (lastError != null) {
+      throw lastError;
+    }
+
+    return null;
+  }
+
   /// Load user's assigned roles from database
   Future<void> _loadUserRoles() async {
     if (_currentUser == null) {
@@ -312,7 +361,7 @@ class AuthProvider with ChangeNotifier {
       _logDebug('⚠️ No current user, skipping role load');
       return;
     }
-    
+
     try {
       _logDebug('🔄 Loading roles for user');
       _userRoles = await _roleRepository.getCurrentUserRoles();
@@ -340,8 +389,11 @@ class AuthProvider with ChangeNotifier {
       return;
     }
 
-    final isValid = _selectedRoleName != null &&
-        _userRoles.any((r) => r.name.toLowerCase() == _selectedRoleName!.toLowerCase());
+    final isValid =
+        _selectedRoleName != null &&
+        _userRoles.any(
+          (r) => r.name.toLowerCase() == _selectedRoleName!.toLowerCase(),
+        );
 
     if (!isValid) {
       _selectedRoleName = _userRoles.first.name;
@@ -366,7 +418,9 @@ class AuthProvider with ChangeNotifier {
     if (nextRole != null && nextRole.isEmpty) nextRole = null;
 
     if (nextRole != null) {
-      final exists = _userRoles.any((r) => r.name.toLowerCase() == nextRole!.toLowerCase());
+      final exists = _userRoles.any(
+        (r) => r.name.toLowerCase() == nextRole!.toLowerCase(),
+      );
       if (!exists) {
         nextRole = _userRoles.first.name;
       }
@@ -416,7 +470,9 @@ class AuthProvider with ChangeNotifier {
           saveTasks.add(prefs.setString('user_first_name', profile.firstName!));
         }
         if (profile.middleName != null) {
-          saveTasks.add(prefs.setString('user_middle_name', profile.middleName!));
+          saveTasks.add(
+            prefs.setString('user_middle_name', profile.middleName!),
+          );
         }
         if (profile.lastName != null) {
           saveTasks.add(prefs.setString('user_last_name', profile.lastName!));
@@ -437,19 +493,25 @@ class AuthProvider with ChangeNotifier {
           saveTasks.add(prefs.setString('user_address', profile.address!));
         }
         if (profile.birthdate != null) {
-          saveTasks.add(prefs.setString(
-            'user_birthdate',
-            profile.birthdate!.toIso8601String(),
-          ));
+          saveTasks.add(
+            prefs.setString(
+              'user_birthdate',
+              profile.birthdate!.toIso8601String(),
+            ),
+          );
         }
         if (profile.gender != null) {
           saveTasks.add(prefs.setString('user_gender', profile.gender!));
         }
         if (profile.signupTroopId != null) {
-          saveTasks.add(prefs.setString('user_signup_troop', profile.signupTroopId!));
+          saveTasks.add(
+            prefs.setString('user_signup_troop', profile.signupTroopId!),
+          );
         }
         if (profile.generation != null) {
-          saveTasks.add(prefs.setString('user_generation', profile.generation!));
+          saveTasks.add(
+            prefs.setString('user_generation', profile.generation!),
+          );
         }
 
         saveTasks.add(prefs.setInt('user_role_rank', profile.roleRank));
@@ -510,16 +572,16 @@ class AuthProvider with ChangeNotifier {
 
     try {
       _currentUser = await authMethod();
-      
+
       // Immediately load profile and roles after successful authentication
       // Don't notify until both are loaded to avoid showing no-role state
       await _loadUserProfile(notifyOnComplete: false);
       await _loadUserRoles();
       await _saveUserData();
-      
+
       // Manually notify after both profile and roles are loaded
       notifyListeners();
-      
+
       return true;
     } on AuthException catch (e) {
       _setError(e.message);
@@ -536,13 +598,12 @@ class AuthProvider with ChangeNotifier {
   Future<bool> signInWithPassword({
     required String phoneNumber,
     required String password,
-  }) async =>
-      _executeAuthMethod(
-        () => _authRepository.signInWithPassword(
-          phoneNumber: phoneNumber,
-          password: password,
-        ),
-      );
+  }) async => _executeAuthMethod(
+    () => _authRepository.signInWithPassword(
+      phoneNumber: phoneNumber,
+      password: password,
+    ),
+  );
 
   /// Sign up with phone - sends OTP for verification
   Future<bool> signUpWithPhone({
@@ -575,14 +636,13 @@ class AuthProvider with ChangeNotifier {
   Future<bool> verifySignUpOtp({
     required String phoneNumber,
     required String otpCode,
-  }) async =>
-      _executeAuthMethod(
-        () => _authRepository.verifySignUpOtp(
-          phoneNumber: phoneNumber,
-          otpCode: otpCode,
-        ),
-        errorMessage: 'An unexpected error occurred during verification',
-      );
+  }) async => _executeAuthMethod(
+    () => _authRepository.verifySignUpOtp(
+      phoneNumber: phoneNumber,
+      otpCode: otpCode,
+    ),
+    errorMessage: 'An unexpected error occurred during verification',
+  );
 
   /// Create or update user profile with complete data
   Future<bool> createOrUpdateProfile({
@@ -614,7 +674,9 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Get list of troops with id and name from Supabase
-  Future<List<Map<String, dynamic>>> getTroops({bool forceRefresh = false}) async {
+  Future<List<Map<String, dynamic>>> getTroops({
+    bool forceRefresh = false,
+  }) async {
     // Check cache if not forcing refresh
     if (!forceRefresh) {
       final cachedTroops = _troopsCache.get('troops');
@@ -623,11 +685,13 @@ class AuthProvider with ChangeNotifier {
         return cachedTroops;
       }
     }
-    
+
     try {
       final troops = await _authRepository.getTroops();
       _troopsCache.set('troops', troops, _troopsCacheTtl);
-      _logDebug('✅ Loaded ${troops.length} troops (cached for ${_troopsCacheTtl.inMinutes}min)');
+      _logDebug(
+        '✅ Loaded ${troops.length} troops (cached for ${_troopsCacheTtl.inMinutes}min)',
+      );
       return troops;
     } catch (e) {
       _logDebug('Failed to fetch troops: $e');
@@ -668,12 +732,10 @@ class AuthProvider with ChangeNotifier {
   // ============================================================================
 
   /// Send OTP for password reset (Step 1)
-  /// 
+  ///
   /// Initiates password reset flow by sending OTP to registered phone number
   /// Returns true if OTP sent successfully
-  Future<bool> sendPasswordResetOtp({
-    required String phoneNumber,
-  }) async {
+  Future<bool> sendPasswordResetOtp({required String phoneNumber}) async {
     _setLoading(true);
     _clearError();
 
@@ -694,7 +756,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Verify OTP for password reset (Step 2)
-  /// 
+  ///
   /// Verifies OTP code and returns true if successful
   /// User will have active session after verification (but NO profile/roles loaded)
   Future<bool> verifyPasswordResetOtp({
@@ -709,11 +771,11 @@ class AuthProvider with ChangeNotifier {
         phoneNumber: phoneNumber,
         otpCode: otpCode,
       );
-      
+
       // Set current user for password update (but don't load profile/roles)
       // This is a temporary session just for password reset
       _currentUser = user;
-      
+
       return true;
     } on AuthException catch (e) {
       _setError(e.message);
@@ -727,12 +789,10 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Update password after OTP verification (Step 3)
-  /// 
+  ///
   /// Updates user password - must have active session from OTP verification
   /// Returns true if password updated successfully
-  Future<bool> updatePassword({
-    required String newPassword,
-  }) async {
+  Future<bool> updatePassword({required String newPassword}) async {
     _setLoading(true);
     _clearError();
 
@@ -801,7 +861,7 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   /// Check if current user can access content with given minimum role rank
   /// Returns true for public content (minRoleRank = 0)
   /// Returns false if user is not authenticated and minRoleRank > 0
@@ -814,30 +874,39 @@ class AuthProvider with ChangeNotifier {
   /// Manually refresh the user profile and roles (e.g. on pull-to-refresh)
   Future<void> refreshProfile() async {
     if (_currentUser != null) {
-      // Load both profile and roles before notifying to avoid race condition
-      await _loadUserProfile(notifyOnComplete: false);
-      await _loadUserRoles();
-      await _saveUserData();
-      
-      // Manually notify after both are loaded
+      _profileLoading = true;
       notifyListeners();
+
+      try {
+        // Load both profile and roles before notifying to avoid race condition
+        await _loadUserProfile(notifyOnComplete: false);
+        await _loadUserRoles();
+        await _saveUserData();
+      } finally {
+        _profileLoading = false;
+        // Manually notify after both are loaded
+        notifyListeners();
+      }
     }
   }
 
   /// Set loading state
   void _setLoading(bool value) {
+    if (_isLoading == value) return;
     _isLoading = value;
     notifyListeners();
   }
 
   /// Set error message
   void _setError(String message) {
+    if (_errorMessage == message) return;
     _errorMessage = message;
     notifyListeners();
   }
 
   /// Clear error message
   void _clearError() {
+    if (_errorMessage == null) return;
     _errorMessage = null;
     notifyListeners();
   }

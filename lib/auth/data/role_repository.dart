@@ -20,6 +20,12 @@ class RoleException implements Exception {
 class RoleRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
+
   /// Fetch user profile with role rank
   ///
   /// Join path: auth.uid() → profiles.user_id → profiles.id → profile_roles.profile_id → profile_roles.role_id → roles.id
@@ -27,7 +33,7 @@ class RoleRepository {
   /// Throws [RoleException] on error
   Future<UserProfile?> getUserProfile(String userId) async {
     try {
-      debugPrint('🔍 Fetching profile for user: $userId');
+      _logDebug('🔍 Fetching profile for user: $userId');
 
       // Step 1: auth.uid() → profiles.user_id to get all profile data
       final profileResponse = await _supabase
@@ -59,23 +65,28 @@ class RoleRepository {
             ),
           );
 
-      debugPrint('📊 Profile query result: ${profileResponse != null ? "FOUND" : "NULL"}');
+      _logDebug(
+        '📊 Profile query result: ${profileResponse != null ? "FOUND" : "NULL"}',
+      );
       if (profileResponse != null) {
-        debugPrint('   Raw response keys: ${profileResponse.keys.toList()}');
-        debugPrint('   first_name: ${profileResponse['first_name']}');
-        debugPrint('   middle_name: ${profileResponse['middle_name']}');
-        debugPrint('   last_name: ${profileResponse['last_name']}');
-        debugPrint('   email: ${profileResponse['email']}');
+        _logDebug('   Raw response keys: ${profileResponse.keys.toList()}');
+        _logDebug('   first_name: ${profileResponse['first_name']}');
+        _logDebug('   middle_name: ${profileResponse['middle_name']}');
+        _logDebug('   last_name: ${profileResponse['last_name']}');
+        _logDebug('   email: ${profileResponse['email']}');
       }
 
       if (profileResponse == null) {
-        debugPrint('❌ No profile found for user: $userId');
+        _logDebug('❌ No profile found for user: $userId');
         return null;
       }
 
       final profileId = profileResponse['id'] as String;
-      debugPrint('   Profile ID: $profileId');
-      debugPrint('   Name: ${profileResponse['first_name']} ${profileResponse['middle_name'] ?? ''} ${profileResponse['last_name']}'.trim());
+      _logDebug('   Profile ID: $profileId');
+      _logDebug(
+        '   Name: ${profileResponse['first_name']} ${profileResponse['middle_name'] ?? ''} ${profileResponse['last_name']}'
+            .trim(),
+      );
 
       // Step 2: profiles.id → profile_roles.profile_id to get role_id and troop_context
       // Step 3: profile_roles.role_id → roles.id to get role_rank
@@ -94,34 +105,44 @@ class RoleRepository {
       // Get the highest role_rank and extract troop_context for troop-scoped roles
       int roleRank = 0;
       String? managedTroopId;
-      
+
       if (rolesResponse.isNotEmpty) {
         // Find role with highest rank for default access level
         var highestRole = rolesResponse.reduce((a, b) {
-          final rankA = (a['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
-          final rankB = (b['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          final rankA =
+              (a['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          final rankB =
+              (b['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
           return rankA > rankB ? a : b;
         });
-        
-        roleRank = (highestRole['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
-        
+
+        roleRank =
+            (highestRole['roles'] as Map<String, dynamic>)['role_rank']
+                as int? ??
+            0;
+
         // Extract troop_context from ANY troop-scoped role (rank 60 or 70)
         // This is separate from highest rank - user might be System Admin (100) + Troop Head (70)
         for (var roleEntry in rolesResponse) {
-          final entryRank = (roleEntry['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+          final entryRank =
+              (roleEntry['roles'] as Map<String, dynamic>)['role_rank']
+                  as int? ??
+              0;
           if (entryRank == 60 || entryRank == 70) {
             final troopContext = roleEntry['troop_context'] as String?;
             if (troopContext != null) {
               managedTroopId = troopContext;
-              debugPrint('   Troop-scoped role (rank $entryRank) detected. Managed troop: $managedTroopId');
+              _logDebug(
+                '   Troop-scoped role (rank $entryRank) detected. Managed troop: $managedTroopId',
+              );
               break; // Use first found troop context
             }
           }
         }
-        
-        debugPrint('   Highest role rank: $roleRank');
+
+        _logDebug('   Highest role rank: $roleRank');
       } else {
-        debugPrint('   No roles found, defaulting to rank 0');
+        _logDebug('   No roles found, defaulting to rank 0');
       }
 
       // Add role_rank and managed_troop_id to profile data
@@ -132,17 +153,14 @@ class RoleRepository {
       };
 
       final profile = UserProfile.fromJson(profileData);
-      debugPrint('✅ Profile loaded: ${profile.fullName} (rank $roleRank)');
+      _logDebug('✅ Profile loaded: ${profile.fullName} (rank $roleRank)');
       return profile;
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {
         // No rows returned - user profile doesn't exist
         return null;
       }
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e) {
@@ -182,10 +200,7 @@ class RoleRepository {
           .map((json) => Role.fromJson(json as Map<String, dynamic>))
           .toList();
     } on PostgrestException catch (e) {
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e) {
@@ -216,10 +231,7 @@ class RoleRepository {
           .map((item) => Role.fromJson(item['roles'] as Map<String, dynamic>))
           .toList();
     } on PostgrestException catch (e) {
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e) {
@@ -245,7 +257,8 @@ class RoleRepository {
           );
 
       for (final entry in response as List) {
-        final rank = (entry['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
+        final rank =
+            (entry['roles'] as Map<String, dynamic>)['role_rank'] as int? ?? 0;
         if (rank == 60 || rank == 70) {
           final troopContext = entry['troop_context'] as String?;
           if (troopContext != null) {
@@ -256,10 +269,7 @@ class RoleRepository {
 
       return null;
     } on PostgrestException catch (e) {
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e) {
@@ -290,7 +300,7 @@ class RoleRepository {
   /// Returns true if minRank is 0 (public content)
   Future<bool> canUserAccess(String userId, int minRank) async {
     if (minRank == 0) return true; // Public content
-    
+
     final userRank = await getUserRoleRank(userId);
     return userRank >= minRank;
   }
@@ -298,10 +308,10 @@ class RoleRepository {
   /// Check if current user can access content with given minimum rank
   Future<bool> canCurrentUserAccess(int minRank) async {
     if (minRank == 0) return true; // Public content
-    
+
     final user = _supabase.auth.currentUser;
     if (user == null) return false; // Not authenticated
-    
+
     return canUserAccess(user.id, minRank);
   }
 
@@ -313,9 +323,9 @@ class RoleRepository {
   /// Throws [RoleException] on error
   Future<List<Role>> getUserRoles(String userId) async {
     try {
-      debugPrint('🔍 ========== FETCHING ROLES DEBUG ==========');
-      debugPrint('   User ID (auth.uid): $userId');
-      
+      _logDebug('🔍 ========== FETCHING ROLES DEBUG ==========');
+      _logDebug('   User ID (auth.uid): $userId');
+
       // Step 1: auth.uid() → profiles.user_id to get profiles.id
       final profileResponse = await _supabase
           .from('profiles')
@@ -324,37 +334,41 @@ class RoleRepository {
           .maybeSingle();
 
       if (profileResponse == null) {
-        debugPrint('❌ No profile found for user: $userId');
+        _logDebug('❌ No profile found for user: $userId');
         return [];
       }
 
       final profileId = profileResponse['id'] as String;
-      debugPrint('✅ Profile ID: $profileId');
+      _logDebug('✅ Profile ID: $profileId');
 
       // Step 2: Check profile_roles junction table
-      debugPrint('🔍 Checking profile_roles table for profile_id: $profileId');
+      _logDebug('🔍 Checking profile_roles table for profile_id: $profileId');
       final profileRolesCheck = await _supabase
           .from('profile_roles')
           .select('id, profile_id, role_id')
           .eq('profile_id', profileId);
-      
-      debugPrint('   Rows: $profileRolesCheck');
-      debugPrint('   Count: ${(profileRolesCheck as List).length}');
-      
+
+      _logDebug('   Rows: $profileRolesCheck');
+      _logDebug('   Count: ${(profileRolesCheck as List).length}');
+
       if ((profileRolesCheck).isEmpty) {
-        debugPrint('⚠️ No entries in profile_roles for this profile!');
-        debugPrint('   ACTION NEEDED: Insert a row in profile_roles table:');
-        debugPrint('   INSERT INTO profile_roles (profile_id, role_id) VALUES (\'$profileId\', <role-id>);');
+        _logDebug('⚠️ No entries in profile_roles for this profile!');
+        _logDebug('   ACTION NEEDED: Insert a row in profile_roles table:');
+        _logDebug(
+          '   INSERT INTO profile_roles (profile_id, role_id) VALUES (\'$profileId\', <role-id>);',
+        );
         return [];
       }
 
       // Print each entry
       for (var entry in profileRolesCheck) {
-        debugPrint('   Found: profile_roles.id=${entry['id']}, role_id=${entry['role_id']}');
+        _logDebug(
+          '   Found: profile_roles.id=${entry['id']}, role_id=${entry['role_id']}',
+        );
       }
 
       // Step 3: Join with roles table to get full role details
-      debugPrint('🔍 Attempting join query: profile_roles → roles');
+      _logDebug('🔍 Attempting join query: profile_roles → roles');
       final response = await _supabase
           .from('profile_roles')
           .select('''
@@ -379,39 +393,37 @@ class RoleRepository {
             ),
           );
 
-      debugPrint('   Join query raw response: $response');
-      debugPrint('   Response type: ${response.runtimeType}');
-      debugPrint('   Response length: ${(response as List).length}');
-      
+      _logDebug('   Join query raw response: $response');
+      _logDebug('   Response type: ${response.runtimeType}');
+      _logDebug('   Response length: ${(response as List).length}');
+
       if ((response as List).isEmpty) {
-        debugPrint('⚠️ Join returned empty - possible RLS blocking or invalid role_id references');
+        _logDebug(
+          '⚠️ Join returned empty - possible RLS blocking or invalid role_id references',
+        );
         return [];
       }
 
-      final roles = response
-          .map((item) {
-            debugPrint('   Processing item: $item');
-            final roleData = item['roles'] as Map<String, dynamic>;
-            debugPrint('   → Role: ${roleData['name']} (rank ${roleData['role_rank']})');
-            return Role.fromJson(roleData);
-          })
-          .toList();
-      
-      debugPrint('✅ ========== FOUND ${roles.length} ROLES ==========');
+      final roles = response.map((item) {
+        _logDebug('   Processing item: $item');
+        final roleData = item['roles'] as Map<String, dynamic>;
+        _logDebug(
+          '   → Role: ${roleData['name']} (rank ${roleData['role_rank']})',
+        );
+        return Role.fromJson(roleData);
+      }).toList();
+
+      _logDebug('✅ ========== FOUND ${roles.length} ROLES ==========');
       return roles;
-      
     } on PostgrestException catch (e) {
-      debugPrint('❌ PostgrestException: ${e.message}');
-      debugPrint('   Code: ${e.code}, Details: ${e.details}');
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      _logDebug('❌ PostgrestException: ${e.message}');
+      _logDebug('   Code: ${e.code}, Details: ${e.details}');
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e, stackTrace) {
-      debugPrint('❌ Unexpected error: $e');
-      debugPrint('   Stack: $stackTrace');
+      _logDebug('❌ Unexpected error: $e');
+      _logDebug('   Stack: $stackTrace');
       throw RoleException('Failed to fetch user roles: $e');
     }
   }
@@ -464,15 +476,17 @@ class RoleRepository {
     required String assignedBy,
   }) async {
     try {
-      debugPrint('🔧 Assigning role $roleId to profile $profileId with troop context: $troopId');
-      
+      _logDebug(
+        '🔧 Assigning role $roleId to profile $profileId with troop context: $troopId',
+      );
+
       final data = {
         'profile_id': profileId,
         'role_id': roleId,
         'assigned_by': assignedBy,
         if (troopId != null) 'troop_context': troopId,
       };
-      
+
       await _supabase
           .from('profile_roles')
           .insert(data)
@@ -483,13 +497,10 @@ class RoleRepository {
               statusCode: '408',
             ),
           );
-      
-      debugPrint('✅ Role assigned successfully');
+
+      _logDebug('✅ Role assigned successfully');
     } on PostgrestException catch (e) {
-      throw RoleException(
-        'Database error: ${e.message}',
-        statusCode: e.code,
-      );
+      throw RoleException('Database error: ${e.message}', statusCode: e.code);
     } on RoleException {
       rethrow;
     } catch (e) {

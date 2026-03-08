@@ -12,6 +12,7 @@ import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../../core/widgets/error_view.dart';
 import '../../core/widgets/loading_view.dart';
 import '../../core/widgets/settings_dialog.dart';
+import 'profile_qr_code_screen.dart';
 
 import 'components/future_modules_section.dart';
 import 'components/profile_hero_section.dart';
@@ -140,7 +141,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             email: profile.email,
                             avatarUrl: profile.avatarUrl,
-                            onQrTap: () => _showQrPlaceholder(context),
+                            onQrTap: () => _showProfileQrCode(
+                              context,
+                              profile.id,
+                              profile.fullName ??
+                                  authProvider.fullName ??
+                                  'Member',
+                            ),
                           ),
                           const SizedBox(height: 24),
                           _buildProfileInfoSection(
@@ -525,12 +532,34 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(context: context, builder: (context) => const SettingsDialog());
   }
 
-  void _showQrPlaceholder(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('QR profile card will be available soon'),
-        duration: Duration(seconds: 2),
-      ),
+  void _showProfileQrCode(
+    BuildContext context,
+    String profileId,
+    String profileName,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark
+              ? AppColors.cardDarkElevated
+              : AppColors.cardLight,
+          child: ProfileQrCodeScreen(
+            profileId: profileId,
+            profileName: profileName,
+          ),
+        );
+      },
     );
   }
 }

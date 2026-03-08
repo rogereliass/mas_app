@@ -17,11 +17,11 @@ class AuthRepository {
   Future<bool> testConnection() async {
     try {
       _logDebug('=== TESTING SUPABASE CONNECTION ===');
-      
+
       // Simple auth status check
       final session = _supabase.auth.currentSession;
       _logDebug('Current session: ${session != null ? "exists" : "none"}');
-      
+
       return true;
     } catch (e) {
       _logDebug('Connection test failed: $e');
@@ -41,10 +41,7 @@ class AuthRepository {
       final formattedPhone = _formatPhoneNumber(phoneNumber);
 
       final response = await _supabase.auth
-          .signInWithPassword(
-            phone: formattedPhone,
-            password: password,
-          )
+          .signInWithPassword(phone: formattedPhone, password: password)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -77,7 +74,7 @@ class AuthRepository {
     try {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
-      
+
       _logDebug('=== SIGNUP REQUEST ===');
 
       // Sign up with phone - Supabase will send OTP
@@ -101,7 +98,7 @@ class AuthRepository {
 
       _logDebug('=== SIGNUP RESPONSE ===');
       _logDebug('Session: ${response.session != null}');
-      
+
       // Return true to indicate OTP was sent
       return true;
     } on AuthException catch (e) {
@@ -127,19 +124,17 @@ class AuthRepository {
     try {
       // Format phone number
       final formattedPhone = _formatPhoneNumber(phoneNumber);
-      
+
       _logDebug('=== OTP VERIFICATION REQUEST ===');
 
       final response = await _supabase.auth
-          .verifyOTP(
-            phone: formattedPhone,
-            token: otpCode,
-            type: OtpType.sms,
-          )
+          .verifyOTP(phone: formattedPhone, token: otpCode, type: OtpType.sms)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
-              _logDebug('TIMEOUT: OTP verification took longer than 60 seconds');
+              _logDebug(
+                'TIMEOUT: OTP verification took longer than 60 seconds',
+              );
               throw AuthException(
                 'Request timed out. Please check your internet connection.',
               );
@@ -172,11 +167,11 @@ class AuthRepository {
   Future<void> signOut() async {
     try {
       await _supabase.auth.signOut().timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw AuthException('Log out request timed out');
-            },
-          );
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw AuthException('Log out request timed out');
+        },
+      );
     } on AuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
@@ -210,16 +205,14 @@ class AuthRepository {
   // ============================================================================
 
   /// Send OTP for password reset (Step 1)
-  /// 
+  ///
   /// - Phone number must be registered
   /// - Sends OTP to user's phone
   /// - Rate limited on client side (max 2 attempts)
-  Future<bool> sendPasswordResetOtp({
-    required String phoneNumber,
-  }) async {
+  Future<bool> sendPasswordResetOtp({required String phoneNumber}) async {
     try {
       final formattedPhone = _formatPhoneNumber(phoneNumber);
-      
+
       _logDebug('=== PASSWORD RESET OTP REQUEST ===');
 
       // Use Supabase's signInWithOtp for existing users (password reset flow)
@@ -252,7 +245,7 @@ class AuthRepository {
   }
 
   /// Verify OTP for password reset (Step 2)
-  /// 
+  ///
   /// - Verifies the OTP code
   /// - Returns authenticated session for password update
   Future<User> verifyPasswordResetOtp({
@@ -261,15 +254,11 @@ class AuthRepository {
   }) async {
     try {
       final formattedPhone = _formatPhoneNumber(phoneNumber);
-      
+
       _logDebug('=== PASSWORD RESET OTP VERIFICATION ===');
 
       final response = await _supabase.auth
-          .verifyOTP(
-            phone: formattedPhone,
-            token: otpCode,
-            type: OtpType.sms,
-          )
+          .verifyOTP(phone: formattedPhone, token: otpCode, type: OtpType.sms)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -279,7 +268,7 @@ class AuthRepository {
             },
           );
 
-          _logDebug('✓ OTP verified successfully');
+      _logDebug('✓ OTP verified successfully');
 
       if (response.user == null) {
         throw AuthException('Verification failed: No user returned');
@@ -299,13 +288,11 @@ class AuthRepository {
   }
 
   /// Update user password (Step 3)
-  /// 
+  ///
   /// - Must be called after successful OTP verification
   /// - User must have active session
   /// - Password requirements: min 8 characters, complexity validated client-side
-  Future<bool> updatePassword({
-    required String newPassword,
-  }) async {
+  Future<bool> updatePassword({required String newPassword}) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
@@ -315,11 +302,7 @@ class AuthRepository {
       _logDebug('=== UPDATE PASSWORD ===');
 
       final response = await _supabase.auth
-          .updateUser(
-            UserAttributes(
-              password: newPassword,
-            ),
-          )
+          .updateUser(UserAttributes(password: newPassword))
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -393,10 +376,7 @@ class AuthRepository {
       // Phone has UNIQUE constraint (profiles_phone_key)
       await _supabase
           .from('profiles')
-          .upsert(
-            profileRecord,
-            onConflict: 'phone',
-          );
+          .upsert(profileRecord, onConflict: 'phone');
 
       _logDebug('✓ Profile upserted successfully');
     } catch (e, stackTrace) {
@@ -415,7 +395,12 @@ class AuthRepository {
       final response = await _supabase
           .from('troops')
           .select('id, name')
-          .order('name');
+          .order('name')
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                throw AuthException('Request timed out while fetching troops'),
+          );
 
       if (response.isEmpty) {
         return [];
@@ -499,7 +484,8 @@ class AuthRepository {
         message = 'Network error. Please check your connection';
         break;
       case String msg when msg.contains('phone') && msg.contains('not enabled'):
-        message = 'Phone authentication is not enabled. Please contact support.';
+        message =
+            'Phone authentication is not enabled. Please contact support.';
         break;
       case String msg when msg.contains('sms') || msg.contains('provider'):
         message = 'SMS service not configured. Please contact support.';
