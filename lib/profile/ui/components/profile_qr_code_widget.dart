@@ -7,11 +7,17 @@ import '../../../core/constants/app_colors.dart';
 class ProfileQrCodeWidget extends StatelessWidget {
   final String profileId;
   final double size;
+  final bool showCenterLogo;
+  final String centerLogoAssetPath;
+  final double? centerLogoSize;
 
   const ProfileQrCodeWidget({
     super.key,
     required this.profileId,
     this.size = 260,
+    this.showCenterLogo = true,
+    this.centerLogoAssetPath = 'assets/images/mas_logo.png',
+    this.centerLogoSize,
   });
 
   @override
@@ -41,6 +47,9 @@ class ProfileQrCodeWidget extends StatelessWidget {
     }
 
     final qrPayload = 'user:$trimmedProfileId';
+    final resolvedLogoSize = (centerLogoSize ?? size * 0.22)
+        .clamp(40.0, 64.0)
+        .toDouble();
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -55,12 +64,60 @@ class ProfileQrCodeWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: QrImageView(
-        data: qrPayload,
-        version: QrVersions.auto,
-        size: size,
-        gapless: true,
-        backgroundColor: AppColors.cardLight,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          QrImageView(
+            data: qrPayload,
+            version: QrVersions.auto,
+            errorCorrectionLevel: QrErrorCorrectLevel.H,
+            size: size,
+            gapless: true,
+            backgroundColor: AppColors.cardLight,
+          ),
+          if (showCenterLogo)
+            _CenterLogo(
+              logoAssetPath: centerLogoAssetPath,
+              size: resolvedLogoSize,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CenterLogo extends StatelessWidget {
+  final String logoAssetPath;
+  final double size;
+
+  const _CenterLogo({required this.logoAssetPath, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: size + 12,
+      height: size + 12,
+      decoration: BoxDecoration(
+        color: AppColors.cardLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      padding: const EdgeInsets.all(6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.asset(
+          logoAssetPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (context, error, stackTrace) => Icon(
+            Icons.qr_code_2_rounded,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }

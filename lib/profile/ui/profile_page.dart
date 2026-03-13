@@ -122,51 +122,43 @@ class _ProfilePageState extends State<ProfilePage> {
                     profileLoadError,
                     authProvider,
                   )
-                : RefreshIndicator(
-                    onRefresh: authProvider.refreshProfile,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ProfileHeroSection(
-                            fullName:
-                                profile.fullName ??
-                                authProvider.fullName ??
-                                'User',
-                            secondaryInfo: _buildHeaderSecondaryInfo(
-                              profile,
-                              authProvider.userRoles,
-                            ),
-                            email: profile.email,
-                            avatarUrl: profile.avatarUrl,
-                            onQrTap: () => _showProfileQrCode(
-                              context,
-                              profile.id,
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ProfileHeroSection(
+                          fullName:
                               profile.fullName ??
-                                  authProvider.fullName ??
-                                  'Member',
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildProfileInfoSection(
+                              authProvider.fullName ??
+                              'User',
+                          email: profile.email,
+                          avatarUrl: profile.avatarUrl,
+                          onQrTap: () => _showProfileQrCode(
                             context,
-                            profile,
-                            authProvider,
+                            profile.id,
+                            profile.fullName ??
+                                authProvider.fullName ??
+                                'Member',
                           ),
-                          const SizedBox(height: 32),
-                          _buildAccessSection(
-                            context,
-                            profile,
-                            authProvider.userRoles,
-                          ),
-                          const SizedBox(height: 32),
-                          _buildAccountSection(context, profile),
-                          const SizedBox(height: 32),
-                          const FutureModulesSection(),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildProfileInfoSection(
+                          context,
+                          profile,
+                          authProvider,
+                        ),
+                        const SizedBox(height: 32),
+                        _buildAccessSection(
+                          context,
+                          profile,
+                          authProvider.userRoles,
+                        ),
+                        const SizedBox(height: 32),
+                        _buildAccountSection(context, profile),
+                        const SizedBox(height: 32),
+                        const FutureModulesSection(),
+                      ],
                     ),
                   ),
             const Positioned(
@@ -348,18 +340,6 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ],
     );
-  }
-
-  String _buildHeaderSecondaryInfo(UserProfile profile, List<Role> roles) {
-    final chunks = <String>[];
-    chunks.add(_resolvePrimaryRole(profile.roleRank, roles));
-
-    final troop = _resolveTroopValue(profile);
-    if (troop != 'Not assigned') {
-      chunks.add('Troop $troop');
-    }
-
-    return chunks.join(' | ');
   }
 
   String _resolvePrimaryRole(int roleRank, List<Role> roles) {

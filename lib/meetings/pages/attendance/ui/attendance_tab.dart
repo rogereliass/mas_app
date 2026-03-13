@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:masapp/auth/logic/auth_provider.dart';
 import 'package:masapp/core/constants/app_colors.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/core/widgets/error_view.dart';
@@ -8,6 +9,7 @@ import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart'
 import 'package:masapp/meetings/pages/attendance/logic/attendance_provider.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
 import 'package:masapp/meetings/pages/attendance/ui/components/attendance_row.dart';
+import 'package:masapp/profile/ui/profile_qr_code_screen.dart';
 
 /// The "Attendance" tab inside MeetingsPage's TabBarView.
 /// Allows editors to mark and save attendance for a selected meeting.
@@ -167,12 +169,15 @@ class _AttendanceActions extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 500;
+          const showQrButton = _ShowProfileQrCodeButton();
           final scanButton = _ScanQrCodesButton(provider: provider);
           final saveButton = _SaveAttendanceButton(provider: provider);
 
           if (isNarrow) {
             return Column(
               children: [
+                const SizedBox(width: double.infinity, child: showQrButton),
+                const SizedBox(height: 10),
                 SizedBox(width: double.infinity, child: scanButton),
                 const SizedBox(height: 10),
                 SizedBox(width: double.infinity, child: saveButton),
@@ -182,12 +187,83 @@ class _AttendanceActions extends StatelessWidget {
 
           return Row(
             children: [
+              const Expanded(child: showQrButton),
+              const SizedBox(width: 12),
               Expanded(child: scanButton),
               const SizedBox(width: 12),
               Expanded(child: saveButton),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ShowProfileQrCodeButton extends StatelessWidget {
+  const _ShowProfileQrCodeButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final authProvider = Provider.of<AuthProvider>(context);
+    final profile = authProvider.currentUserProfile;
+    final profileId = profile?.id ?? '';
+    final profileName = profile?.fullName ?? authProvider.fullName ?? 'Member';
+
+    return FilledButton.tonalIcon(
+      onPressed: () {
+        if (profileId.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your profile QR is not ready yet. Please try again.',
+              ),
+            ),
+          );
+          return;
+        }
+
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            backgroundColor: isDark
+                ? AppColors.cardDarkElevated
+                : AppColors.cardLight,
+            child: ProfileQrCodeScreen(
+              profileId: profileId,
+              profileName: profileName,
+            ),
+          ),
+        );
+      },
+      icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+      label: const Text('Show QR Code'),
+      style: FilledButton.styleFrom(
+        foregroundColor: isDark
+            ? AppColors.textPrimaryDark
+            : AppColors.textPrimaryLight,
+        backgroundColor: AppColors.goldAccent.withValues(
+          alpha: isDark ? 0.24 : 0.18,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(
+          color: isDark
+              ? AppColors.goldAccent.withValues(alpha: 0.45)
+              : AppColors.rankBronze.withValues(alpha: 0.28),
+        ),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -810,24 +886,21 @@ class _ScoutAttendanceView extends StatelessWidget {
       return const _NoMeetingsView();
     }
 
-    // Make the entire view scrollable
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100), // Padding only at the bottom for scroll
-      itemCount: provider.myLogs.length + 1, // +1 for the stats card at the top
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _ScoutStatsCard(provider: provider);
-        }
-        
-        final log = provider.myLogs[index - 1]; // Offset index
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _LogCard(
-            key: ValueKey(log.meeting.id),
-            log: log,
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 100),
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: _ShowProfileQrCodeButton(),
+        ),
+        _ScoutStatsCard(provider: provider),
+        ...provider.myLogs.map(
+          (log) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _LogCard(key: ValueKey(log.meeting.id), log: log),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
@@ -856,7 +929,9 @@ class _ScoutStatsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : AppColors.primaryBlue).withValues(alpha: isDark ? 0.3 : 0.08),
+            color: (isDark ? Colors.black : AppColors.primaryBlue).withValues(
+              alpha: isDark ? 0.3 : 0.08,
+            ),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -865,7 +940,7 @@ class _ScoutStatsCard extends StatelessWidget {
             blurRadius: 0,
             spreadRadius: 1,
             offset: const Offset(0, 0),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -879,11 +954,16 @@ class _ScoutStatsCard extends StatelessWidget {
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -899,27 +979,69 @@ class _ScoutStatsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Detailed Breakdown Rows (Big circle removed)
-          _buildStatRow(context, 'Present', present, total, AppColors.success, Icons.check_circle_rounded),
+          _buildStatRow(
+            context,
+            'Present',
+            present,
+            total,
+            AppColors.success,
+            Icons.check_circle_rounded,
+          ),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Absent', absent, total, AppColors.error, Icons.cancel_rounded),
+          _buildStatRow(
+            context,
+            'Absent',
+            absent,
+            total,
+            AppColors.error,
+            Icons.cancel_rounded,
+          ),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Late', lateCount, total, AppColors.warning, Icons.watch_later_rounded),
+          _buildStatRow(
+            context,
+            'Late',
+            lateCount,
+            total,
+            AppColors.warning,
+            Icons.watch_later_rounded,
+          ),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Excused', excused, total, AppColors.info, Icons.info_rounded),
+          _buildStatRow(
+            context,
+            'Excused',
+            excused,
+            total,
+            AppColors.info,
+            Icons.info_rounded,
+          ),
           const SizedBox(height: 16),
-          _buildStatRow(context, 'Unrecorded', unrecorded, total, isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, Icons.help_rounded),
+          _buildStatRow(
+            context,
+            'Unrecorded',
+            unrecorded,
+            total,
+            isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            Icons.help_rounded,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatRow(BuildContext context, String label, int count, int total, Color color, IconData icon) {
+  Widget _buildStatRow(
+    BuildContext context,
+    String label,
+    int count,
+    int total,
+    Color color,
+    IconData icon,
+  ) {
     if (total == 0) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     final double fraction = count / total;
     final int percentage = (fraction * 100).round();
 
@@ -936,7 +1058,7 @@ class _ScoutStatsCard extends StatelessWidget {
           child: Icon(icon, color: color, size: 24),
         ),
         const SizedBox(width: 16),
-        
+
         // Label & Bar
         Expanded(
           child: Column(
@@ -950,7 +1072,9 @@ class _ScoutStatsCard extends StatelessWidget {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.2,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
                     ),
                   ),
                   Text(
@@ -988,12 +1112,12 @@ class _ScoutStatsCard extends StatelessWidget {
                               color: color.withValues(alpha: 0.4),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
-                            )
-                          ]
+                            ),
+                          ],
                         ),
                       ),
                     );
-                  }
+                  },
                 ),
               ),
             ],
@@ -1021,7 +1145,9 @@ class _LogCard extends StatelessWidget {
     IconData statusIcon;
 
     if (!isRecorded) {
-      statusColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+      statusColor = isDark
+          ? AppColors.textSecondaryDark
+          : AppColors.textSecondaryLight;
       statusLabel = 'Not Recorded';
       statusIcon = Icons.help_outline;
     } else {
@@ -1049,7 +1175,8 @@ class _LogCard extends StatelessWidget {
       }
     }
 
-    final hasNotes = log.record?.notes != null && log.record!.notes!.trim().isNotEmpty;
+    final hasNotes =
+        log.record?.notes != null && log.record!.notes!.trim().isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1082,7 +1209,9 @@ class _LogCard extends StatelessWidget {
                     Text(
                       log.meeting.formattedDate,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -1090,7 +1219,10 @@ class _LogCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -1119,7 +1251,9 @@ class _LogCard extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isDark
-                    ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                    ? theme.colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.3,
+                      )
                     : theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1129,7 +1263,9 @@ class _LogCard extends StatelessWidget {
                   Icon(
                     Icons.format_quote,
                     size: 16,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1137,7 +1273,9 @@ class _LogCard extends StatelessWidget {
                       log.record!.notes!.trim(),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontStyle: FontStyle.italic,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
                       ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,

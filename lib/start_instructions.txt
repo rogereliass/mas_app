@@ -27,7 +27,7 @@ Act as a senior production software engineer and review this implementation to e
 - clean copilot instructions
 
 - Homepage for scout (Smart Stack, Swipable Cards,...)
-- QR code for attendance recording 
+- QR code for attendance recording - [Troop Heads]
 - role management for system admin
 
 ---------------------------------------------------------
