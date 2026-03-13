@@ -221,8 +221,8 @@ class _HomePageState extends State<HomePage> {
                     _buildWelcomeHeader(context, authProvider),
                     const SizedBox(height: 24),
 
-                    // Quick Actions
-                    _buildQuickActions(context),
+                    // Smart Stack (Dynamic updates)
+                    const SmartStack(),
                     const SizedBox(height: 32),
 
                     // Summary / Stats
@@ -261,6 +261,7 @@ class _HomePageState extends State<HomePage> {
     final colorScheme = theme.colorScheme;
 
     // Debug logging to trace the issue
+    if(kDebugMode){
     debugPrint('🔍 _buildWelcomeHeader DEBUG:');
     debugPrint('   currentUser: ${authProvider.currentUser?.id}');
     debugPrint('   currentUserProfile: ${authProvider.currentUserProfile}');
@@ -269,7 +270,8 @@ class _HomePageState extends State<HomePage> {
     debugPrint('   lastName: ${authProvider.currentUserProfile?.lastName}');
     debugPrint('   fullName getter: ${authProvider.fullName}');
     debugPrint('   userMetadata: ${authProvider.userMetadata}');
-
+    }
+    
     final userName = authProvider.fullName ?? 'User';
     final currentRole = authProvider.selectedRoleName ?? 'No Role';
 
@@ -290,74 +292,11 @@ class _HomePageState extends State<HomePage> {
             color: colorScheme.onSurface,
           ),
         ),
-        const SizedBox(height: 8),
-        // Role Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.badge_outlined,
-                size: 16,
-                color: colorScheme.onSecondaryContainer,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                currentRole,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSecondaryContainer,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
 
-  /// Quick Actions / Shortcuts
-  /// Grid or Row of frequently used actions
-  Widget _buildQuickActions(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // TODO: Populate dynamically based on user permissions
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _QuickActionItem(
-              icon: Icons.library_books_outlined,
-              label: 'Library',
-              onTap: () => Navigator.pushNamed(context, AppRouter.library),
-            ),
-            _QuickActionItem(
-              icon: Icons.folder_open_outlined,
-              label: 'Folders',
-              onTap: () => Navigator.pushNamed(context, AppRouter.allFolders),
-            ),
-            _QuickActionItem(
-              icon: Icons.download_done_outlined,
-              label: 'Offline',
-              onTap: () {
-                // TODO: Navigate to offline files
-              },
-            ),
-            _QuickActionItem(
-              icon: Icons.person_outline,
-              label: 'Profile',
-              onTap: () => Navigator.pushNamed(context, AppRouter.profile),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+
 
   /// Summary Cards or Statistics
   /// Displays key metrics relevant to the selected role
@@ -599,51 +538,3 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _QuickActionItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickActionItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(minWidth: 70),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: colorScheme.onPrimaryContainer,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
