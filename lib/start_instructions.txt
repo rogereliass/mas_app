@@ -29,6 +29,7 @@ Act as a senior production software engineer and review this implementation to e
 - Homepage for scout (Smart Stack, Swipable Cards,...)
 - QR code for attendance recording - [Troop Heads]
 - role management for system admin
+- user creation for admin/troop head,leaders
 
 ---------------------------------------------------------
 

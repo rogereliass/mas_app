@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../routing/app_router.dart';
+import 'premium_dashboard_widgets.dart';
 
 /// System Admin Dashboard Statistics Component
 /// 
-/// Shows admin-level statistics including:
-/// - Total users count
-/// - Total files/folders count
-/// - Storage usage
-/// - Recent activity count
+/// Premium UI using shared dashboard components for top-level admin stats
+/// and actions, alongside custom activity and health widgets.
 class SystemAdminStats extends StatelessWidget {
   const SystemAdminStats({super.key});
 
@@ -19,62 +17,74 @@ class SystemAdminStats extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section Header
-        Text(
-          'System Overview',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Stats Grid - 2x2 layout
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
-          children: [
-            _StatCard(
-              icon: Icons.people_outline,
-              label: 'Total Users',
-              value: '--',
-              color: colorScheme.primary,
-              backgroundColor: colorScheme.primaryContainer,
+        // 1. Premium Dashboard Section (Replaces old Stats Grid and Action Buttons List)
+        PremiumDashboardSection(
+          title: 'System Overview',
+          headerIcon: Icons.admin_panel_settings_rounded,
+          actionCards: [
+            PremiumActionCard(
+              title: 'Season Management',
+              subtitle: 'Manage activity seasons & codes',
+              icon: Icons.calendar_today_rounded,
+              color: const Color(0xFF6366F1), // Indigo
+              onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
             ),
-            _StatCard(
-              icon: Icons.folder_outlined,
-              label: 'Total Folders',
-              value: '--',
-              color: colorScheme.secondary,
-              backgroundColor: colorScheme.secondaryContainer,
+            PremiumActionCard(
+              title: 'User Acceptance',
+              subtitle: 'Review & approve registrations',
+              icon: Icons.how_to_reg_rounded,
+              color: const Color(0xFFF43F5E), // Rose
+              onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
             ),
-            _StatCard(
-              icon: Icons.description_outlined,
-              label: 'Total Files',
-              value: '--',
-              color: colorScheme.tertiary,
-              backgroundColor: colorScheme.tertiaryContainer,
+            PremiumActionCard(
+              title: 'User Management',
+              subtitle: 'Edit profiles & role assignments',
+              icon: Icons.manage_accounts_rounded,
+              color: const Color(0xFF14B8A6), // Teal
+              onTap: () => Navigator.pushNamed(context, AppRouter.userManagement),
             ),
-            _StatCard(
-              icon: Icons.storage_outlined,
-              label: 'Storage Used',
+            PremiumActionCard(
+              title: 'Patrols',
+              subtitle: 'Manage system-wide patrols',
+              icon: Icons.groups_rounded,
+              color: const Color(0xFFF59E0B), // Amber
+              onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
+            ),
+          ],
+          stats: const [
+            PremiumStat(
+              icon: Icons.people_rounded,
+              label: 'Users',
+              value: '--',
+              color: Color(0xFF3B82F6), // Blue
+            ),
+            PremiumStat(
+              icon: Icons.folder_rounded,
+              label: 'Folders',
+              value: '--',
+              color: Color(0xFF14B8A6), // Teal
+            ),
+            PremiumStat(
+              icon: Icons.description_rounded,
+              label: 'Files',
+              value: '--',
+              color: Color(0xFF8B5CF6), // Violet
+            ),
+            PremiumStat(
+              icon: Icons.storage_rounded,
+              label: 'Storage',
               value: '-- GB',
-              color: colorScheme.error,
-              backgroundColor: colorScheme.errorContainer,
+              color: Color(0xFFF43F5E), // Rose
             ),
           ],
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
-        // Recent Activity Summary
+        // 2. Recent Activity Summary (Preserved)
         _ActivitySummaryCard(
           title: 'Recent Activity',
-          items: [
+          items: const [
             _ActivityItem(
               icon: Icons.person_add_outlined,
               label: 'New users (7 days)',
@@ -95,174 +105,9 @@ class SystemAdminStats extends StatelessWidget {
 
         const SizedBox(height: 24),
 
-        // System Health Indicators
+        // 3. System Health Indicators (Preserved)
         _buildSystemHealth(context),
-
-        const SizedBox(height: 24),
-
-        // Admin Actions
-        _buildAdminActions(context),
       ],
-    );
-  }
-
-  Widget _buildAdminActions(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.admin_panel_settings_outlined,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Admin Actions',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Season Management Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, AppRouter.seasonManagement);
-                },
-                icon: const Icon(Icons.calendar_today_rounded),
-                label: const Text('Season Management'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Manage system-wide activity seasons and codes',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // User Acceptance Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRouter.userAcceptance,
-                  );
-                },
-                icon: const Icon(Icons.how_to_reg),
-                label: const Text('User Acceptance'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.secondary,
-                  foregroundColor: colorScheme.onSecondary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            Text(
-              'Review and approve pending user registrations',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRouter.userManagement,
-                  );
-                },
-                icon: const Icon(Icons.manage_accounts_outlined),
-                label: const Text('User Management'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                  foregroundColor: colorScheme.onSurfaceVariant,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                  side: BorderSide(
-                    color: colorScheme.outline.withValues(alpha: 0.5),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Edit user profiles and role assignments',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRouter.patrolsManagement,
-                  );
-                },
-                icon: const Icon(Icons.groups_2_outlined),
-                label: const Text('Patrols Management'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.tertiary,
-                  foregroundColor: colorScheme.onTertiary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create patrols, assign members, and review unassigned scouts',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
