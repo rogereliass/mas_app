@@ -1,3 +1,6 @@
+/// NEXT MEETING CARD
+/// Shows the date and details of the user's upcoming meeting.
+/// TO BE IMPLEMENTED: Query the meetings table to find the next scheduled meeting for the user's troop/patrol.
 import 'package:flutter/material.dart';
 import 'smart_stack_card_base.dart';
 

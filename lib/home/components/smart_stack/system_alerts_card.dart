@@ -1,3 +1,6 @@
+/// SYSTEM ALERTS CARD
+/// Shows high-level system logs or critical alerts for System Admins.
+/// TO BE IMPLEMENTED: Fetch active alerts, error logs, or general system health status.
 import 'package:flutter/material.dart';
 import 'smart_stack_card_base.dart';
 

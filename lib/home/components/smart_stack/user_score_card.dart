@@ -1,3 +1,6 @@
+/// USER SCORE CARD
+/// Shows the Scout's current score, rank progression, or points.
+/// TO BE IMPLEMENTED: Fetch the scout's points/attendance score from the database.
 import 'package:flutter/material.dart';
 import 'smart_stack_card_base.dart';
 
