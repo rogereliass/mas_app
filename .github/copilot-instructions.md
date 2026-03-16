@@ -418,6 +418,17 @@ class MyProvider with ChangeNotifier {
 }
 ```
 
+### 5.1 **Homepage Smart Card Fetching**
+Home dashboard cards inside `lib/home/components/smart_stack/` must not refetch every time the homepage rebuilds or the user switches tabs.
+
+- If a smart card depends on auth/profile data, do **not** fire the fetch once in `initState()` using whatever auth value happens to exist at that moment. Wait until `AuthProvider.profileLoading` is false or until `currentUserProfile` is available.
+- Use an app-session cache (static in-memory cache or provider-owned cache) keyed by the relevant scope such as `userId`, `profileId`, `troopId`, selected role, or season. The goal is: **fetch once on app opening, then reuse while navigating around the app**.
+- Deduplicate concurrent loads with an in-flight request map so multiple rebuilds do not trigger duplicate Supabase calls.
+- Distinguish stable empty states from failures with explicit user-facing messages. At minimum, handle these separately when relevant: signed out, profile still loading, no troop linked, no active season, no upcoming data, and request failure.
+- For cards with a fixed heading, put the dynamic record in the message body. Example: `Your next meeting is ...` instead of replacing the card title with the meeting name.
+- Use `AutomaticKeepAliveClientMixin` for paged smart-stack cards, but do **not** rely on keep-alive alone for caching. Keep-alive only preserves a widget instance while mounted; it does not protect against route/tab rebuilds.
+- Avoid manual refresh on tab switches. Only refresh when the underlying scope changes or the user explicitly requests a refresh.
+
 ### 6. **Widget Lifecycle Management** ⚠️ CRITICAL
 Proper cleanup prevents memory leaks and lifecycle errors:
 

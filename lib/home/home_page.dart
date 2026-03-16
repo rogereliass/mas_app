@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth/logic/auth_provider.dart';
+import '../core/constants/app_colors.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../core/widgets/settings_dialog.dart';
+import '../profile/ui/profile_qr_code_screen.dart';
 import '../routing/app_router.dart';
 import 'components/components.dart';
 
@@ -21,14 +23,14 @@ class _HomePageState extends State<HomePage> {
     // Auth guard: redirect to startup if not authenticated
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      
+
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (kDebugMode) {
         debugPrint('🏠 HomePage initState - Auth check...');
         debugPrint('   isAuthenticated: ${authProvider.isAuthenticated}');
         debugPrint('   User: ${authProvider.fullName}');
       }
-      
+
       if (!authProvider.isAuthenticated) {
         if (kDebugMode) {
           debugPrint('❌ User not authenticated, redirecting to startup...');
@@ -37,9 +39,11 @@ class _HomePageState extends State<HomePage> {
         Navigator.of(context).pushReplacementNamed(AppRouter.startup);
         return;
       }
-      
+
       if (kDebugMode) {
-        debugPrint('🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}');
+        debugPrint(
+          '🏠 HomePage initState - Roles count: ${authProvider.userRoles.length}',
+        );
       }
       if (authProvider.userRoles.isEmpty) {
         if (kDebugMode) {
@@ -66,7 +70,9 @@ class _HomePageState extends State<HomePage> {
       debugPrint('   Roles Count: ${userRoles.length}');
       debugPrint('   Selected Role: $selectedRole');
       if (userRoles.isNotEmpty) {
-        debugPrint('   Available Roles: ${userRoles.map((r) => r.name).join(', ')}');
+        debugPrint(
+          '   Available Roles: ${userRoles.map((r) => r.name).join(', ')}',
+        );
       }
       debugPrint('🏠 ======================================');
     }
@@ -80,10 +86,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               CircularProgressIndicator(color: colorScheme.primary),
               const SizedBox(height: 16),
-              Text(
-                'Loading your profile...',
-                style: theme.textTheme.bodyLarge,
-              ),
+              Text('Loading your profile...', style: theme.textTheme.bodyLarge),
             ],
           ),
         ),
@@ -109,6 +112,14 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         centerTitle: true,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Notifications',
+            onPressed: () => _showNotificationsPanel(context),
+          ),
+        ),
         // Role Selector (Center)
         title: Container(
           height: 40,
@@ -122,7 +133,10 @@ class _HomePageState extends State<HomePage> {
           ),
           child: userRoles.isEmpty
               ? Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Text(
                     'No Role',
                     style: theme.textTheme.labelLarge?.copyWith(
@@ -136,7 +150,10 @@ class _HomePageState extends State<HomePage> {
                     value: selectedRole,
                     icon: Padding(
                       padding: const EdgeInsets.only(right: 8.0),
-                      child: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
+                      child: Icon(
+                        Icons.arrow_drop_down,
+                        color: colorScheme.primary,
+                      ),
                     ),
                     borderRadius: BorderRadius.circular(16),
                     dropdownColor: theme.cardColor,
@@ -168,7 +185,10 @@ class _HomePageState extends State<HomePage> {
             tooltip: 'Reload Profile & Roles',
             onPressed: () async {
               debugPrint('🔄 Manual reload triggered from HomePage');
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
 
               // Show loading
               ScaffoldMessenger.of(context).showSnackBar(
@@ -213,7 +233,12 @@ class _HomePageState extends State<HomePage> {
             SafeArea(
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 100),
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 24,
+                  bottom: 100,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -231,7 +256,7 @@ class _HomePageState extends State<HomePage> {
 
                     // // Recent Activity
                     // _buildRecentActivity(context),
-                    
+
                     // Bottom padding to ensure content isn't hidden behind FAB or Nav bar if needed
                     const SizedBox(height: 24),
                   ],
@@ -261,17 +286,19 @@ class _HomePageState extends State<HomePage> {
     final colorScheme = theme.colorScheme;
 
     // Debug logging to trace the issue
-    if(kDebugMode){
-    debugPrint('🔍 _buildWelcomeHeader DEBUG:');
-    debugPrint('   currentUser: ${authProvider.currentUser?.id}');
-    debugPrint('   currentUserProfile: ${authProvider.currentUserProfile}');
-    debugPrint('   firstName: ${authProvider.currentUserProfile?.firstName}');
-    debugPrint('   middleName: ${authProvider.currentUserProfile?.middleName}');
-    debugPrint('   lastName: ${authProvider.currentUserProfile?.lastName}');
-    debugPrint('   fullName getter: ${authProvider.fullName}');
-    debugPrint('   userMetadata: ${authProvider.userMetadata}');
+    if (kDebugMode) {
+      debugPrint('🔍 _buildWelcomeHeader DEBUG:');
+      debugPrint('   currentUser: ${authProvider.currentUser?.id}');
+      debugPrint('   currentUserProfile: ${authProvider.currentUserProfile}');
+      debugPrint('   firstName: ${authProvider.currentUserProfile?.firstName}');
+      debugPrint(
+        '   middleName: ${authProvider.currentUserProfile?.middleName}',
+      );
+      debugPrint('   lastName: ${authProvider.currentUserProfile?.lastName}');
+      debugPrint('   fullName getter: ${authProvider.fullName}');
+      debugPrint('   userMetadata: ${authProvider.userMetadata}');
     }
-    
+
     final userName = authProvider.fullName ?? 'User';
     final currentRole = authProvider.selectedRoleName ?? 'No Role';
 
@@ -284,19 +311,143 @@ class _HomePageState extends State<HomePage> {
             color: colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          userName,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                userName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Transform.translate(
+              offset: const Offset(0, -4),
+              child: GestureDetector(
+                onTap: () => _showCurrentUserQrCode(context, authProvider),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.qr_code_2_rounded, 
+                    color: colorScheme.primary,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
+  void _showCurrentUserQrCode(BuildContext context, AuthProvider authProvider) {
+    final profileId =
+        authProvider.currentUserProfile?.id ?? authProvider.userId;
+    final profileName =
+        authProvider.currentUserProfile?.fullName ??
+        authProvider.fullName ??
+        'Member';
 
+    if (profileId == null || profileId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to generate QR code right now.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          backgroundColor: isDark
+              ? AppColors.cardDarkElevated
+              : AppColors.cardLight,
+          child: ProfileQrCodeScreen(
+            profileId: profileId,
+            profileName: profileName,
+          ),
+        );
+      },
+    );
+  }
+
+  void _showNotificationsPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    Icons.notifications_active_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Notifications',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No new notifications yet.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   /// Summary Cards or Statistics
   /// Displays key metrics relevant to the selected role
@@ -304,30 +455,32 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final roleRank = authProvider.currentUserRoleRank;
-    
+
     // Show no role message if user has no roles assigned
     final selectedRole = authProvider.selectedRoleName;
 
-    if (authProvider.userRoles.isEmpty || selectedRole == null || selectedRole == 'No Role') {
+    if (authProvider.userRoles.isEmpty ||
+        selectedRole == null ||
+        selectedRole == 'No Role') {
       return const NoRoleMessage();
     }
-    
+
     // Show role-specific components based on role rank
     final selectedRoleRank = authProvider.getRankForRole(selectedRole);
     final effectiveRank = selectedRoleRank > 0
-      ? selectedRoleRank
-      : authProvider.currentUserRoleRank;
-    
+        ? selectedRoleRank
+        : authProvider.currentUserRoleRank;
+
     // System Admins (rank 100) and Admins (rank 90-99) see the system dashboard
     if (effectiveRank >= 90) {
       return const SystemAdminStats();
     }
-    
+
     // Troop Head (rank 70) and Troop Leader (rank 60) see troop dashboard
     if (effectiveRank == 60 || effectiveRank == 70) {
       return const TroopHeadStats();
     }
-    
+
     // Default stats for other roles
     return const SizedBox.shrink();
   }
@@ -410,10 +563,6 @@ class _HomePageState extends State<HomePage> {
 
   /// Show settings dialog
   void _showSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const SettingsDialog(),
-    );
+    showDialog(context: context, builder: (context) => const SettingsDialog());
   }
 }
-

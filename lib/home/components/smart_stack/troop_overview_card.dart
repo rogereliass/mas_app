@@ -1,6 +1,7 @@
 /// TROOP OVERVIEW CARD
 /// Shows a quick summary for Troop Heads/Leaders regarding their troop.
 /// TO BE IMPLEMENTED: Fetch pending user approvals, total members, or other troop-specific stats.
+library;
 import 'package:flutter/material.dart';
 import 'smart_stack_card_base.dart';
 

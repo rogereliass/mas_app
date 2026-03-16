@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 class SmartStackCardBase extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final Widget? customSubtitle;
   final List<Color> colors;
   final Color onColor;
 
@@ -11,7 +12,8 @@ class SmartStackCardBase extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
+    this.customSubtitle,
     required this.colors,
     required this.onColor,
   });
@@ -65,14 +67,17 @@ class SmartStackCardBase extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: onColor.withValues(alpha: 0.8),
+              if (customSubtitle != null)
+                customSubtitle!
+              else if (subtitle != null)
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: onColor.withValues(alpha: 0.8),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
             ],
           ),
         ],

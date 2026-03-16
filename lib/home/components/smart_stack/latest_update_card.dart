@@ -1,6 +1,7 @@
 /// LATEST UPDATE CARD
 /// Shows the most recent notification or system update for the user.
 /// TO BE IMPLEMENTED: Fetch the latest notification/announcement from the database.
+library;
 import 'package:flutter/material.dart';
 import 'smart_stack_card_base.dart';
 
