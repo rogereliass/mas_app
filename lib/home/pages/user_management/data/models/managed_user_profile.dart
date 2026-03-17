@@ -134,7 +134,8 @@ class ManagedUserProfile {
 
     // Validate required profile fields
     final id = asString(json['id']);
-    final userId = asString(json['user_id']);
+    // Fallback to id if user_id is missing, since some profiles might not be linked to auth yet
+    final userId = asString(json['user_id']) ?? id;
     final createdAt = asDateTime(json['created_at']);
 
     if (id == null || id.isEmpty) {

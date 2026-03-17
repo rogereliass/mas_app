@@ -247,6 +247,111 @@ class PointsService {
     }
   }
 
+  Future<List<PointEntry>> fetchPointsForSeason(
+    String troopId,
+    String seasonId,
+  ) async {
+    try {
+      final meetings = await fetchMeetings(seasonId: seasonId, troopId: troopId);
+      if (meetings.isEmpty) return [];
+
+      final meetingIds = meetings.map((m) => m.id).toList();
+
+      List<Map<String, dynamic>> rawPoints;
+      try {
+        final result = await _supabase
+            .from('points')
+            .select('''
+              id,
+              meeting_id,
+              patrol_id,
+              category_id,
+              value,
+              reason,
+              awarded_by_profile_id,
+              approved,
+              approved_by_profile_id,
+              approved_at,
+              created_at,
+              patrol:patrols!points_patrol_id_fkey(id, name, troop_id),
+              category:point_categories!points_category_id_fkey(
+                id,
+                slug,
+                name,
+                description,
+                troop_id
+              ),
+              awarded_by:profiles!points_awarded_by_profile_id_fkey(
+                id,
+                first_name,
+                middle_name,
+                last_name
+              )
+            ''')
+            .inFilter('meeting_id', meetingIds)
+            .order('created_at', ascending: false);
+            
+        rawPoints = (result as List).cast<Map<String, dynamic>>();
+      } catch (_) {
+        final result = await _supabase
+            .from('points')
+            .select(
+              'id, meeting_id, patrol_id, category_id, value, reason, awarded_by_profile_id, approved, approved_by_profile_id, approved_at, created_at',
+            )
+            .inFilter('meeting_id', meetingIds)
+            .order('created_at', ascending: false);
+
+        final rows = (result as List).cast<Map<String, dynamic>>();
+        if (rows.isEmpty) return [];
+
+        final patrolIds = rows
+            .map((row) => row['patrol_id'] as String?)
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final categoryIds = rows
+            .map((row) => row['category_id'] as String?)
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final profileIds = rows
+            .map((row) => row['awarded_by_profile_id'] as String?)
+            .whereType<String>()
+            .toSet()
+            .toList();
+
+        final patrolMap = await _fetchMapById(
+          table: 'patrols',
+          ids: patrolIds,
+          select: 'id, name, troop_id',
+        );
+        final categoryMap = await _fetchMapById(
+          table: 'point_categories',
+          ids: categoryIds,
+          select: 'id, slug, name, description, troop_id',
+        );
+        final profileMap = await _fetchMapById(
+          table: 'profiles',
+          ids: profileIds,
+          select: 'id, first_name, middle_name, last_name',
+        );
+
+        rawPoints = rows.map((row) {
+          return {
+            ...row,
+            'patrol': patrolMap[row['patrol_id']],
+            'category': categoryMap[row['category_id']],
+            'awarded_by': profileMap[row['awarded_by_profile_id']],
+          };
+        }).toList();
+      }
+
+      return _toPointEntries(rawPoints);
+    } catch (e) {
+      throw Exception('PointsService.fetchPointsForSeason: $e');
+    }
+  }
+
   Future<List<PointEntry>> fetchPointsForMeeting({
     required String meetingId,
   }) async {

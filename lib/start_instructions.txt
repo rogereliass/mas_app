@@ -53,7 +53,8 @@ Troop Head/Leader:
     - ✅Meeting Creation
     - ✅Attendance + Stats?
     - ✅Points System
-- 🏗️Homepage Stats for Meeting/Attendance/Scoring
+- ✅Homepage Standings Card (Premium UI)
+- 🏗️Homepage Stats for Meeting/Attendance/Scoring (In Progress)
 - Eftekad Module
 - (later) Sending Notifications System (Scope access & rate limit)
 

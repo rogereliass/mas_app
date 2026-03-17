@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 ///
 /// Links user authentication with their role rank and contains all user data
 class UserProfile {
-  final String id;  // Maps to profiles.id (primary key)
-  final String userId;  // Maps to profiles.user_id (auth UID)
+  final String id; // Maps to profiles.id (primary key)
+  final String userId; // Maps to profiles.user_id (auth UID)
   final String? firstName;
   final String? middleName;
   final String? lastName;
@@ -19,7 +19,8 @@ class UserProfile {
   final String? generation;
   final String? avatarUrl;
   final int roleRank;
-  final String? managedTroopId;  // Troop context for troop-scoped roles (rank 60, 70)
+  final String?
+  managedTroopId; // Troop context for troop-scoped roles (rank 60, 70)
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -46,8 +47,11 @@ class UserProfile {
 
   /// Get full name constructed from first, middle, and last names
   String? get fullName {
-    final parts = [firstName, middleName, lastName]
-        .where((part) => part != null && part.isNotEmpty);
+    final parts = [
+      firstName,
+      middleName,
+      lastName,
+    ].where((part) => part != null && part.isNotEmpty);
     return parts.isNotEmpty ? parts.join(' ') : null;
   }
 
@@ -57,13 +61,20 @@ class UserProfile {
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     // Debug log to diagnose missing id issue
     if (json['id'] == null) {
-      debugPrint('⚠️ UserProfile.fromJson called with null id! JSON keys: ${json.keys.toList()}');
+      debugPrint(
+        '⚠️ UserProfile.fromJson called with null id! JSON keys: ${json.keys.toList()}',
+      );
       debugPrint('   JSON dump: $json');
     }
-    
+
     return UserProfile(
-      id: json['id'] as String? ?? '', // Provide empty string fallback to prevent crash
-      userId: json['user_id'] as String,
+      id:
+          json['id'] as String? ??
+          '', // Provide empty string fallback to prevent crash
+      userId:
+          json['user_id'] as String? ??
+          json['id'] as String? ??
+          '', // Fallback to id to prevent crash on non-auth profiles
       firstName: json['first_name'] as String?,
       middleName: json['middle_name'] as String?,
       lastName: json['last_name'] as String?,
@@ -78,8 +89,11 @@ class UserProfile {
       signupTroopId: json['signup_troop'] as String?,
       generation: json['generation'] as String?,
       avatarUrl: json['avatar_url'] as String?,
-      roleRank: json['role_rank'] as int? ?? 0, // Default to 0 (public) if no role
-      managedTroopId: json['managed_troop_id'] as String?,  // From profile_roles.troop_context join
+      roleRank:
+          json['role_rank'] as int? ?? 0, // Default to 0 (public) if no role
+      managedTroopId:
+          json['managed_troop_id']
+              as String?, // From profile_roles.troop_context join
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -122,13 +136,13 @@ class UserProfile {
 
   /// Check if user is system admin (rank == 100)
   bool get isSystemAdmin => roleRank == 100;
-  
+
   /// Check if user is troop-scoped (Troop Leader rank 60 or Troop Head rank 70)
   bool get isTroopScoped => roleRank == 60 || roleRank == 70;
-  
+
   /// Check if user has system-wide access (Moderator 90 or System Admin 100)
   bool get hasSystemWideAccess => roleRank >= 90;
-  
+
   /// Get troop context for scope filtering
   /// Returns managedTroopId for troop-scoped users, null for system-wide users
   String? getTroopContextForScope() {

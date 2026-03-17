@@ -690,4 +690,4 @@ Reference this feature when implementing similar functionality.
 - Auth setup: [lib/auth/AUTH_SETUP.md](lib/auth/AUTH_SETUP.md)
 - Main entry: [lib/main.dart](lib/main.dart)
 - App root: [lib/app.dart](lib/app.dart)
-- Current focus: Refining role-specific dashboard views (Troop Leader/Head) in HomePage.
+- Current focus: Completed Premium Troop Standings Card. Next: Refining other role-specific dashboard views (Meeting/Attendance) in HomePage.

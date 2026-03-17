@@ -253,6 +253,10 @@ class _HomePageState extends State<HomePage> {
                     // Summary / Stats
                     _buildSummaryStats(context),
                     const SizedBox(height: 32),
+                    
+                    // Troop Standings (Role specific)
+                    _buildTroopStandings(context),
+                    const SizedBox(height: 32),
 
                     // // Recent Activity
                     // _buildRecentActivity(context),
@@ -300,7 +304,6 @@ class _HomePageState extends State<HomePage> {
     }
 
     final userName = authProvider.fullName ?? 'User';
-    final currentRole = authProvider.selectedRoleName ?? 'No Role';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,9 +455,7 @@ class _HomePageState extends State<HomePage> {
   /// Summary Cards or Statistics
   /// Displays key metrics relevant to the selected role
   Widget _buildSummaryStats(BuildContext context) {
-    final theme = Theme.of(context);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final roleRank = authProvider.currentUserRoleRank;
 
     // Show no role message if user has no roles assigned
     final selectedRole = authProvider.selectedRoleName;
@@ -548,6 +549,28 @@ class _HomePageState extends State<HomePage> {
   //     ],
   //   );
   // }
+
+  /// Troop Standings Card (Ranks 10 to 70 only)
+  Widget _buildTroopStandings(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final selectedRole = authProvider.selectedRoleName;
+
+    if (selectedRole == null || selectedRole == 'No Role') {
+      return const SizedBox.shrink();
+    }
+
+    final selectedRoleRank = authProvider.getRankForRole(selectedRole);
+    final effectiveRank = selectedRoleRank > 0
+        ? selectedRoleRank
+        : authProvider.currentUserRoleRank;
+
+    // Show only for Members/Scouts (10) up to Troop Head (70)
+    if (effectiveRank >= 10 && effectiveRank <= 70) {
+      return const HomeTroopStandingsCard(); 
+    }
+
+    return const SizedBox.shrink();
+  }
 
   /// Handle role change event
   void _onRoleChanged(String newRole) {
