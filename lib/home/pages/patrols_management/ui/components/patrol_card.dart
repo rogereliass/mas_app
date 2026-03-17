@@ -6,196 +6,221 @@ import '../../data/models/troop_member.dart';
 
 class PatrolCard extends StatelessWidget {
   final PatrolWithMembers item;
-  final VoidCallback onManageMembers;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onManageMembers;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const PatrolCard({
     super.key,
     required this.item,
-    required this.onManageMembers,
-    required this.onEdit,
-    required this.onDelete,
+    this.onManageMembers,
+    this.onEdit,
+    this.onDelete,
   });
 
   Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
     }
   }
 
+  bool _isArabic(String text) => RegExp(r'[\u0600-\u06FF]').hasMatch(text);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.5),
-          width: 1,
-        ),
-      ),
-      color: isDark ? colorScheme.surfaceContainerLow : AppColors.cardLight,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Section
-            Builder(
-              builder: (context) {
-                final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(item.patrol.name);
-                return Container(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                  decoration: BoxDecoration(
-                    color: isDark 
-                        ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                        : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-                  ),
-                  child: Row(
-                    textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.patrol.name,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
-                                color: colorScheme.onSurface,
-                              ),
-                              textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                              textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (item.patrol.description?.trim().isNotEmpty == true)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  item.patrol.description!.trim(),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                  textAlign: isArabic ? TextAlign.right : TextAlign.left,
-                                  textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _buildCountBadge(context, item.members.length),
-                    ],
-                  ),
-                );
-              },
-            ),
+      elevation: 0,
+      shadowColor: isDark ? Colors.black54 : Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      color: isDark ? AppColors.cardDark : AppColors.cardLight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Compact Premium Header
+          _buildCompactHeader(theme, isDark),
 
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Leader & Assistants Section
-                  _buildLeadershipSection(context),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Members Section
-                  Row(
-                    children: [
-                      Icon(Icons.people_outline, size: 18, color: colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Team Members',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (item.members.isEmpty)
-                    _buildEmptyState(context)
-                  else
-                    Column(
-                      children: item.members.map((member) {
-                        int stars = 0;
-                        if (member.id == item.patrol.patrolLeaderProfileId) {
-                          stars = 3;
-                        } else if (member.id == item.patrol.assistant1ProfileId) {
-                          stars = 2;
-                        } else if (member.id == item.patrol.assistant2ProfileId) {
-                          stars = 1;
-                        }
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Condensed Leadership Section
+                _buildLeadershipSection(isDark, theme),
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _MemberListItem(
-                            member: member,
-                            stars: stars,
-                            onTap: () => _makePhoneCall(member.phone ?? ''),
-                          ),
-                        );
-                      }).toList(),
+                const SizedBox(height: 16),
+
+                // Command Team Header
+                Row(
+                  children: [
+                    Icon(Icons.groups_rounded, size: 14, 
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'COMMAND TEAM',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        fontSize: 9,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                      ),
                     ),
+                  ],
+                ),
 
-                  const SizedBox(height: 24),
-                  
-                  // Actions Section
-                  _buildActions(context),
-                ],
-              ),
+                const SizedBox(height: 8),
+
+                // Micro Member List
+                if (item.members.isEmpty)
+                  _buildEmptyState(theme)
+                else
+                  ...item.members.map((member) {
+                    int stars = 0;
+                    if (member.id == item.patrol.patrolLeaderProfileId) stars = 3;
+                    else if (member.id == item.patrol.assistant1ProfileId) stars = 2;
+                    else if (member.id == item.patrol.assistant2ProfileId) stars = 1;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _MemberListItemCompact(
+                        member: member,
+                        stars: stars,
+                        isDark: isDark,
+                        onTap: () => _makePhoneCall(member.phone ?? ''),
+                      ),
+                    );
+                  }),
+
+                const SizedBox(height: 16),
+
+                // Simpler Actions
+                if (onManageMembers != null || onEdit != null || onDelete != null)
+                  _buildCompactActions(theme, isDark),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildLeadershipSection(BuildContext context) {
+  Widget _buildCompactHeader(ThemeData theme, bool isDark) {
+    final name = item.patrol.name;
+    final isArabic = _isArabic(name);
+    final description = item.patrol.description ?? '';
+    final isDescArabic = _isArabic(description);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark 
+              ? [AppColors.leaderboardHeaderStart, AppColors.leaderboardHeaderEnd]
+              : [AppColors.primaryBlue, AppColors.primaryBlue.withValues(alpha: 0.85)],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.shield_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: isArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                      textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${item.members.length} MEMBERS',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+                height: 1.2,
+                fontSize: 12,
+              ),
+              textAlign: isDescArabic ? TextAlign.right : TextAlign.left,
+              textDirection: isDescArabic ? TextDirection.rtl : TextDirection.ltr,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadershipSection(bool isDark, ThemeData theme) {
     return Column(
       children: [
-        _LeadershipRow(
-          label: 'Patrol Leader',
+        _LeadershipSpotlightCompact(
+          label: 'PATROL LEADER',
           member: item.patrolLeader,
-          icon: Icons.star,
           isLeader: true,
-          onTap: item.patrolLeader != null ? () => _makePhoneCall(item.patrolLeader!.phone ?? '') : null,
+          isDark: isDark,
+          onTap: item.patrolLeader != null 
+              ? () => _makePhoneCall(item.patrolLeader!.phone ?? '') : null,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         Row(
           children: [
             Expanded(
-              child: _LeadershipRow(
-                label: 'Assistant 1',
+              child: _LeadershipSpotlightCompact(
+                label: 'ASSISTANT 1',
                 member: item.assistant1,
-                icon: Icons.star_half,
-                onTap: item.assistant1 != null ? () => _makePhoneCall(item.assistant1!.phone ?? '') : null,
+                isDark: isDark,
+                onTap: item.assistant1 != null 
+                    ? () => _makePhoneCall(item.assistant1!.phone ?? '') : null,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 6),
             Expanded(
-              child: _LeadershipRow(
-                label: 'Assistant 2',
+              child: _LeadershipSpotlightCompact(
+                label: 'ASSISTANT 2',
                 member: item.assistant2,
-                icon: Icons.star_half,
-                onTap: item.assistant2 != null ? () => _makePhoneCall(item.assistant2!.phone ?? '') : null,
+                isDark: isDark,
+                onTap: item.assistant2 != null 
+                    ? () => _makePhoneCall(item.assistant2!.phone ?? '') : null,
               ),
             ),
           ],
@@ -204,206 +229,137 @@ class PatrolCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCountBadge(BuildContext context, int count) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: ShapeDecoration(
-        color: isDark ? colorScheme.surfaceContainerHigh : colorScheme.surface,
-        shape: StadiumBorder(side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.group, size: 14, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 4),
-          Text(
-            '$count',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildEmptyState(ThemeData theme) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          Icon(Icons.person_add_outlined, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: 32),
-          const SizedBox(height: 8),
-          Text(
-            'No members assigned yet',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontStyle: FontStyle.italic,
-            ),
+      child: Center(
+        child: Text(
+          'UNIT AWAITING PERSONNEL',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+            fontSize: 9,
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildActions(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    
+  Widget _buildCompactActions(ThemeData theme, bool isDark) {
     return Row(
       children: [
-        Expanded(
-          flex: 2,
-          child: FilledButton.icon(
-            onPressed: onManageMembers,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
+        if (onManageMembers != null)
+          Expanded(
+            flex: 2,
+            child: SizedBox(
+              height: 38,
+              child: FilledButton(
+                onPressed: onManageMembers!,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('MANAGE UNIT', 
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.5)),
+              ),
             ),
-            icon: const Icon(Icons.manage_accounts_outlined, size: 18),
-            label: const Text('Manage Members'),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: onEdit,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              side: BorderSide(color: colorScheme.outline),
-            ),
-            child: const Icon(Icons.edit_outlined, size: 18),
+        const SizedBox(width: 6),
+        if (onEdit != null)
+          _SmallIconButton(
+            onPressed: onEdit!,
+            icon: Icons.edit_note_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: onDelete,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              foregroundColor: colorScheme.error,
-              side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Icon(Icons.delete_outline, size: 18),
+        if (onDelete != null) ...[
+          const SizedBox(width: 6),
+          _SmallIconButton(
+            onPressed: onDelete!,
+            icon: Icons.delete_outline_rounded,
+            color: AppColors.error,
           ),
-        ),
+        ],
       ],
     );
   }
 }
 
-class _LeadershipRow extends StatelessWidget {
+class _LeadershipSpotlightCompact extends StatelessWidget {
   final String label;
   final TroopMember? member;
-  final IconData icon;
   final bool isLeader;
+  final bool isDark;
   final VoidCallback? onTap;
 
-  const _LeadershipRow({
+  const _LeadershipSpotlightCompact({
     required this.label,
     this.member,
-    required this.icon,
     this.isLeader = false,
+    required this.isDark,
     this.onTap,
   });
+
+  bool _isArabic(String text) => RegExp(r'[\u0600-\u06FF]').hasMatch(text);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    final goldColor = isDark 
-        ? AppColors.goldAccent.withValues(alpha: 0.8) // Less intense gold for dark theme
-        : AppColors.goldAccent;
+    final color = isLeader ? AppColors.goldAccent : theme.colorScheme.primary.withValues(alpha: isDark ? 0.6 : 0.7);
+    final memberName = member?.fullName ?? 'NOT ASSIGNED';
+    final isNameArabic = _isArabic(memberName);
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isDark 
-              ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.2)
-              : AppColors.cardLight.withValues(alpha: 0.5),
+          color: isDark ? Colors.white.withValues(alpha: 0.02) : Colors.black.withValues(alpha: 0.01),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isLeader 
-                ? goldColor.withValues(alpha: 0.4)
-                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+            color: color.withValues(alpha: isLeader ? 0.2 : 0.05),
             width: isLeader ? 1.2 : 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: isNameArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isLeader ? goldColor : colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon, 
-                size: 16, 
-                color: isLeader ? Colors.white : colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isLeader ? goldColor : colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    member?.fullName ?? 'Not assigned',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: member == null ? colorScheme.onSurfaceVariant.withValues(alpha: 0.6) : colorScheme.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            if (isLeader && member != null)
-              Container(
-                margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: ShapeDecoration(
-                  color: goldColor,
-                  shape: const StadiumBorder(),
-                ),
-                child: Text(
-                  'LEADER',
+            Row(
+              textDirection: isNameArabic ? TextDirection.rtl : TextDirection.ltr,
+              children: [
+                Icon(isLeader ? Icons.stars_rounded : Icons.star_outline_rounded, 
+                    size: 10, color: color),
+                const SizedBox(width: 4),
+                Text(
+                  label,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
+                    color: color,
                     fontWeight: FontWeight.w900,
-                    fontSize: 8,
+                    fontSize: 7.5,
+                    letterSpacing: 0.5,
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              memberName,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: member == null ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3) : null,
               ),
+              textDirection: isNameArabic ? TextDirection.rtl : TextDirection.ltr,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -411,80 +367,111 @@ class _LeadershipRow extends StatelessWidget {
   }
 }
 
-class _MemberListItem extends StatelessWidget {
+class _MemberListItemCompact extends StatelessWidget {
   final TroopMember member;
-  final VoidCallback onTap;
   final int stars;
+  final bool isDark;
+  final VoidCallback onTap;
 
-  const _MemberListItem({
+  const _MemberListItemCompact({
     required this.member,
+    required this.stars,
+    required this.isDark,
     required this.onTap,
-    this.stars = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(member.fullName);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? colorScheme.surfaceContainerHigh.withValues(alpha: 0.5) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.person, size: 16, color: colorScheme.primary.withValues(alpha: 0.6)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    Text(
-                      member.fullName,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    if (stars > 0) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: List.generate(
-                            stars,
-                            (_) => const Icon(
-                              Icons.star,
-                              size: 10,
-                              color: Colors.amber,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.02) : Colors.black.withValues(alpha: 0.01),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.03)),
+        ),
+        child: Row(
+          textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+          children: [
+            Icon(Icons.person_rounded, size: 12, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                member.fullName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
                 ),
+                textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              Icon(Icons.call_outlined, size: 18, color: colorScheme.primary),
+            ),
+            if (stars > 0) ...[
+              const SizedBox(width: 6),
+              _StarsCompact(stars: stars),
             ],
-          ),
+            const SizedBox(width: 8),
+            Icon(Icons.call_rounded, size: 14, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+          ],
         ),
       ),
     );
   }
 }
+
+class _StarsCompact extends StatelessWidget {
+  final int stars;
+  const _StarsCompact({required this.stars});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.goldAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(stars, (_) => const Icon(Icons.star_rounded, size: 7, color: AppColors.goldAccent)),
+      ),
+    );
+  }
+}
+
+class _SmallIconButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final IconData icon;
+  final Color color;
+
+  const _SmallIconButton({
+    required this.onPressed,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 38,
+      height: 38,
+      child: IconButton.filledTonal(
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          foregroundColor: color,
+          backgroundColor: color.withValues(alpha: 0.1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          padding: EdgeInsets.zero,
+        ),
+        icon: Icon(icon, size: 18),
+      ),
+    );
+  }
+}
+

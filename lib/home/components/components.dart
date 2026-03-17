@@ -7,4 +7,5 @@ export 'troop_head_stats.dart';
 export 'no_role_message.dart';
 export 'smart_stack/smart_stack.dart';
 export 'smart_stack/home_troop_standings_card.dart';
+export 'home_patrol_card.dart';
 

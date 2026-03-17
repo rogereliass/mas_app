@@ -258,6 +258,10 @@ class _HomePageState extends State<HomePage> {
                     _buildTroopStandings(context),
                     const SizedBox(height: 32),
 
+                    // Patrol Card (For Scout Leaders)
+                    _buildHomePatrolCard(context),
+                    const SizedBox(height: 32),
+
                     // // Recent Activity
                     // _buildRecentActivity(context),
 
@@ -565,8 +569,30 @@ class _HomePageState extends State<HomePage> {
         : authProvider.currentUserRoleRank;
 
     // Show only for Members/Scouts (10) up to Troop Head (70)
-    if (effectiveRank >= 10 && effectiveRank <= 70) {
+    if (effectiveRank >= 10 && effectiveRank <= 30 || effectiveRank == 60 || effectiveRank == 70) {
       return const HomeTroopStandingsCard(); 
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  /// Home Patrol Card (Ranks 20 to 30)
+  Widget _buildHomePatrolCard(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final selectedRole = authProvider.selectedRoleName;
+
+    if (selectedRole == null || selectedRole == 'No Role') {
+      return const SizedBox.shrink();
+    }
+
+    final selectedRoleRank = authProvider.getRankForRole(selectedRole);
+    final effectiveRank = selectedRoleRank > 0
+        ? selectedRoleRank
+        : authProvider.currentUserRoleRank;
+
+    // Show for Patrol Leader (30), Assistant 1 (25), Assistant 2 (20)
+    if (effectiveRank >= 20 && effectiveRank <= 30) {
+      return const HomePatrolCard();
     }
 
     return const SizedBox.shrink();

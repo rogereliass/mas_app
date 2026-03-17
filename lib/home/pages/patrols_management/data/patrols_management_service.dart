@@ -405,6 +405,24 @@ class PatrolsManagementService with ScopedServiceMixin {
     try {
       _validateTroopAccess(currentUser: currentUser, troopId: troopId);
 
+      // Check if the member was a leader in their current patrol before moving them
+      final memberRows = await _supabase
+          .from(_profilesTable)
+          .select('patrol_id')
+          .eq('id', memberProfileId)
+          .maybeSingle();
+
+      final oldPatrolId = memberRows?['patrol_id'] as String?;
+
+      // If they had a patrol and it's different from the new one, clean up leadership
+      if (oldPatrolId != null && oldPatrolId != patrolId) {
+        await _cleanupLeadershipForRemovedMembers(
+          currentUser: currentUser,
+          patrolId: oldPatrolId,
+          removedMemberIds: {memberProfileId},
+        );
+      }
+
       await _supabase
           .from(_profilesTable)
           .update({'patrol_id': patrolId})
@@ -459,6 +477,16 @@ class PatrolsManagementService with ScopedServiceMixin {
 
       final removedMemberIds = currentMemberIds.difference(newMemberIds);
 
+      // Before updating patrol_id, clean up any leadership roles held by
+      // members who are being removed from this patrol.
+      if (removedMemberIds.isNotEmpty) {
+        await _cleanupLeadershipForRemovedMembers(
+          currentUser: currentUser,
+          patrolId: patrolId,
+          removedMemberIds: removedMemberIds,
+        );
+      }
+
       if (removedMemberIds.isNotEmpty) {
         await _supabase
             .from(_profilesTable)
@@ -478,6 +506,90 @@ class PatrolsManagementService with ScopedServiceMixin {
     } catch (e) {
       _logError('updatePatrolMembers', e);
       rethrow;
+    }
+  }
+
+  /// Cleans up leadership roles for members who are being removed from a patrol.
+  ///
+  /// For each removed member that held a PL / APL1 / APL2 slot in the patrol:
+  /// 1. Clears their slot in the `patrols` table.
+  /// 2. Removes their role record from `profile_roles`.
+  Future<void> _cleanupLeadershipForRemovedMembers({
+    required UserProfile currentUser,
+    required String patrolId,
+    required Set<String> removedMemberIds,
+  }) async {
+    try {
+      if (removedMemberIds.isEmpty) return;
+
+      // Fetch current leadership state for this patrol
+      final patrolRow = await _supabase
+          .from(_patrolsTable)
+          .select('patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id')
+          .eq('id', patrolId)
+          .maybeSingle();
+
+      if (patrolRow == null) return;
+
+      final leaderId = patrolRow['patrol_leader_profile_id'] as String?;
+      final asst1Id  = patrolRow['assistant_1_profile_id']  as String?;
+      final asst2Id  = patrolRow['assistant_2_profile_id']  as String?;
+
+      // Build a map of slot → profileId for any removed member holding a leadership slot
+      final Map<String, String?> patchPayload = {};
+      final Set<String> affectedProfileIds = {};
+
+      if (leaderId != null && removedMemberIds.contains(leaderId)) {
+        patchPayload['patrol_leader_profile_id'] = null;
+        affectedProfileIds.add(leaderId);
+      }
+      if (asst1Id != null && removedMemberIds.contains(asst1Id)) {
+        patchPayload['assistant_1_profile_id'] = null;
+        affectedProfileIds.add(asst1Id);
+      }
+      if (asst2Id != null && removedMemberIds.contains(asst2Id)) {
+        patchPayload['assistant_2_profile_id'] = null;
+        affectedProfileIds.add(asst2Id);
+      }
+
+      if (patchPayload.isEmpty) return; // nobody removed was a leader
+
+      // 1. Clear leadership slots in the patrols table
+      await _supabase
+          .from(_patrolsTable)
+          .update(patchPayload)
+          .eq('id', patrolId);
+
+      if (kDebugMode) {
+        debugPrint('🧹 Cleared leadership slots for patrol $patrolId: $patchPayload');
+      }
+
+      // 2. Remove their leadership role records from profile_roles
+      final roleRepo = RoleRepository();
+      final roles = await roleRepo.getAllRoles();
+      final leadershipRoleIds = roles
+          .where((r) => r.rank == 30 || r.rank == 25 || r.rank == 20)
+          .map((r) => r.id)
+          .whereType<String>()
+          .toList();
+
+      if (leadershipRoleIds.isNotEmpty) {
+        final deleted = await _supabase
+            .from(_profileRolesTable)
+            .delete()
+            .inFilter('profile_id', affectedProfileIds.toList())
+            .inFilter('role_id', leadershipRoleIds)
+            .select('id');
+
+        if (kDebugMode) {
+          debugPrint('🧹 Removed ${deleted.length} leadership profile_roles for: $affectedProfileIds');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ _cleanupLeadershipForRemovedMembers error (non-fatal): $e');
+      }
+      // Non-fatal: don't rethrow, the member move itself is the primary operation
     }
   }
 
