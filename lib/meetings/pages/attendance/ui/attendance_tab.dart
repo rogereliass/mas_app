@@ -914,7 +914,7 @@ class _ScoutStatsCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final total = provider.myLogs.length;
+    final pastTotal = provider.scoutTotalPastMeetings;
     final present = provider.scoutPresentCount;
     final lateCount = provider.scoutLateCount;
     final absent = provider.scoutAbsentCount;
@@ -969,7 +969,7 @@ class _ScoutStatsCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Total: $total',
+                  'Total: $pastTotal',
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w800,
@@ -985,7 +985,7 @@ class _ScoutStatsCard extends StatelessWidget {
             context,
             'Present',
             present,
-            total,
+            pastTotal,
             AppColors.success,
             Icons.check_circle_rounded,
           ),
@@ -994,7 +994,7 @@ class _ScoutStatsCard extends StatelessWidget {
             context,
             'Absent',
             absent,
-            total,
+            pastTotal,
             AppColors.error,
             Icons.cancel_rounded,
           ),
@@ -1003,7 +1003,7 @@ class _ScoutStatsCard extends StatelessWidget {
             context,
             'Late',
             lateCount,
-            total,
+            pastTotal,
             AppColors.warning,
             Icons.watch_later_rounded,
           ),
@@ -1012,7 +1012,7 @@ class _ScoutStatsCard extends StatelessWidget {
             context,
             'Excused',
             excused,
-            total,
+            pastTotal,
             AppColors.info,
             Icons.info_rounded,
           ),
@@ -1021,7 +1021,7 @@ class _ScoutStatsCard extends StatelessWidget {
             context,
             'Unrecorded',
             unrecorded,
-            total,
+            pastTotal,
             isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
             Icons.help_rounded,
           ),

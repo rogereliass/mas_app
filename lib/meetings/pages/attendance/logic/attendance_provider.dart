@@ -52,11 +52,39 @@ class AttendanceProvider with ChangeNotifier {
   List<MyAttendanceLog> _myLogs = [];
   List<MyAttendanceLog> get myLogs => _myLogs;
 
-  int get scoutPresentCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.present).length;
-  int get scoutAbsentCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.absent).length;
-  int get scoutLateCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.late).length;
-  int get scoutExcusedCount => _myLogs.where((l) => l.isRecorded && l.record!.status == AttendanceStatus.excused).length;
-  int get scoutUnrecordedCount => _myLogs.where((l) => !l.isRecorded).length;
+  DateTime get _todayLocalStart {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool _isBeforeToday(DateTime meetingDate) {
+    final localDate = meetingDate.toLocal();
+    final meetingDay = DateTime(localDate.year, localDate.month, localDate.day);
+    return meetingDay.isBefore(_todayLocalStart);
+  }
+
+  Iterable<MyAttendanceLog> get _pastLogs =>
+      _myLogs.where((log) => _isBeforeToday(log.meeting.meetingDate));
+
+  List<MyAttendanceLog> get pastMyLogs => List.unmodifiable(_pastLogs.toList());
+
+  int _countRecordedStatus(AttendanceStatus status) {
+    return _pastLogs
+        .where((log) => log.isRecorded && log.record!.status == status)
+        .length;
+  }
+
+  int get scoutTotalPastMeetings => _pastLogs.length;
+  int get scoutPresentCount => _countRecordedStatus(AttendanceStatus.present);
+  int get scoutAbsentCount => _countRecordedStatus(AttendanceStatus.absent);
+  int get scoutLateCount => _countRecordedStatus(AttendanceStatus.late);
+  int get scoutExcusedCount => _countRecordedStatus(AttendanceStatus.excused);
+  int get scoutRecordedCount =>
+      scoutPresentCount + scoutAbsentCount + scoutLateCount + scoutExcusedCount;
+  int get scoutUnrecordedCount {
+    final unrecorded = scoutTotalPastMeetings - scoutRecordedCount;
+    return unrecorded > 0 ? unrecorded : 0;
+  }
 
   // ── Constructor / lifecycle ────────────────────────────────────────────────
 
@@ -80,6 +108,7 @@ class AttendanceProvider with ChangeNotifier {
     _attendanceService.clearCache();
     _meetingsService.clearCache();
     _meetings = [];
+    _myLogs = [];
     _selectedMeetingId = null;
     _noMeetings = false;
     _error = null;

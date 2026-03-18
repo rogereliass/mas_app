@@ -62,12 +62,12 @@ class PatrolCard extends StatelessWidget {
                         color: theme.colorScheme.primary.withValues(alpha: 0.6)),
                     const SizedBox(width: 8),
                     Text(
-                      'COMMAND TEAM',
+                      'ALL PATROL MEMBERS',
                       style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1,
-                        fontSize: 9,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -239,12 +239,12 @@ class PatrolCard extends StatelessWidget {
       ),
       child: Center(
         child: Text(
-          'UNIT AWAITING PERSONNEL',
+          'NO MEMBERS ASSIGNED',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
             fontWeight: FontWeight.w900,
             letterSpacing: 0.5,
-            fontSize: 9,
+            fontSize: 10,
           ),
         ),
       ),
@@ -342,7 +342,7 @@ class _LeadershipSpotlightCompact extends StatelessWidget {
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: color,
                     fontWeight: FontWeight.w900,
-                    fontSize: 7.5,
+                    fontSize: 9.5,
                     letterSpacing: 0.5,
                   ),
                 ),

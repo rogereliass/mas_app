@@ -7,6 +7,7 @@ class SmartStackCardBase extends StatelessWidget {
   final Widget? customSubtitle;
   final List<Color> colors;
   final Color onColor;
+  final bool hideHeaderIcon;
 
   const SmartStackCardBase({
     super.key,
@@ -16,6 +17,7 @@ class SmartStackCardBase extends StatelessWidget {
     this.customSubtitle,
     required this.colors,
     required this.onColor,
+    this.hideHeaderIcon = false,
   });
 
   @override
@@ -47,38 +49,43 @@ class SmartStackCardBase extends StatelessWidget {
             top: -20,
             child: Icon(icon, size: 120, color: onColor.withValues(alpha: 0.15)),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: onColor.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: onColor),
-              ),
-              const Spacer(),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: onColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              if (customSubtitle != null)
-                customSubtitle!
-              else if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: onColor.withValues(alpha: 0.8),
+          SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(), // Prevent erratic scrolling 
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!hideHeaderIcon) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: onColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: onColor),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: onColor,
+                  ),
                 ),
-            ],
+                const SizedBox(height: 4),
+                if (customSubtitle != null)
+                  customSubtitle!
+                else if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: onColor.withValues(alpha: 0.8),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
           ),
         ],
       ),

@@ -26,10 +26,9 @@ Act as a senior production software engineer and review this implementation to e
 
 - clean copilot instructions
 
-- Homepage for scout (Smart Stack, Swipable Cards,...)
 - QR code for attendance recording - [Troop Heads]
 - role management for system admin
-- user creation for admin/troop head,leaders
+- user creation button for admin/troop head,leaders
 
 ---------------------------------------------------------
 
@@ -54,14 +53,16 @@ Troop Head/Leader:
     - ✅Attendance + Stats?
     - ✅Points System
 - ✅Homepage Standings Card (Premium UI)
-- 🏗️Homepage Stats for Meeting/Attendance/Scoring (In Progress)
-- Eftekad Module
+- ✅Homepage Stats for Meeting/Attendance/Scoring
+- Eftekad Module - profile l kol wahed by name w records personal + records eftekad beta3to
 - (later) Sending Notifications System (Scope access & rate limit)
 
 Scouts:
 -✅View their meetings & history
 -✅View their attendance stats
 -✅View their troop stats
-- Home Page design
+-✅Home Page design
+- notifications view tab
 - (later) Badges in Profile?
+- Edit own profile?
 

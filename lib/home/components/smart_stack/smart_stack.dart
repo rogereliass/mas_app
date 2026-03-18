@@ -32,7 +32,7 @@ class _SmartStackState extends State<SmartStack> {
 
   void _startTimer() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
       if (_cardCount > 1 && _pageController.hasClients) {
         int nextPage = (_currentPageIndex + 1) % _cardCount;
         _pageController.animateToPage(
