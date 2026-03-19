@@ -1,121 +1,174 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../routing/app_router.dart';
+import '../logic/home_overview_stats_provider.dart';
 import 'premium_dashboard_widgets.dart';
 
 /// System Admin Dashboard Statistics Component
-/// 
+///
 /// Premium UI using shared dashboard components for top-level admin stats
 /// and actions, alongside custom activity and health widgets.
-class SystemAdminStats extends StatelessWidget {
+class SystemAdminStats extends StatefulWidget {
   const SystemAdminStats({super.key});
+
+  @override
+  State<SystemAdminStats> createState() => _SystemAdminStatsState();
+}
+
+class _SystemAdminStatsState extends State<SystemAdminStats> {
+  bool _requestedInitialLoad = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_requestedInitialLoad) {
+      return;
+    }
+    _requestedInitialLoad = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<HomeOverviewStatsProvider>().loadOverview();
+    });
+  }
+
+  String _valueOrPlaceholder({
+    required Object? value,
+    required bool isLoading,
+  }) {
+    if (value != null) {
+      return value.toString();
+    }
+    return isLoading ? '...' : '--';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. Premium Dashboard Section (Replaces old Stats Grid and Action Buttons List)
-        PremiumDashboardSection(
-          title: 'System Overview',
-          headerIcon: Icons.admin_panel_settings_rounded,
-          actionCards: [
-            PremiumActionCard(
-              title: 'Season Management',
-              subtitle: 'Manage activity seasons & codes',
-              icon: Icons.calendar_today_rounded,
-              color: const Color(0xFF6366F1), // Indigo
-              onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
+    return Consumer<HomeOverviewStatsProvider>(
+      builder: (context, overviewProvider, _) {
+        final stats = overviewProvider.adminStats;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Premium Dashboard Section (Replaces old Stats Grid and Action Buttons List)
+            PremiumDashboardSection(
+              title: 'System Overview',
+              headerIcon: Icons.admin_panel_settings_rounded,
+              actionCards: [
+                PremiumActionCard(
+                  title: 'Season Management',
+                  subtitle: 'Manage activity seasons & codes',
+                  icon: Icons.calendar_today_rounded,
+                  color: const Color(0xFF6366F1), // Indigo
+                  onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
+                ),
+                PremiumActionCard(
+                  title: 'User Acceptance',
+                  subtitle: 'Review & approve registrations',
+                  icon: Icons.how_to_reg_rounded,
+                  color: const Color(0xFFF43F5E), // Rose
+                  onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
+                ),
+                PremiumActionCard(
+                  title: 'User Management',
+                  subtitle: 'Edit profiles & role assignments',
+                  icon: Icons.manage_accounts_rounded,
+                  color: const Color(0xFF14B8A6), // Teal
+                  onTap: () => Navigator.pushNamed(context, AppRouter.userManagement),
+                ),
+                PremiumActionCard(
+                  title: 'Patrols',
+                  subtitle: 'Manage system-wide patrols',
+                  icon: Icons.groups_rounded,
+                  color: const Color(0xFFF59E0B), // Amber
+                  onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
+                ),
+                PremiumActionCard(
+                  title: 'Eftekad',
+                  subtitle: 'Open Eftekad tools (coming soon)',
+                  icon: Icons.fact_check_rounded,
+                  color: AppColors.primaryBlue,
+                  onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
+                ),
+              ],
+              stats: [
+                PremiumStat(
+                  icon: Icons.people_rounded,
+                  label: 'App Users',
+                  value: _valueOrPlaceholder(
+                    value: stats?.totalAppUsers,
+                    isLoading: overviewProvider.isLoading,
+                  ),
+                  color: const Color(0xFF3B82F6), // Blue
+                ),
+                PremiumStat(
+                  icon: Icons.hourglass_top_rounded,
+                  label: 'Pending Users',
+                  value: _valueOrPlaceholder(
+                    value: stats?.totalPendingUsers,
+                    isLoading: overviewProvider.isLoading,
+                  ),
+                  color: const Color(0xFF14B8A6), // Teal
+                ),
+                PremiumStat(
+                  icon: Icons.event_rounded,
+                  label: 'Season Meetings',
+                  value: _valueOrPlaceholder(
+                    value: stats?.seasonMeetingsAllTroops,
+                    isLoading: overviewProvider.isLoading,
+                  ),
+                  color: const Color(0xFF8B5CF6), // Violet
+                ),
+                PremiumStat(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'Season Code',
+                  value: _valueOrPlaceholder(
+                    value: stats?.currentSeasonCode,
+                    isLoading: overviewProvider.isLoading,
+                  ),
+                  color: const Color(0xFFF43F5E), // Rose
+                ),
+              ],
             ),
-            PremiumActionCard(
-              title: 'User Acceptance',
-              subtitle: 'Review & approve registrations',
-              icon: Icons.how_to_reg_rounded,
-              color: const Color(0xFFF43F5E), // Rose
-              onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
+
+            const SizedBox(height: 32),
+
+            // 2. Recent Activity Summary (Preserved)
+            _ActivitySummaryCard(
+              title: 'Recent Activity',
+              items: const [
+                _ActivityItem(
+                  icon: Icons.person_add_outlined,
+                  label: 'New users (7 days)',
+                  value: '--',
+                ),
+                _ActivityItem(
+                  icon: Icons.upload_file_outlined,
+                  label: 'Files uploaded (7 days)',
+                  value: '--',
+                ),
+                _ActivityItem(
+                  icon: Icons.download_outlined,
+                  label: 'Total downloads (7 days)',
+                  value: '--',
+                ),
+              ],
             ),
-            PremiumActionCard(
-              title: 'User Management',
-              subtitle: 'Edit profiles & role assignments',
-              icon: Icons.manage_accounts_rounded,
-              color: const Color(0xFF14B8A6), // Teal
-              onTap: () => Navigator.pushNamed(context, AppRouter.userManagement),
-            ),
-            PremiumActionCard(
-              title: 'Patrols',
-              subtitle: 'Manage system-wide patrols',
-              icon: Icons.groups_rounded,
-              color: const Color(0xFFF59E0B), // Amber
-              onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
-            ),
-            PremiumActionCard(
-              title: 'Eftekad',
-              subtitle: 'Open Eftekad tools (coming soon)',
-              icon: Icons.fact_check_rounded,
-              color: AppColors.primaryBlue,
-              onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
-            ),
+
+            const SizedBox(height: 24),
+
+            // 3. System Health Indicators (Preserved)
+            _buildSystemHealth(context),
           ],
-          stats: const [
-            PremiumStat(
-              icon: Icons.people_rounded,
-              label: 'Users',
-              value: '--',
-              color: Color(0xFF3B82F6), // Blue
-            ),
-            PremiumStat(
-              icon: Icons.folder_rounded,
-              label: 'Folders',
-              value: '--',
-              color: Color(0xFF14B8A6), // Teal
-            ),
-            PremiumStat(
-              icon: Icons.description_rounded,
-              label: 'Files',
-              value: '--',
-              color: Color(0xFF8B5CF6), // Violet
-            ),
-            PremiumStat(
-              icon: Icons.storage_rounded,
-              label: 'Storage',
-              value: '-- GB',
-              color: Color(0xFFF43F5E), // Rose
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 32),
-
-        // 2. Recent Activity Summary (Preserved)
-        _ActivitySummaryCard(
-          title: 'Recent Activity',
-          items: const [
-            _ActivityItem(
-              icon: Icons.person_add_outlined,
-              label: 'New users (7 days)',
-              value: '--',
-            ),
-            _ActivityItem(
-              icon: Icons.upload_file_outlined,
-              label: 'Files uploaded (7 days)',
-              value: '--',
-            ),
-            _ActivityItem(
-              icon: Icons.download_outlined,
-              label: 'Total downloads (7 days)',
-              value: '--',
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // 3. System Health Indicators (Preserved)
-        _buildSystemHealth(context),
-      ],
+        );
+      },
     );
   }
 

@@ -351,7 +351,7 @@ class PremiumStatGroup extends StatelessWidget {
     // Create a new list interleaving dividers between the stats
     final List<Widget> children = [];
     for (int i = 0; i < stats.length; i++) {
-      children.add(stats[i]);
+      children.add(Expanded(child: stats[i]));
       if (i < stats.length - 1) {
         children.add(_buildDivider(colorScheme));
       }
@@ -380,7 +380,7 @@ class PremiumStatGroup extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: children,
       ),
     );
@@ -437,38 +437,52 @@ class PremiumStat extends StatelessWidget {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+        SizedBox(
+          height: 32,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14, color: color),
               ),
-              child: Icon(icon, size: 14, color: color),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              value,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: theme.colorScheme.onSurface,
-                letterSpacing: -0.5,
+              const SizedBox(width: 6),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            fontSize: 9.5,
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 32,
+          child: Center(
+            child: Text(
+              label.toUpperCase(),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                fontSize: 9.5,
+              ),
+            ),
           ),
         ),
       ],
