@@ -17,6 +17,7 @@ import '../home/pages/user_approval/ui/user_acceptance_page.dart';
 import '../home/pages/user_management/ui/user_management_page.dart';
 import '../home/pages/season_management/ui/season_management_page.dart';
 import '../home/pages/patrols_management/ui/patrols_management_page.dart';
+import '../home/pages/eftekad/ui/eftekad_page.dart';
 import '../meetings/meetings_page.dart';
 
 /// Centralized routing configuration for the application
@@ -85,6 +86,9 @@ class AppRouter {
 
   /// Meetings page route
   static const String meetings = '/meetings';
+
+  /// Eftekad page route (troop management)
+  static const String eftekad = '/eftekad';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -172,6 +176,13 @@ class AppRouter {
     if (settings.name == meetings) {
       return MaterialPageRoute(
         builder: (context) => const MeetingsPage(),
+      );
+    }
+
+    // Handle Eftekad placeholder page
+    if (settings.name == eftekad) {
+      return MaterialPageRoute(
+        builder: (context) => const EftekadPage(),
       );
     }
 

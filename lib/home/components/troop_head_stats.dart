@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../routing/app_router.dart';
 import 'premium_dashboard_widgets.dart';
 
@@ -35,6 +36,13 @@ class TroopHeadStats extends StatelessWidget {
           icon: Icons.groups_rounded,
           color: const Color(0xFFF59E0B), // Amber
           onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
+        ),
+        PremiumActionCard(
+          title: 'Eftekad',
+          subtitle: 'Open Eftekad tools (coming soon)',
+          icon: Icons.fact_check_rounded,
+          color: AppColors.primaryBlue,
+          onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
         ),
       ],
       stats: const [

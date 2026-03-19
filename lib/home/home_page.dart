@@ -568,7 +568,7 @@ class _HomePageState extends State<HomePage> {
         ? selectedRoleRank
         : authProvider.currentUserRoleRank;
 
-    // Show only for Members/Scouts (10) up to Troop Head (70)
+    // Show only for Members/Scouts (10) and Troop Head (70)
     if (effectiveRank >= 10 && effectiveRank <= 30 || effectiveRank == 60 || effectiveRank == 70) {
       return const HomeTroopStandingsCard(); 
     }
