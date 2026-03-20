@@ -14,6 +14,7 @@ import 'home/pages/season_management/logic/season_management_provider.dart';
 import 'home/pages/patrols_management/logic/patrols_management_provider.dart';
 import 'home/logic/season_standings_provider.dart';
 import 'home/logic/home_overview_stats_provider.dart';
+import 'home/pages/notifications/logic/notifications_provider.dart';
 import 'meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'meetings/pages/points/logic/points_provider.dart';
@@ -116,6 +117,15 @@ void main() async {
           ),
           update: (context, auth, previous) =>
               previous ?? HomeOverviewStatsProvider(authProvider: auth),
+        ),
+
+        // NotificationsProvider powers in-app notifications + unread badge.
+        ChangeNotifierProxyProvider<AuthProvider, NotificationsProvider>(
+          create: (context) => NotificationsProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? NotificationsProvider(authProvider: auth),
         ),
 
         // AttendanceProvider depends on AuthProvider for role/scope checks

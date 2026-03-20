@@ -17,7 +17,7 @@ flutter run
 - supabase RLS 
 - login process - Twilio Account Needed but logic is working
 - file views & download stats
-let's implement this card similar to what we've done in th other ones by fetching a few good & accurate stats about the user's troop and showing them in the card
+
 ---------------------------------------------------------
 
 Act as a senior production software engineer and review this implementation to ensure it matches the planned behavior and app conventions, is secure, stable, production-safe, has modern UI consistent with the existing design, contains no crashes, edge-case failures, or bad state handling, and follows best practices without over-engineering; if any issue exists, fix it immediately with the simplest bulletproof solution, re-check security, stability, and performance after the fix, and return only: 1) critical issues found (if any), 2) corrected final code, 3) confirmation the feature is production-ready.
@@ -29,6 +29,7 @@ Act as a senior production software engineer and review this implementation to e
 - QR code for attendance recording - [Troop Heads]
 - role management for [system admin]
 - user creation button for admin/troop head,leaders
+- add reporting to library views
 
 ---------------------------------------------------------
 
@@ -65,4 +66,17 @@ Scouts:
 - notifications view tab
 - (later) Badges in Profile?
 - (later) Edit own profile?
+
+Clan Leader: Similar to troop head
+- User Management
+- can manage multiple clans (similar to patrols)
+- Meeting Manager (clan-based instead of troops)
+
+
+Rover: Similar to Scout
+- View their meetings & history
+- View their attendance stats
+-
+-
+-
 

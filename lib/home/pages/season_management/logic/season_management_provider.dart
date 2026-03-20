@@ -1,13 +1,19 @@
 import 'package:flutter/foundation.dart';
 import '../data/models/season.dart';
 import '../data/season_service.dart';
+import '../../notifications/data/notification_repository.dart';
 
 /// Provider for season management operations
 class SeasonManagementProvider with ChangeNotifier {
   final SeasonService _service;
+  final NotificationRepository _notificationRepository;
 
-  SeasonManagementProvider({SeasonService? service})
-      : _service = service ?? SeasonService.instance();
+  SeasonManagementProvider({
+    SeasonService? service,
+    NotificationRepository? notificationRepository,
+  })  : _service = service ?? SeasonService.instance(),
+        _notificationRepository =
+            notificationRepository ?? NotificationRepository();
 
   List<Season> _seasons = [];
   bool _isLoading = false;
@@ -84,5 +90,26 @@ class SeasonManagementProvider with ChangeNotifier {
 
   Future<void> refresh() async {
     await loadSeasons();
+  }
+
+  Future<int?> cleanupNotificationsForSeason(String seasonId) async {
+    _isProcessing = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final deletedCount =
+          await _notificationRepository.cleanupSeasonNotifications(seasonId);
+      return deletedCount;
+    } catch (e) {
+      _error = 'Failed to clean season notifications. Please try again.';
+      debugPrint(
+        '❌ SeasonManagementProvider.cleanupNotificationsForSeason error: $e',
+      );
+      return null;
+    } finally {
+      _isProcessing = false;
+      notifyListeners();
+    }
   }
 }

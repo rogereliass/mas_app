@@ -32,6 +32,51 @@ class TroopOverviewStats {
   }
 }
 
+/// Typed metrics used by the Troop Overview smart stack card.
+class TroopInsightStats {
+  final int patrolCount;
+  final double averageScoutsPresentPerMeeting;
+  final DateTime? lastMeetingDate;
+  final int lastMeetingPresentCount;
+
+  const TroopInsightStats({
+    required this.patrolCount,
+    required this.averageScoutsPresentPerMeeting,
+    required this.lastMeetingDate,
+    required this.lastMeetingPresentCount,
+  });
+
+  const TroopInsightStats.empty()
+    : patrolCount = 0,
+      averageScoutsPresentPerMeeting = 0,
+      lastMeetingDate = null,
+      lastMeetingPresentCount = 0;
+
+  TroopInsightStats copyWith({
+    int? patrolCount,
+    double? averageScoutsPresentPerMeeting,
+    DateTime? lastMeetingDate,
+    bool clearLastMeetingDate = false,
+    int? lastMeetingPresentCount,
+  }) {
+    return TroopInsightStats(
+      patrolCount: patrolCount ?? this.patrolCount,
+      averageScoutsPresentPerMeeting:
+          averageScoutsPresentPerMeeting ?? this.averageScoutsPresentPerMeeting,
+      lastMeetingDate: clearLastMeetingDate
+          ? null
+          : (lastMeetingDate ?? this.lastMeetingDate),
+      lastMeetingPresentCount:
+          lastMeetingPresentCount ?? this.lastMeetingPresentCount,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'TroopInsightStats(patrolCount: $patrolCount, averageScoutsPresentPerMeeting: $averageScoutsPresentPerMeeting, lastMeetingDate: $lastMeetingDate, lastMeetingPresentCount: $lastMeetingPresentCount)';
+  }
+}
+
 /// Typed metrics used by the home overview row for system-wide roles.
 class AdminOverviewStats {
   final int totalAppUsers;

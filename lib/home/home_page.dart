@@ -7,6 +7,8 @@ import '../core/widgets/app_bottom_nav_bar.dart';
 import '../core/widgets/settings_dialog.dart';
 import '../profile/ui/profile_qr_code_screen.dart';
 import '../routing/app_router.dart';
+import 'pages/notifications/logic/notifications_provider.dart';
+import 'pages/notifications/ui/components/notifications_panel.dart';
 import 'components/components.dart';
 
 class HomePage extends StatefulWidget {
@@ -50,6 +52,10 @@ class _HomePageState extends State<HomePage> {
           debugPrint('⚠️ No roles found for user');
         }
       }
+
+      final notificationsProvider =
+          Provider.of<NotificationsProvider>(context, listen: false);
+      notificationsProvider.loadNotifications();
     });
   }
 
@@ -58,6 +64,7 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final authProvider = Provider.of<AuthProvider>(context);
+    final notificationsProvider = Provider.of<NotificationsProvider>(context);
     final userRoles = authProvider.userRoles;
     final selectedRole = authProvider.selectedRoleName;
 
@@ -115,7 +122,42 @@ class _HomePageState extends State<HomePage> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 16),
           child: IconButton(
-            icon: const Icon(Icons.notifications_outlined),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_outlined),
+                if (notificationsProvider.unreadCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.error,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        notificationsProvider.unreadCount > 99
+                            ? '99+'
+                            : '${notificationsProvider.unreadCount}',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onError,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             tooltip: 'Notifications',
             onPressed: () => _showNotificationsPanel(context),
           ),
@@ -399,9 +441,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showNotificationsPanel(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -410,48 +449,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Icon(
-                    Icons.notifications_active_outlined,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Notifications',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'No new notifications yet.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        );
+        return const NotificationsPanel();
       },
     );
   }

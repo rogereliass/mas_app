@@ -85,7 +85,7 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
       backgroundColor: colorScheme.surfaceContainerLow,
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(context),
+          _buildSliverAppBar(context, provider),
           SliverToBoxAdapter(child: _buildHeader(context)),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -115,7 +115,10 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context) {
+  Widget _buildSliverAppBar(
+    BuildContext context,
+    SeasonManagementProvider provider,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     return SliverAppBar(
       expandedHeight: 0,
@@ -127,8 +130,17 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
       title: const Text('Season Management', style: TextStyle(fontWeight: FontWeight.bold)),
       actions: [
         IconButton(
+          tooltip: 'Cleanup season notifications',
+          icon: const Icon(Icons.delete_sweep_rounded),
+          onPressed: provider.isProcessing
+              ? null
+              : () => _showSeasonCleanupDialog(context),
+        ),
+        IconButton(
           icon: const Icon(Icons.refresh_rounded),
-          onPressed: () => context.read<SeasonManagementProvider>().refresh(),
+          onPressed: provider.isProcessing
+              ? null
+              : () => context.read<SeasonManagementProvider>().refresh(),
         ),
         const SizedBox(width: 8),
       ],
@@ -249,6 +261,213 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) => const CreateSeasonDialog(),
+    );
+  }
+
+  Future<void> _showSeasonCleanupDialog(BuildContext context) async {
+    final provider = context.read<SeasonManagementProvider>();
+    if (provider.seasons.isEmpty) {
+      await provider.loadSeasons();
+      if (!context.mounted) {
+        return;
+      }
+    }
+
+    if (provider.seasons.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No seasons available for cleanup.')),
+      );
+      return;
+    }
+
+    String? selectedSeasonId = provider.seasons.first.id;
+    String? inlineError;
+    bool isSubmitting = false;
+
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final colorScheme = theme.colorScheme;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 24,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Cleanup Notifications',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Delete all notifications and recipients for a selected season.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedSeasonId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Season',
+                        ),
+                        items: provider.seasons.map((season) {
+                          final name = (season.name?.trim().isNotEmpty ?? false)
+                              ? season.name!.trim()
+                              : season.seasonCode;
+                          return DropdownMenuItem<String>(
+                            value: season.id,
+                            child: Text(
+                              '$name (${season.seasonCode})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                setDialogState(() {
+                                  selectedSeasonId = value;
+                                  inlineError = null;
+                                });
+                              },
+                      ),
+                      if (inlineError != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer.withValues(
+                              alpha: 0.45,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            inlineError!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    if (selectedSeasonId == null ||
+                                        selectedSeasonId!.isEmpty) {
+                                      setDialogState(() {
+                                        inlineError = 'Season is required.';
+                                      });
+                                      return;
+                                    }
+
+                                    setDialogState(() {
+                                      isSubmitting = true;
+                                      inlineError = null;
+                                    });
+
+                                    final deletedCount =
+                                        await provider.cleanupNotificationsForSeason(
+                                      selectedSeasonId!,
+                                    );
+
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+
+                                    if (deletedCount == null) {
+                                      setDialogState(() {
+                                        isSubmitting = false;
+                                        inlineError = provider.error ??
+                                            'Cleanup failed. Please try again.';
+                                      });
+                                      return;
+                                    }
+
+                                    Navigator.of(dialogContext).pop(deletedCount);
+                                  },
+                            icon: isSubmitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.delete_forever_rounded),
+                            label: Text(
+                              isSubmitting ? 'Cleaning...' : 'Delete Season Notifications',
+                            ),
+                          ),
+                        ],
+                      ),
+                      // TODO(notifications/automation): trigger this cleanup automatically when a season ends.
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (!context.mounted || result == null) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted $result notification(s) for the selected season.'),
+      ),
     );
   }
 }

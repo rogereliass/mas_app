@@ -11,6 +11,9 @@ class HomeOverviewStatsService {
   static const String _profileRolesTable = 'profile_roles';
   static const String _rolesTable = 'roles';
   static const String _meetingsTable = 'meetings';
+  static const String _patrolsTable = 'patrols';
+  static const String _attendanceTable = 'attendance';
+  static const String _attendancePresentStatus = 'present';
 
   final SupabaseClient _supabase;
   final MeetingsService _meetingsService;
@@ -68,6 +71,64 @@ class HomeOverviewStatsService {
     } catch (e) {
       final message =
           'HomeOverviewStatsService.fetchTroopOverviewStats failed: $e';
+      _logError(message);
+      throw Exception(message);
+    }
+  }
+
+  /// Fetches live troop insight metrics for the Troop Overview smart card.
+  Future<TroopInsightStats> fetchTroopInsightStats({
+    required UserProfile currentUser,
+  }) async {
+    final troopId = _resolveTroopScope(currentUser);
+
+    if (troopId == null || troopId.isEmpty) {
+      _logDebug(
+        'fetchTroopInsightStats fallback: troop-scoped user has no troop context; returning empty stats.',
+      );
+      return const TroopInsightStats.empty();
+    }
+
+    _logDebug(
+      'fetchTroopInsightStats start: roleRank=${currentUser.roleRank}, troopId=$troopId',
+    );
+
+    try {
+      final patrolCount = await _countPatrols(troopId: troopId);
+
+      final activeSeason = await _meetingsService.fetchActiveSeason();
+      final seasonId = (activeSeason?['id'] as String?)?.trim();
+
+      final seasonMeetingIds = seasonId == null || seasonId.isEmpty
+          ? const <String>[]
+          : await _fetchTroopMeetingIdsForSeason(
+              troopId: troopId,
+              seasonId: seasonId,
+            );
+
+      final averageScoutsPresentPerMeeting =
+          await _computeAveragePresentAttendance(meetingIds: seasonMeetingIds);
+
+      final lastMeeting = await _fetchLastTroopMeeting(troopId: troopId);
+      final lastMeetingId = (lastMeeting?['id'] as String?)?.trim();
+      final lastMeetingDate = _parseMeetingDate(lastMeeting?['meeting_date']);
+
+      final lastMeetingPresentCount =
+          (lastMeetingId == null || lastMeetingId.isEmpty)
+          ? 0
+          : await _countPresentAttendanceForMeeting(meetingId: lastMeetingId);
+
+      final stats = TroopInsightStats(
+        patrolCount: patrolCount,
+        averageScoutsPresentPerMeeting: averageScoutsPresentPerMeeting,
+        lastMeetingDate: lastMeetingDate,
+        lastMeetingPresentCount: lastMeetingPresentCount,
+      );
+
+      _logDebug('fetchTroopInsightStats success: $stats');
+      return stats;
+    } catch (e) {
+      final message = 'HomeOverviewStatsService.fetchTroopInsightStats failed: $e';
       _logError(message);
       throw Exception(message);
     }
@@ -171,6 +232,143 @@ class HomeOverviewStatsService {
 
     final rows = await query as List<dynamic>;
     return rows.length;
+  }
+
+  Future<int> _countPatrols({required String troopId}) async {
+    final rows = await _supabase
+        .from(_patrolsTable)
+        .select('id')
+        .eq('troop_id', troopId) as List<dynamic>;
+
+    return rows.length;
+  }
+
+  Future<List<String>> _fetchTroopMeetingIdsForSeason({
+    required String troopId,
+    required String seasonId,
+  }) async {
+    final rows = List<Map<String, dynamic>>.from(
+      await _supabase
+              .from(_meetingsTable)
+              .select('id')
+              .eq('troop_id', troopId)
+              .eq('season_id', seasonId)
+              .eq('is_template', false)
+          as List,
+    );
+
+    return rows
+        .map((row) => (row['id'] as String?)?.trim())
+        .whereType<String>()
+        .where((meetingId) => meetingId.isNotEmpty)
+        .toList();
+  }
+
+  Future<double> _computeAveragePresentAttendance({
+    required List<String> meetingIds,
+  }) async {
+    if (meetingIds.isEmpty) {
+      return 0;
+    }
+
+    final presentCounts = await _countPresentAttendanceByMeeting(
+      meetingIds: meetingIds,
+    );
+
+    final totalPresent = presentCounts.values.fold<int>(
+      0,
+      (sum, count) => sum + count,
+    );
+
+    return totalPresent / meetingIds.length;
+  }
+
+  Future<Map<String, int>> _countPresentAttendanceByMeeting({
+    required List<String> meetingIds,
+  }) async {
+    if (meetingIds.isEmpty) {
+      return const <String, int>{};
+    }
+
+    final rows = List<Map<String, dynamic>>.from(
+      await _supabase
+              .from(_attendanceTable)
+              .select('meeting_id, status')
+              .inFilter('meeting_id', meetingIds)
+          as List,
+    );
+
+    final counts = <String, int>{
+      for (final meetingId in meetingIds) meetingId: 0,
+    };
+
+    for (final row in rows) {
+      final meetingId = (row['meeting_id'] as String?)?.trim();
+      final status = (row['status'] as String?)?.trim().toLowerCase();
+
+      if (meetingId == null || meetingId.isEmpty) {
+        continue;
+      }
+
+      if (status != _attendancePresentStatus) {
+        continue;
+      }
+
+      if (!counts.containsKey(meetingId)) {
+        continue;
+      }
+
+      counts[meetingId] = (counts[meetingId] ?? 0) + 1;
+    }
+
+    return counts;
+  }
+
+  Future<Map<String, dynamic>?> _fetchLastTroopMeeting({
+    required String troopId,
+  }) async {
+    final row = await _supabase
+        .from(_meetingsTable)
+        .select('id, meeting_date')
+        .eq('troop_id', troopId)
+        .eq('is_template', false)
+        .order('meeting_date', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (row == null) {
+      return null;
+    }
+
+    return Map<String, dynamic>.from(row as Map);
+  }
+
+  Future<int> _countPresentAttendanceForMeeting({required String meetingId}) async {
+    final presentCounts = await _countPresentAttendanceByMeeting(
+      meetingIds: [meetingId],
+    );
+
+    return presentCounts[meetingId] ?? 0;
+  }
+
+  DateTime? _parseMeetingDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) {
+        return null;
+      }
+      return DateTime.tryParse(trimmed);
+    }
+
+    return null;
   }
 
   Future<int> _countAssignedLeaders({required String troopId}) async {
