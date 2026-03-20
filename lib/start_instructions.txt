@@ -12,24 +12,26 @@ flutter clean
 flutter pub get
 flutter run
 
-
----------------------------------------------------------
-- supabase RLS 
-- login process - Twilio Account Needed but logic is working
-- file views & download stats
-
 ---------------------------------------------------------
 
 Act as a senior production software engineer and review this implementation to ensure it matches the planned behavior and app conventions, is secure, stable, production-safe, has modern UI consistent with the existing design, contains no crashes, edge-case failures, or bad state handling, and follows best practices without over-engineering; if any issue exists, fix it immediately with the simplest bulletproof solution, re-check security, stability, and performance after the fix, and return only: 1) critical issues found (if any), 2) corrected final code, 3) confirmation the feature is production-ready.
 
 ---------------------------------------------------------
 
-- clean copilot instructions
+- login process revisit- replace Twilio Account
+- file views & download stats
 
-- QR code for attendance recording - [Troop Heads]
-- role management for [system admin]
+---------------------------------------------------------
+- tester account in sandbox enviroment
+
+- FCM & RateLimits
+- wire in Notifications card
 - user creation button for admin/troop head,leaders
+- role management for [system admin]
 - add reporting to library views
+- Eftekad Module
+- Clans & Rovers
+- QR code for attendance recording - [Troop Heads]
 
 ---------------------------------------------------------
 
@@ -39,10 +41,10 @@ Admin:
 -✅User Management (tweaks)
 -✅Season Management
 -✅Patrols View (manage patrol members/leaders ,filter by,)
+-✅Sending Notifications System
 - Role Management Page
 - (later) Library Management (CRUD) for files and Folders
 - (later) System Status Stats
-- (later) Sending Notifications System
 
 
 Troop Head/Leader:
@@ -55,28 +57,37 @@ Troop Head/Leader:
     - ✅Points System
 - ✅Homepage Standings Card (Premium UI)
 - ✅Homepage Stats for Meeting/Attendance/Scoring
-- Eftekad Module - profile l kol wahed by name w records personal + records eftekad beta3to
-- (later) Sending Notifications System (Scope access & rate limit)
+- ✅ Sending Notifications System (Scope access & rate limit)
+- Eftekad Module - profile l kol wahed by name w personal data + records eftekad beta3to
+- [Heads Only] 
+    - view leaders of their troop data
+    - tracking Leaders attendance (Meetings & Tahdeer)
 
 Scouts:
 -✅View their meetings & history
 -✅View their attendance stats
 -✅View their troop stats
 -✅Home Page design
-- notifications view tab
+-✅notifications view tab
 - (later) Badges in Profile?
 - (later) Edit own profile?
 
-Clan Leader: Similar to troop head
+Clan Leader: [Similar to troop head]
 - User Management
 - can manage multiple clans (similar to patrols)
 - Meeting Manager (clan-based instead of troops)
 
 
-Rover: Similar to Scout
+Rover: [Similar to Scout]
 - View their meetings & history
 - View their attendance stats
 -
--
--
 
+
+Leadership:
+- view overall members
+- view leaders/troop 
+
+Legan:
+- 3ohda tracking
+- events module

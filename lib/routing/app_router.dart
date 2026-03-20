@@ -20,6 +20,24 @@ import '../home/pages/patrols_management/ui/patrols_management_page.dart';
 import '../home/pages/eftekad/ui/eftekad_page.dart';
 import '../meetings/meetings_page.dart';
 
+class MeetingsTab {
+  MeetingsTab._();
+
+  static const int management = 0;
+  static const int attendance = 1;
+  static const int points = 2;
+}
+
+class MeetingsRouteArgs {
+  const MeetingsRouteArgs({
+    this.initialTabIndex = MeetingsTab.management,
+    this.meetingId,
+  });
+
+  final int initialTabIndex;
+  final String? meetingId;
+}
+
 /// Centralized routing configuration for the application
 /// 
 /// This class manages all navigation routes in the app.
@@ -174,6 +192,16 @@ class AppRouter {
     
     // Handle Meetings with role context
     if (settings.name == meetings) {
+      final args = settings.arguments;
+      if (args is MeetingsRouteArgs) {
+        return MaterialPageRoute(
+          builder: (context) => MeetingsPage(
+            initialTabIndex: args.initialTabIndex,
+            initialMeetingId: args.meetingId,
+          ),
+        );
+      }
+
       return MaterialPageRoute(
         builder: (context) => const MeetingsPage(),
       );

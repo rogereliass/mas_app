@@ -225,6 +225,7 @@ class NotificationCreateRequest {
   final NotificationType type;
   final NotificationTargetType targetType;
   final String? targetId;
+  final String? roleTroopId;
   final Map<String, dynamic> data;
 
   const NotificationCreateRequest({
@@ -233,6 +234,7 @@ class NotificationCreateRequest {
     required this.type,
     required this.targetType,
     required this.targetId,
+    this.roleTroopId,
     required this.data,
   });
 }

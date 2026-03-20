@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/config/theme_config.dart';
 import 'core/config/theme_provider.dart';
 import 'routing/app_router.dart';
+import 'routing/navigation_service.dart';
 
 /// Main application widget
 /// 
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
           // App identity
           title: 'Scout Digital Library',
           debugShowCheckedModeBanner: false,
+          navigatorKey: NavigationService.navigatorKey,
           
           // Theme configuration - uses centralized AppTheme
           theme: AppTheme.lightTheme,

@@ -12,7 +12,14 @@ import 'pages/meeting_creation/ui/management_tab.dart';
 import 'pages/points/ui/points_tab.dart';
 
 class MeetingsPage extends StatefulWidget {
-  const MeetingsPage({super.key});
+  const MeetingsPage({
+    super.key,
+    this.initialTabIndex = 0,
+    this.initialMeetingId,
+  });
+
+  final int initialTabIndex;
+  final String? initialMeetingId;
 
   @override
   State<MeetingsPage> createState() => _MeetingsPageState();
@@ -30,7 +37,11 @@ class _MeetingsPageState extends State<MeetingsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this)
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _normalizeTabIndex(widget.initialTabIndex),
+    )
       ..addListener(_onTabChanged);
     _lastTabIndex = _tabController.index;
 
@@ -38,6 +49,12 @@ class _MeetingsPageState extends State<MeetingsPage>
       if (!mounted) return;
       _meetingsProvider?.init();
     });
+  }
+
+  int _normalizeTabIndex(int index) {
+    if (index < 0) return 0;
+    if (index > 2) return 2;
+    return index;
   }
 
   @override
@@ -191,6 +208,7 @@ class _MeetingsPageState extends State<MeetingsPage>
                         AttendanceTab(
                           troopId: meetingsProvider.effectiveTroopId,
                           seasonId: meetingsProvider.activeSeasonId,
+                          initialMeetingId: widget.initialMeetingId,
                         ),
                         PointsTab(
                           troopId: meetingsProvider.effectiveTroopId,

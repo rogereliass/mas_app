@@ -17,11 +17,13 @@ import 'package:masapp/profile/ui/profile_qr_code_screen.dart';
 class AttendanceTab extends StatefulWidget {
   final String? troopId;
   final String? seasonId;
+  final String? initialMeetingId;
 
   const AttendanceTab({
     super.key,
     required this.troopId,
     required this.seasonId,
+    this.initialMeetingId,
   });
 
   @override
@@ -29,18 +31,23 @@ class AttendanceTab extends StatefulWidget {
 }
 
 class _AttendanceTabState extends State<AttendanceTab> {
+  String? _lastAppliedMeetingId;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final troopId = widget.troopId;
       final seasonId = widget.seasonId;
       if (troopId != null && seasonId != null) {
-        Provider.of<AttendanceProvider>(
+        final provider = Provider.of<AttendanceProvider>(
           context,
           listen: false,
-        ).loadMeetings(troopId: troopId, seasonId: seasonId);
+        );
+        await provider.loadMeetings(troopId: troopId, seasonId: seasonId);
+        if (!mounted) return;
+        await _applyInitialMeetingSelection(provider);
       }
     });
   }
@@ -51,18 +58,54 @@ class _AttendanceTabState extends State<AttendanceTab> {
     // Reload when the effective troop or season changes (e.g. admin picks a troop)
     if (widget.troopId != oldWidget.troopId ||
         widget.seasonId != oldWidget.seasonId) {
+      _lastAppliedMeetingId = null;
       final troopId = widget.troopId;
       final seasonId = widget.seasonId;
       if (troopId != null && seasonId != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted) return;
-          Provider.of<AttendanceProvider>(
+          final provider = Provider.of<AttendanceProvider>(
             context,
             listen: false,
-          ).loadMeetings(troopId: troopId, seasonId: seasonId);
+          );
+          await provider.loadMeetings(troopId: troopId, seasonId: seasonId);
+          if (!mounted) return;
+          await _applyInitialMeetingSelection(provider);
         });
       }
     }
+
+    if (widget.initialMeetingId != oldWidget.initialMeetingId) {
+      _lastAppliedMeetingId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        final provider = Provider.of<AttendanceProvider>(context, listen: false);
+        await _applyInitialMeetingSelection(provider);
+      });
+    }
+  }
+
+  Future<void> _applyInitialMeetingSelection(AttendanceProvider provider) async {
+    final initialMeetingId = widget.initialMeetingId?.trim();
+    if (initialMeetingId == null || initialMeetingId.isEmpty) {
+      return;
+    }
+
+    if (_lastAppliedMeetingId == initialMeetingId) {
+      return;
+    }
+
+    final existsInCurrentList =
+        provider.meetings.any((meeting) => meeting.id == initialMeetingId);
+    if (!existsInCurrentList) {
+      return;
+    }
+
+    if (provider.selectedMeetingId != initialMeetingId) {
+      await provider.selectMeeting(initialMeetingId);
+    }
+
+    _lastAppliedMeetingId = initialMeetingId;
   }
 
   @override
@@ -164,6 +207,12 @@ class _AttendanceActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedRoleRank = context.select<AuthProvider, int>(
+      (auth) => auth.selectedRoleRank,
+    );
+    final isTroopHeadOrLeaderView =
+        selectedRoleRank == 60 || selectedRoleRank == 70;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: LayoutBuilder(
@@ -172,6 +221,16 @@ class _AttendanceActions extends StatelessWidget {
           const showQrButton = _ShowProfileQrCodeButton();
           final scanButton = _ScanQrCodesButton(provider: provider);
           final saveButton = _SaveAttendanceButton(provider: provider);
+
+          if (isTroopHeadOrLeaderView) {
+            return Row(
+              children: [
+                Expanded(child: scanButton),
+                const SizedBox(width: 12),
+                Expanded(child: saveButton),
+              ],
+            );
+          }
 
           if (isNarrow) {
             return Column(

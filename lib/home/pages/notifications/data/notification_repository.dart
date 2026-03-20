@@ -75,13 +75,22 @@ class NotificationRepository {
       senderTroopId: senderTroopId,
     );
 
+    final normalizedRoleTroopId = request.roleTroopId?.trim();
+    final normalizedData = <String, dynamic>{...request.data};
+    if (request.targetType == NotificationTargetType.role &&
+        normalizedRoleTroopId != null &&
+        normalizedRoleTroopId.isNotEmpty) {
+      normalizedData['role_troop_id'] = normalizedRoleTroopId;
+    }
+
     final normalizedRequest = NotificationCreateRequest(
       title: title,
       body: body,
       type: request.type,
       targetType: request.targetType,
       targetId: normalizedTargetId,
-      data: request.data,
+      roleTroopId: normalizedRoleTroopId,
+      data: normalizedData,
     );
 
     if (normalizedRequest.targetType != NotificationTargetType.all &&
@@ -115,6 +124,7 @@ class NotificationRepository {
       final recipients = await _service.resolveRecipientProfileIds(
         targetType: normalizedRequest.targetType,
         targetId: normalizedRequest.targetId,
+        roleTroopId: normalizedRequest.roleTroopId,
         senderRoleRank: senderRoleRank,
         senderTroopId: senderTroopId,
       );

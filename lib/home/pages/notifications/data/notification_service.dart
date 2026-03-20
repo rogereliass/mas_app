@@ -126,6 +126,7 @@ class NotificationService {
   Future<List<String>> resolveRecipientProfileIds({
     required NotificationTargetType targetType,
     required String? targetId,
+    String? roleTroopId,
     required int senderRoleRank,
     required String? senderTroopId,
   }) async {
@@ -146,7 +147,7 @@ class NotificationService {
       case NotificationTargetType.individual:
         return _fetchIndividualProfileIds(targetId!);
       case NotificationTargetType.role:
-        return _fetchRoleProfileIds(targetId!);
+        return _fetchRoleProfileIds(targetId!, troopId: roleTroopId);
     }
   }
 
@@ -366,7 +367,10 @@ class NotificationService {
   /// Fetch all approved profile IDs associated with a specific role slug.
   /// Role slug is matched against roles.slug.
   /// This joins profiles → profile_roles → roles and returns approved users only.
-  Future<List<String>> _fetchRoleProfileIds(String roleSlug) async {
+  Future<List<String>> _fetchRoleProfileIds(
+    String roleSlug, {
+    String? troopId,
+  }) async {
     try {
       // Step 1: Get role ID by slug from roles table
       final roleResponse = await _supabase
@@ -399,12 +403,19 @@ class NotificationService {
         return [];
       }
 
-      // Step 3: Filter to only approved profiles
-      final approvedProfiles = await _supabase
+      // Step 3: Filter to only approved profiles (optionally scoped by troop)
+      var approvedQuery = _supabase
           .from(_profilesTable)
           .select('id')
           .eq('approved', true)
           .inFilter('id', profileIds);
+
+      final normalizedTroopId = troopId?.trim();
+      if (normalizedTroopId != null && normalizedTroopId.isNotEmpty) {
+        approvedQuery = approvedQuery.eq('signup_troop', normalizedTroopId);
+      }
+
+      final approvedProfiles = await approvedQuery;
 
       return (approvedProfiles as List)
           .map((row) => (row as Map)['id'] as String?)

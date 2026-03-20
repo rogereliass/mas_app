@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:masapp/routing/deep_link/deep_link_service.dart';
 
 import '../../../../../auth/logic/auth_provider.dart';
 import '../../data/models/notification_models.dart';
@@ -209,17 +210,14 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
           return NotificationItem(
             key: ValueKey(entry.id),
             entry: entry,
-            onTap: () => _openDetails(context, entry),
+            onTap: () => _openDetails(entry),
           );
         },
       ),
     );
   }
 
-  Future<void> _openDetails(
-    BuildContext context,
-    NotificationRecipientEntry entry,
-  ) async {
+  Future<void> _openDetails(NotificationRecipientEntry entry) async {
     final provider = context.read<NotificationsProvider>();
 
     if (!entry.isRead) {
@@ -228,6 +226,24 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
 
     if (!context.mounted) {
       return;
+    }
+
+    final deepLinkResult = await DeepLinkService.handle(entry.notification.data);
+    if (!mounted) {
+      return;
+    }
+
+    if (deepLinkResult.handled) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    if (deepLinkResult.message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(deepLinkResult.message!)),
+      );
     }
 
     final latestEntry = provider.items.firstWhere(
