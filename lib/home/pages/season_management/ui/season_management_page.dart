@@ -282,7 +282,20 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
 
     String? selectedSeasonId = provider.seasons.first.id;
     String? inlineError;
+    String? codeInputError;
+    String? nameInputError;
     bool isSubmitting = false;
+    final codeController = TextEditingController();
+    final nameController = TextEditingController();
+
+    Season? resolveSelectedSeason() {
+      for (final season in provider.seasons) {
+        if (season.id == selectedSeasonId) {
+          return season;
+        }
+      }
+      return null;
+    }
 
     final result = await showDialog<int?>(
       context: context,
@@ -292,6 +305,18 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final selectedSeason = resolveSelectedSeason();
+            final expectedCode = selectedSeason?.seasonCode.trim() ?? '';
+            final expectedName =
+                ((selectedSeason?.name ?? '').trim().isNotEmpty)
+                    ? selectedSeason!.name!.trim()
+                    : expectedCode;
+            final canSubmit =
+                !isSubmitting &&
+                expectedCode.isNotEmpty &&
+                codeController.text.trim().isNotEmpty &&
+                nameController.text.trim().isNotEmpty;
+
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -360,8 +385,67 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
                                 setDialogState(() {
                                   selectedSeasonId = value;
                                   inlineError = null;
+                                  codeInputError = null;
+                                  nameInputError = null;
+                                  codeController.clear();
+                                  nameController.clear();
                                 });
                               },
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.errorContainer.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.error.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Text(
+                          'Type the following exactly to confirm deletion:\n'
+                          'Code: $expectedCode\n'
+                          'Name: $expectedName',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: codeController,
+                        enabled: !isSubmitting,
+                        decoration: InputDecoration(
+                          labelText: 'Type season code to confirm',
+                          errorText: codeInputError,
+                        ),
+                        onChanged: (_) {
+                          setDialogState(() {
+                            codeInputError = null;
+                            inlineError = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: nameController,
+                        enabled: !isSubmitting,
+                        decoration: InputDecoration(
+                          labelText: 'Type season name to confirm',
+                          errorText: nameInputError,
+                        ),
+                        onChanged: (_) {
+                          setDialogState(() {
+                            nameInputError = null;
+                            inlineError = null;
+                          });
+                        },
                       ),
                       if (inlineError != null) ...[
                         const SizedBox(height: 10),
@@ -398,13 +482,33 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
                           ),
                           const SizedBox(width: 8),
                           FilledButton.icon(
-                            onPressed: isSubmitting
-                                ? null
-                                : () async {
-                                    if (selectedSeasonId == null ||
-                                        selectedSeasonId!.isEmpty) {
+                            onPressed: canSubmit
+                                ? () async {
+                                    if (selectedSeason == null) {
                                       setDialogState(() {
                                         inlineError = 'Season is required.';
+                                      });
+                                      return;
+                                    }
+
+                                    final enteredCode = codeController.text.trim();
+                                    final enteredName = nameController.text.trim();
+
+                                    final codeMatches = enteredCode == expectedCode;
+                                    final nameMatches = enteredName == expectedName;
+
+                                    if (!codeMatches || !nameMatches) {
+                                      setDialogState(() {
+                                        if (!codeMatches) {
+                                          codeInputError =
+                                              'Code does not match the selected season.';
+                                        }
+                                        if (!nameMatches) {
+                                          nameInputError =
+                                              'Name does not match the selected season.';
+                                        }
+                                        inlineError =
+                                            'Confirmation text mismatch. Deletion blocked.';
                                       });
                                       return;
                                     }
@@ -412,11 +516,13 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
                                     setDialogState(() {
                                       isSubmitting = true;
                                       inlineError = null;
+                                      codeInputError = null;
+                                      nameInputError = null;
                                     });
 
                                     final deletedCount =
                                         await provider.cleanupNotificationsForSeason(
-                                      selectedSeasonId!,
+                                      selectedSeason.id,
                                     );
 
                                     if (!context.mounted) {
@@ -433,7 +539,8 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
                                     }
 
                                     Navigator.of(dialogContext).pop(deletedCount);
-                                  },
+                                  }
+                                : null,
                             icon: isSubmitting
                                 ? const SizedBox(
                                     width: 16,
@@ -459,6 +566,9 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
         );
       },
     );
+
+    codeController.dispose();
+    nameController.dispose();
 
     if (!context.mounted || result == null) {
       return;

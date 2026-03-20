@@ -152,6 +152,8 @@ class NotificationAuditItem extends StatelessWidget {
         return 'Patrol: ${entry.targetLabel ?? entry.targetId ?? 'Unknown'}';
       case NotificationTargetType.individual:
         return 'Individual: ${entry.targetLabel ?? entry.targetId ?? 'Unknown'}';
+      case NotificationTargetType.role:
+        return 'Role: ${entry.targetLabel ?? entry.targetId ?? 'Unknown'}';
     }
   }
 

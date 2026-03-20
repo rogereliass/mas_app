@@ -51,6 +51,7 @@ class NotificationsProvider with ChangeNotifier {
         NotificationTargetType.troop,
         NotificationTargetType.patrol,
         NotificationTargetType.individual,
+        NotificationTargetType.role,
       ];
     }
 
@@ -254,6 +255,12 @@ class NotificationsProvider with ChangeNotifier {
       senderRoleRank: _authProvider.selectedRoleRank,
       senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)?.trim(),
       troopId: selectedTroopId,
+    );
+  }
+
+  Future<List<NotificationTargetOption>> loadRoleTargets() {
+    return _repository.fetchRoleTargets(
+      senderRoleRank: _authProvider.selectedRoleRank,
     );
   }
 

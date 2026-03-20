@@ -27,9 +27,11 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
 
   List<NotificationTargetOption> _troopOptions = const <NotificationTargetOption>[];
   List<NotificationTargetOption> _targetOptions = const <NotificationTargetOption>[];
+  List<NotificationTargetOption> _roleOptions = const <NotificationTargetOption>[];
 
   bool _isLoadingTargets = false;
   bool _isSubmitting = false;
+  bool _hasAttemptedSubmit = false;
   String? _inlineError;
 
   @override
@@ -93,6 +95,17 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
           _isLoadingTargets = false;
           _targetOptions = const <NotificationTargetOption>[];
           _selectedTargetId = null;
+        });
+        return;
+      }
+
+      if (targetType == NotificationTargetType.role) {
+        final options = await provider.loadRoleTargets();
+        setState(() {
+          _roleOptions = options;
+          _targetOptions = options;
+          _selectedTargetId = options.isNotEmpty ? options.first.id : null;
+          _isLoadingTargets = false;
         });
         return;
       }
@@ -189,6 +202,11 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
     if (_isSubmitting || !provider.canSendNotifications) {
       return;
     }
+
+    setState(() {
+      _hasAttemptedSubmit = true;
+      _inlineError = null;
+    });
 
     final formIsValid = _formKey.currentState?.validate() ?? false;
     if (!formIsValid) {
@@ -304,6 +322,9 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           child: Form(
             key: _formKey,
+            autovalidateMode: _hasAttemptedSubmit
+                ? AutovalidateMode.onUserInteraction
+                : AutovalidateMode.disabled,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,6 +411,9 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                         if (text.isEmpty) {
                           return 'Title is required.';
                         }
+                        if (text.length < 3) {
+                          return 'Title must be at least 3 characters.';
+                        }
                         return null;
                       },
                     ),
@@ -408,6 +432,9 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                         final text = (value ?? '').trim();
                         if (text.isEmpty) {
                           return 'Body is required.';
+                        }
+                        if (text.length < 8) {
+                          return 'Message must be at least 8 characters.';
                         }
                         return null;
                       },
@@ -435,11 +462,14 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                               setState(() {
                                 _selectedTargetType = next;
                                 _selectedTargetId = null;
+                                _inlineError = null;
                               });
                               await _loadTargetOptions();
                             }
                           : null,
-                      validator: (value) => value == null ? 'Required.' : null,
+                      validator: (value) => value == null
+                          ? 'Target type is required.'
+                          : null,
                     ),
                     if ((_selectedTargetType == NotificationTargetType.patrol ||
                             _selectedTargetType == NotificationTargetType.individual) &&
@@ -455,10 +485,26 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                             child: Text(troop.label),
                           );
                         }).toList(),
-                        onChanged: canSend ? _onTroopChanged : null,
-                        validator: (value) => isSystemSender && (value == null || value.isEmpty)
-                            ? 'Required.'
+                        onChanged: canSend
+                            ? (value) {
+                                setState(() {
+                                  _inlineError = null;
+                                });
+                                _onTroopChanged(value);
+                              }
                             : null,
+                        validator: (value) {
+                          if (!isSystemSender) {
+                            return null;
+                          }
+                          if (_troopOptions.isEmpty) {
+                            return 'No troop options are available.';
+                          }
+                          if (value == null || value.isEmpty) {
+                            return 'Troop is required.';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                     if (_selectedTargetType != null &&
@@ -484,13 +530,28 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                           );
                         }).toList(),
                         onChanged: canSend
-                            ? (next) => setState(() => _selectedTargetId = next)
+                            ? (next) {
+                                setState(() {
+                                  _selectedTargetId = next;
+                                  _inlineError = null;
+                                });
+                              }
                             : null,
-                        validator: (value) =>
-                            (_selectedTargetType != NotificationTargetType.all &&
-                                    (value == null || value.isEmpty))
-                                ? 'Required.'
-                                : null,
+                        validator: (value) {
+                          if (_selectedTargetType == NotificationTargetType.all) {
+                            return null;
+                          }
+                          if (_targetOptions.isEmpty) {
+                            if (_selectedTargetType == NotificationTargetType.role) {
+                              return 'No roles available for selection.';
+                            }
+                            return 'No selectable targets are available.';
+                          }
+                          if (value == null || value.isEmpty) {
+                            return 'Target is required.';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ],
@@ -570,6 +631,8 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
         return 'Patrol';
       case NotificationTargetType.individual:
         return 'Individual';
+      case NotificationTargetType.role:
+        return 'By Role';
     }
   }
 
@@ -583,6 +646,8 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
         return 'Patrol';
       case NotificationTargetType.individual:
         return 'Member';
+      case NotificationTargetType.role:
+        return 'Role';
     }
   }
 

@@ -46,6 +46,7 @@ enum NotificationTargetType {
   troop,
   patrol,
   individual,
+  role,
 }
 
 extension NotificationTargetTypeX on NotificationTargetType {
@@ -59,6 +60,8 @@ extension NotificationTargetTypeX on NotificationTargetType {
         return 'patrol';
       case NotificationTargetType.individual:
         return 'individual';
+      case NotificationTargetType.role:
+        return 'role';
     }
   }
 
@@ -70,6 +73,8 @@ extension NotificationTargetTypeX on NotificationTargetType {
         return NotificationTargetType.patrol;
       case 'individual':
         return NotificationTargetType.individual;
+      case 'role':
+        return NotificationTargetType.role;
       case 'all':
       default:
         return NotificationTargetType.all;

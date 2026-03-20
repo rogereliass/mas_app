@@ -145,6 +145,8 @@ class NotificationService {
         return _fetchPatrolProfileIds(targetId!);
       case NotificationTargetType.individual:
         return _fetchIndividualProfileIds(targetId!);
+      case NotificationTargetType.role:
+        return _fetchRoleProfileIds(targetId!);
     }
   }
 
@@ -262,6 +264,26 @@ class NotificationService {
         .toList();
   }
 
+  /// Fetch all available roles that can be targeted for notifications.
+  /// Returns role key and display name pairs.
+  Future<List<NotificationTargetOption>> fetchRoleTargetOptions() async {
+    final response = await _supabase
+        .from('roles')
+        .select('slug, name, role_rank')
+        .order('role_rank', ascending: false);
+
+    return (response as List)
+        .map((row) {
+          final map = Map<String, dynamic>.from(row as Map);
+          return NotificationTargetOption(
+            id: (map['slug'] as String? ?? '').trim(),
+            label: (map['name'] as String? ?? '').trim(),
+          );
+        })
+        .where((option) => option.id.isNotEmpty && option.label.isNotEmpty)
+        .toList();
+  }
+
   Future<int> cleanupSeasonNotifications({required String seasonId}) async {
     final notifications = await _supabase
         .from(_notificationsTable)
@@ -341,7 +363,57 @@ class NotificationService {
         .whereType<String>()
         .toList();
   }
+  /// Fetch all approved profile IDs associated with a specific role slug.
+  /// Role slug is matched against roles.slug.
+  /// This joins profiles → profile_roles → roles and returns approved users only.
+  Future<List<String>> _fetchRoleProfileIds(String roleSlug) async {
+    try {
+      // Step 1: Get role ID by slug from roles table
+      final roleResponse = await _supabase
+          .from('roles')
+          .select('id')
+          .eq('slug', roleSlug.trim())
+          .maybeSingle();
 
+      if (roleResponse == null) {
+        return [];
+      }
+
+      final roleId = roleResponse['id'] as String?;
+      if (roleId == null || roleId.isEmpty) {
+        return [];
+      }
+
+      // Step 2: Get profile IDs who have this role_id
+      final profileRolesResponse = await _supabase
+          .from('profile_roles')
+          .select('profile_id')
+          .eq('role_id', roleId);
+
+      final profileIds = (profileRolesResponse as List)
+          .map((row) => (row as Map)['profile_id'] as String?)
+          .whereType<String>()
+          .toList();
+
+      if (profileIds.isEmpty) {
+        return [];
+      }
+
+      // Step 3: Filter to only approved profiles
+      final approvedProfiles = await _supabase
+          .from(_profilesTable)
+          .select('id')
+          .eq('approved', true)
+          .inFilter('id', profileIds);
+
+      return (approvedProfiles as List)
+          .map((row) => (row as Map)['id'] as String?)
+          .whereType<String>()
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
   void _validateSenderTargetScope({
     required NotificationTargetType targetType,
     required String? targetId,
@@ -362,6 +434,10 @@ class NotificationService {
 
     if (isTroopSender && targetType == NotificationTargetType.all) {
       throw Exception('Troop roles cannot send notifications to all users.');
+    }
+
+    if (isTroopSender && targetType == NotificationTargetType.role) {
+      throw Exception('Troop roles cannot send notifications by role. Only system-wide admins can use role-based targeting.');
     }
 
     if (isTroopSender && (senderTroopId == null || senderTroopId.trim().isEmpty)) {
@@ -396,6 +472,8 @@ class NotificationService {
             .eq('approved', true)
             .maybeSingle();
         return profile != null;
+      case NotificationTargetType.role:
+        return false; // Troop-scoped senders cannot send by role
     }
   }
 }

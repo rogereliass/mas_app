@@ -334,6 +334,8 @@ class _AdminNotificationsAuditScreenState
         return 'Patrols';
       case NotificationTargetType.individual:
         return 'Members';
+      case NotificationTargetType.role:
+        return 'Roles';
     }
   }
 

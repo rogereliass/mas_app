@@ -198,6 +198,17 @@ class NotificationRepository {
     return _service.fetchIndividualTargetOptions(troopId: resolvedTroopId);
   }
 
+  Future<List<NotificationTargetOption>> fetchRoleTargets({
+    required int senderRoleRank,
+  }) async {
+    // Only system admins (rank >= 90) can send notifications by role
+    if (senderRoleRank < 90) {
+      return const <NotificationTargetOption>[];
+    }
+
+    return _service.fetchRoleTargetOptions();
+  }
+
   Future<int> cleanupSeasonNotifications(String seasonId) {
     return _service.cleanupSeasonNotifications(seasonId: seasonId);
   }

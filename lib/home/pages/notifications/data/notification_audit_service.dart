@@ -131,6 +131,8 @@ class NotificationAuditService {
             return patrolIds.contains(rowTargetId);
           case NotificationTargetType.individual:
             return profileIds.contains(rowTargetId);
+          case NotificationTargetType.role:
+            return false; // Role targets don't apply to scope filtering
         }
       }).toList();
     }
@@ -143,6 +145,7 @@ class NotificationAuditService {
     final troopLabels = await _fetchTroopLabels(targetIdsByType['troop']!);
     final patrolLabels = await _fetchPatrolLabels(targetIdsByType['patrol']!);
     final profileLabels = await _fetchProfileLabels(targetIdsByType['individual']!);
+    final roleLabels = await _fetchRoleLabels(targetIdsByType['role']!);
 
     final entries = rows.map((row) {
       final targetType = NotificationTargetTypeX.fromValue(
@@ -162,6 +165,8 @@ class NotificationAuditService {
         targetLabel = patrolLabels[targetId];
       } else if (targetType == NotificationTargetType.individual) {
         targetLabel = profileLabels[targetId];
+      } else if (targetType == NotificationTargetType.role) {
+        targetLabel = roleLabels[targetId];
       }
 
       return NotificationAuditEntry(
@@ -268,6 +273,7 @@ class NotificationAuditService {
     final troopIds = <String>{};
     final patrolIds = <String>{};
     final profileIds = <String>{};
+    final roleKeys = <String>{};
 
     for (final row in rows) {
       final targetType = NotificationTargetTypeX.fromValue(
@@ -284,6 +290,8 @@ class NotificationAuditService {
         patrolIds.add(targetId);
       } else if (targetType == NotificationTargetType.individual) {
         profileIds.add(targetId);
+      } else if (targetType == NotificationTargetType.role) {
+        roleKeys.add(targetId);
       }
     }
 
@@ -291,6 +299,7 @@ class NotificationAuditService {
       'troop': troopIds,
       'patrol': patrolIds,
       'individual': profileIds,
+      'role': roleKeys,
     };
   }
 
@@ -357,6 +366,28 @@ class NotificationAuditService {
       }
       final label = _buildProfileName(typed);
       map[id] = label ?? 'Unknown Member';
+    }
+    return map;
+  }
+
+  Future<Map<String, String>> _fetchRoleLabels(Set<String> roleKeys) async {
+    if (roleKeys.isEmpty) {
+      return <String, String>{};
+    }
+
+    final response = await _supabase
+        .from('roles')
+        .select('slug, name')
+        .inFilter('slug', roleKeys.toList());
+
+    final map = <String, String>{};
+    for (final row in response as List) {
+      final typed = Map<String, dynamic>.from(row as Map);
+      final roleSlug = (typed['slug'] as String? ?? '').trim();
+      final roleName = (typed['name'] as String? ?? '').trim();
+      if (roleSlug.isNotEmpty && roleName.isNotEmpty) {
+        map[roleSlug] = roleName;
+      }
     }
     return map;
   }
