@@ -139,7 +139,7 @@ class NotificationRepository {
         recipientProfileIds: uniqueRecipients,
       );
 
-      // TODO(notifications/fcm): trigger Firebase FCM fan-out using stored fcm_token.
+      // Push fan-out is triggered server-side via DB trigger on notification_recipients.
       return NotificationCreateResult(
         notificationId: notificationId,
         recipientCount: uniqueRecipients.length,

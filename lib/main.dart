@@ -34,7 +34,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await FcmService.instance.init();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -47,6 +46,9 @@ void main() async {
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
   );
+
+  // Initialize FCM only after Supabase is ready for backend token registration.
+  await FcmService.instance.init();
 
   // Initialize Hive
   await Hive.initFlutter();
@@ -157,3 +159,4 @@ void main() async {
     ),
   );
 }
+

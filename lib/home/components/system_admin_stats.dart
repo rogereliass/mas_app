@@ -63,11 +63,11 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
               headerIcon: Icons.admin_panel_settings_rounded,
               actionCards: [
                 PremiumActionCard(
-                  title: 'Season Management',
-                  subtitle: 'Manage activity seasons & codes',
-                  icon: Icons.calendar_today_rounded,
-                  color: const Color(0xFF6366F1), // Indigo
-                  onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
+                  title: 'Manage Roles',
+                  subtitle: 'Define & assign user roles',
+                  icon: Icons.shield_moon_rounded,
+                  color: const Color.fromARGB(255, 123, 28, 28), // Violet
+                  onTap: () => Navigator.pushNamed(context, AppRouter.manageRoles),
                 ),
                 PremiumActionCard(
                   title: 'User Acceptance',
@@ -75,6 +75,13 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
                   icon: Icons.how_to_reg_rounded,
                   color: const Color(0xFFF43F5E), // Rose
                   onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
+                ),
+                PremiumActionCard(
+                  title: 'Season Management',
+                  subtitle: 'Manage activity seasons & codes',
+                  icon: Icons.calendar_today_rounded,
+                  color: const Color(0xFF6366F1), // Indigo
+                  onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
                 ),
                 PremiumActionCard(
                   title: 'User Management',
@@ -94,7 +101,7 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
                   title: 'Eftekad',
                   subtitle: 'Open Eftekad tools (coming soon)',
                   icon: Icons.fact_check_rounded,
-                  color: AppColors.primaryBlue,
+                  color: const Color.fromARGB(255, 25, 58, 156),
                   onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
                 ),
               ],

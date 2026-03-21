@@ -18,6 +18,7 @@ import '../home/pages/user_management/ui/user_management_page.dart';
 import '../home/pages/season_management/ui/season_management_page.dart';
 import '../home/pages/patrols_management/ui/patrols_management_page.dart';
 import '../home/pages/eftekad/ui/eftekad_page.dart';
+import '../home/pages/role_management/ui/role_management_page.dart';
 import '../meetings/meetings_page.dart';
 
 class MeetingsTab {
@@ -107,6 +108,9 @@ class AppRouter {
 
   /// Eftekad page route (troop management)
   static const String eftekad = '/eftekad';
+
+  /// Roles management page route (admin only)
+  static const String manageRoles = '/manage-roles';
 
   // ============================================================================
   // ROUTE DEFINITIONS
@@ -211,6 +215,13 @@ class AppRouter {
     if (settings.name == eftekad) {
       return MaterialPageRoute(
         builder: (context) => const EftekadPage(),
+      );
+    }
+
+    // Handle Manage Roles placeholder page
+    if (settings.name == manageRoles) {
+      return MaterialPageRoute(
+        builder: (context) => const RoleManagementPage(),
       );
     }
 

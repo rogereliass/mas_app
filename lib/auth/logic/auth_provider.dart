@@ -7,6 +7,7 @@ import '../data/role_repository.dart';
 import '../models/user_profile.dart';
 import '../models/role.dart';
 import '../../core/utils/ttl_cache.dart';
+import '../../core/utils/fcm_service.dart';
 
 /// Authentication state management provider
 ///
@@ -45,11 +46,11 @@ class AuthProvider with ChangeNotifier {
       // Check if we have the migration marker
       final migrated = prefs.getBool('_storage_migrated_v1') ?? false;
       if (migrated) {
-        _logDebug('✅ Storage already migrated');
+        _logDebug('[OK] Storage already migrated');
         return;
       }
 
-      _logDebug('🔄 Migrating from encrypted storage to plain storage...');
+      _logDebug('[SYNC] Migrating from encrypted storage to plain storage...');
 
       // List of keys that were previously encrypted
       final encryptedKeys = [
@@ -78,16 +79,16 @@ class AuthProvider with ChangeNotifier {
       }
 
       if (hasEncryptedData) {
-        _logDebug('⚠️ Detected old encrypted data, clearing all user data...');
+        _logDebug('[WARN] Detected old encrypted data, clearing all user data...');
         // Clear all user data to reset to clean state
         await _clearUserData();
       }
 
       // Mark migration as complete
       await prefs.setBool('_storage_migrated_v1', true);
-      _logDebug('✅ Storage migration complete');
+      _logDebug('[OK] Storage migration complete');
     } catch (e) {
-      _logDebug('⚠️ Migration error (non-fatal): $e');
+      _logDebug('[WARN] Migration error (non-fatal): $e');
       // Non-fatal - continue anyway
     }
   }
@@ -191,15 +192,15 @@ class AuthProvider with ChangeNotifier {
   /// Initialize auth state and listen to changes
   void _initialize() {
     _currentUser = _authRepository.getCurrentUser();
-    _logDebug('🚀 AuthProvider Initialize');
+    _logDebug('[INIT] AuthProvider Initialize');
 
     // Migrate from old encrypted storage if needed
     _migrateFromEncryptedStorage()
         .then((_) {
-          _logDebug('✅ Migration check complete, continuing initialization');
+          _logDebug('[OK] Migration check complete, continuing initialization');
         })
         .catchError((e) {
-          _logDebug('⚠️ Migration failed (non-fatal): $e');
+          _logDebug('[WARN] Migration failed (non-fatal): $e');
         });
 
     // Listen to auth state changes and store subscription for cleanup
@@ -208,7 +209,7 @@ class AuthProvider with ChangeNotifier {
     ) async {
       _currentUser = data.session?.user;
 
-      _logDebug('🔔 Auth state changed');
+      _logDebug('[AUTH] Auth state changed');
 
       if (_currentUser != null) {
         // Load profile and roles without intermediate notifications
@@ -216,8 +217,9 @@ class AuthProvider with ChangeNotifier {
         await _loadUserProfile(notifyOnComplete: false);
         await _loadUserRoles();
         await _saveUserData();
+        await _syncFcmTokenWithCurrentProfile();
         _profileLoading = false;
-        _logDebug('📢 Notifying listeners after auth state change');
+        _logDebug('[NOTIFY] Notifying listeners after auth state change');
 
         // Notify listeners since user logged in
         notifyListeners();
@@ -225,6 +227,7 @@ class AuthProvider with ChangeNotifier {
         _currentUserProfile = null;
         _userRoles = [];
         await _clearUserData();
+        await _deactivateFcmTokenForSignedOutUser();
 
         // Notify listeners since user logged out
         notifyListeners();
@@ -233,25 +236,26 @@ class AuthProvider with ChangeNotifier {
 
     // Load user profile if already logged in (async)
     if (_currentUser != null) {
-      _logDebug('👤 User already logged in, loading profile and roles...');
+      _logDebug('[USER] User already logged in, loading profile and roles...');
       // CRITICAL: Set loading flag BEFORE starting async operations to prevent race condition
       _profileLoading = true;
       _loadUserProfile(notifyOnComplete: false)
           .then((_) async {
             await _loadUserRoles();
             await _saveUserData();
+            await _syncFcmTokenWithCurrentProfile();
             _profileLoading = false;
-            _logDebug('📢 Notifying listeners after initial load complete');
+            _logDebug('[NOTIFY] Notifying listeners after initial load complete');
             notifyListeners();
           })
           .catchError((e) {
-            _logDebug('❌ Error in initial load: $e');
+            _logDebug('[ERROR] Error in initial load: $e');
             _profileLoading = false;
             // Still notify listeners so UI can show error state
             notifyListeners();
           });
     } else {
-      _logDebug('⚠️ No user logged in at initialization');
+      _logDebug('[WARN] No user logged in at initialization');
     }
   }
 
@@ -264,11 +268,11 @@ class AuthProvider with ChangeNotifier {
     if (_currentUser == null) {
       _currentUserProfile = null;
       _profileLoadError = null;
-      _logDebug('⚠️ Cannot load profile - no current user');
+      _logDebug('[WARN] Cannot load profile - no current user');
       return;
     }
 
-    _logDebug('🔄 Loading user profile for user ID: ${_currentUser!.id}');
+    _logDebug('[SYNC] Loading user profile for user ID: ${_currentUser!.id}');
 
     // Only set loading flag if we're managing it ourselves (notifyOnComplete = true)
     if (notifyOnComplete) {
@@ -280,11 +284,11 @@ class AuthProvider with ChangeNotifier {
       _currentUserProfile = await _fetchUserProfileWithRetry(_currentUser!.id);
 
       _logDebug(
-        '📊 Profile fetch result: ${_currentUserProfile != null ? "SUCCESS" : "NULL"}',
+        '[PROFILE] Profile fetch result: ${_currentUserProfile != null ? "SUCCESS" : "NULL"}',
       );
 
       if (_currentUserProfile != null) {
-        _logDebug('✅ Loaded user profile: ${_currentUserProfile!.fullName}');
+        _logDebug('[OK] Loaded user profile: ${_currentUserProfile!.fullName}');
         _logDebug('   First Name: ${_currentUserProfile!.firstName}');
         _logDebug('   Middle Name: ${_currentUserProfile!.middleName}');
         _logDebug('   Last Name: ${_currentUserProfile!.lastName}');
@@ -293,20 +297,20 @@ class AuthProvider with ChangeNotifier {
         // Check if name fields are missing
         if (_currentUserProfile!.firstName == null ||
             _currentUserProfile!.lastName == null) {
-          _logDebug('⚠️ WARNING: Name fields are missing in database');
+          _logDebug('[WARN] WARNING: Name fields are missing in database');
           _profileLoadError =
               'Profile data is incomplete. Please contact support.';
         } else {
           _profileLoadError = null;
         }
       } else {
-        _logDebug('❌ No profile found for current user');
+        _logDebug('[ERROR] No profile found for current user');
         _currentUserProfile = null;
         _profileLoadError =
             'User profile not found in database. Please contact support or re-register.';
       }
     } catch (e, stackTrace) {
-      _logDebug('❌ Failed to load user profile: $e');
+      _logDebug('[ERROR] Failed to load user profile: $e');
       _logDebug('   StackTrace: $stackTrace');
       // Set profile to null and store error message
       _currentUserProfile = null;
@@ -333,12 +337,12 @@ class AuthProvider with ChangeNotifier {
         }
 
         _logDebug(
-          '⚠️ Profile fetch returned null (attempt $attempt/$_profileLoadAttempts)',
+          '[WARN] Profile fetch returned null (attempt $attempt/$_profileLoadAttempts)',
         );
       } catch (e) {
         lastError = e;
         _logDebug(
-          '⚠️ Profile fetch failed (attempt $attempt/$_profileLoadAttempts): $e',
+          '[WARN] Profile fetch failed (attempt $attempt/$_profileLoadAttempts): $e',
         );
       }
 
@@ -358,17 +362,17 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUserRoles() async {
     if (_currentUser == null) {
       _userRoles = [];
-      _logDebug('⚠️ No current user, skipping role load');
+      _logDebug('[WARN] No current user, skipping role load');
       return;
     }
 
     try {
-      _logDebug('🔄 Loading roles for user');
+      _logDebug('[SYNC] Loading roles for user');
       _userRoles = await _roleRepository.getCurrentUserRoles();
       await _hydrateAndNormalizeSelectedRole();
-      _logDebug('✅ Loaded ${_userRoles.length} roles for user');
+      _logDebug('[OK] Loaded ${_userRoles.length} roles for user');
     } catch (e, stackTrace) {
-      _logDebug('❌ Failed to load user roles: $e');
+      _logDebug('[ERROR] Failed to load user roles: $e');
       _logDebug('   StackTrace: $stackTrace');
       _userRoles = [];
       _selectedRoleName = null;
@@ -578,6 +582,7 @@ class AuthProvider with ChangeNotifier {
       await _loadUserProfile(notifyOnComplete: false);
       await _loadUserRoles();
       await _saveUserData();
+      await _syncFcmTokenWithCurrentProfile();
 
       // Manually notify after both profile and roles are loaded
       notifyListeners();
@@ -681,7 +686,7 @@ class AuthProvider with ChangeNotifier {
     if (!forceRefresh) {
       final cachedTroops = _troopsCache.get('troops');
       if (cachedTroops != null) {
-        _logDebug('📦 Using cached troops (${cachedTroops.length} items)');
+        _logDebug('[CACHE] Using cached troops (${cachedTroops.length} items)');
         return cachedTroops;
       }
     }
@@ -690,7 +695,7 @@ class AuthProvider with ChangeNotifier {
       final troops = await _authRepository.getTroops();
       _troopsCache.set('troops', troops, _troopsCacheTtl);
       _logDebug(
-        '✅ Loaded ${troops.length} troops (cached for ${_troopsCacheTtl.inMinutes}min)',
+        '[OK] Loaded ${troops.length} troops (cached for ${_troopsCacheTtl.inMinutes}min)',
       );
       return troops;
     } catch (e) {
@@ -882,12 +887,26 @@ class AuthProvider with ChangeNotifier {
         await _loadUserProfile(notifyOnComplete: false);
         await _loadUserRoles();
         await _saveUserData();
+        await _syncFcmTokenWithCurrentProfile();
       } finally {
         _profileLoading = false;
         // Manually notify after both are loaded
         notifyListeners();
       }
     }
+  }
+
+  Future<void> _syncFcmTokenWithCurrentProfile() async {
+    final profileId = _currentUserProfile?.id;
+    if (profileId == null || profileId.trim().isEmpty) {
+      return;
+    }
+
+    await FcmService.instance.syncTokenForProfile(profileId: profileId);
+  }
+
+  Future<void> _deactivateFcmTokenForSignedOutUser() async {
+    await FcmService.instance.clearTokenForSignedOutUser();
   }
 
   /// Set loading state
@@ -916,3 +935,4 @@ class AuthProvider with ChangeNotifier {
     _clearError();
   }
 }
+

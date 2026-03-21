@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../firebase_options.dart';
+import '../../home/pages/notifications/data/token_repository.dart';
 import '../../routing/deep_link/deep_link_service.dart';
 import '../../routing/navigation_service.dart';
 
@@ -28,10 +31,15 @@ class FcmService {
   static final FcmService instance = FcmService._();
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  final TokenRepository _tokenRepository = TokenRepository();
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedAppSubscription;
+
+  final Set<String> _handledMessageIds = <String>{};
+  String? _currentProfileId;
+  String? _lastRegisteredToken;
 
   bool _initialized = false;
   bool _backgroundHandlerRegistered = false;
@@ -49,9 +57,30 @@ class FcmService {
 
     await requestPermission();
     await _configureForegroundPresentation();
-    await getAndStoreToken();
     listenToTokenRefresh();
     await setupListeners();
+  }
+
+  Future<void> syncTokenForProfile({required String profileId}) async {
+    final normalizedProfileId = profileId.trim();
+    if (normalizedProfileId.isEmpty) {
+      return;
+    }
+
+    _currentProfileId = normalizedProfileId;
+
+    if (!_isSupabaseReady()) {
+      debugPrint('FCM token sync skipped because Supabase is not initialized yet.');
+      return;
+    }
+
+    await getAndStoreToken();
+  }
+
+  Future<void> clearTokenForSignedOutUser() async {
+    // Keep token rows on sign-out by decision; only reset in-memory binding.
+    _currentProfileId = null;
+    _lastRegisteredToken = null;
   }
 
   Future<NotificationSettings> requestPermission() async {
@@ -80,8 +109,7 @@ class FcmService {
         return;
       }
 
-      debugPrint('FCM token: $token');
-      // TODO(fcm/backend): Send token to backend once token registration API is ready.
+      await _registerToken(token);
     } catch (error, stackTrace) {
       debugPrint('Failed to fetch FCM token: $error');
       debugPrint('$stackTrace');
@@ -97,8 +125,7 @@ class FcmService {
           return;
         }
 
-        debugPrint('FCM token refreshed: $token');
-        // TODO(fcm/backend): Send refreshed token to backend when endpoint exists.
+        unawaited(_registerToken(token));
       },
       onError: (Object error, StackTrace stackTrace) {
         debugPrint('FCM token refresh stream error: $error');
@@ -143,6 +170,10 @@ class FcmService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    if (_isDuplicateMessage(message)) {
+      return;
+    }
+
     final title = message.notification?.title?.trim();
     final body = message.notification?.body?.trim();
 
@@ -167,6 +198,10 @@ class FcmService {
   }
 
   Future<void> _forwardToDeepLinkHandler(RemoteMessage message) async {
+    if (_isDuplicateMessage(message)) {
+      return;
+    }
+
     final payload = _sanitizePayload(message.data);
     if (payload.isEmpty) {
       debugPrint(
@@ -195,5 +230,89 @@ class FcmService {
     });
 
     return sanitized;
+  }
+
+  Future<void> _registerToken(String token) async {
+    final normalizedToken = token.trim();
+    if (normalizedToken.isEmpty) {
+      return;
+    }
+
+    final profileId = _currentProfileId;
+    if (profileId == null || profileId.isEmpty) {
+      debugPrint('FCM token registration postponed: profile is not ready yet.');
+      return;
+    }
+
+    if (!_isSupabaseReady()) {
+      debugPrint('FCM token registration skipped: Supabase is not initialized yet.');
+      return;
+    }
+
+    if (_lastRegisteredToken == normalizedToken) {
+      return;
+    }
+
+    final deviceType = _resolveDeviceType();
+    if (deviceType == null) {
+      debugPrint('FCM token registration skipped: unsupported platform.');
+      return;
+    }
+
+    try {
+      await _tokenRepository.upsertDeviceToken(
+        profileId: profileId,
+        fcmToken: normalizedToken,
+        deviceType: deviceType,
+      );
+      _lastRegisteredToken = normalizedToken;
+      debugPrint('FCM token registered for profile $profileId ($deviceType).');
+    } catch (error, stackTrace) {
+      debugPrint('FCM token backend registration failed: $error');
+      debugPrint('$stackTrace');
+    }
+  }
+
+  String? _resolveDeviceType() {
+    if (kIsWeb) {
+      return 'web';
+    }
+
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+
+    return null;
+  }
+
+  bool _isSupabaseReady() {
+    try {
+      Supabase.instance.client;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _isDuplicateMessage(RemoteMessage message) {
+    final messageId = message.messageId?.trim();
+    if (messageId == null || messageId.isEmpty) {
+      return false;
+    }
+
+    if (_handledMessageIds.contains(messageId)) {
+      return true;
+    }
+
+    _handledMessageIds.add(messageId);
+    if (_handledMessageIds.length > 200) {
+      _handledMessageIds.remove(_handledMessageIds.first);
+    }
+
+    return false;
   }
 }
