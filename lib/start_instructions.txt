@@ -24,9 +24,9 @@ Act as a senior production software engineer and review this implementation to e
 ---------------------------------------------------------
 - tester account in sandbox enviroment
 
-- FCM & RateLimits
+- RateLimits
+- login process revisit- replace Twilio with email
 - user creation button for admin/troop head,leaders
-- role management for [system admin]
 - add reporting to library views
 - Eftekad Module
 - Clans, Rovers & Leadership
@@ -41,7 +41,7 @@ Admin:
 -✅Season Management
 -✅Patrols View (manage patrol members/leaders ,filter by,)
 -✅Sending Notifications System
-- Role Management Page
+-✅ Role Management Page
 - (later) Library Management (CRUD) for files and Folders
 - (later) System Status Stats
 

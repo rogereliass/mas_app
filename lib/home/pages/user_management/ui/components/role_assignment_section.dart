@@ -62,6 +62,15 @@ class RoleAssignmentSection extends StatelessWidget {
   /// Callback when troop context is changed for a role
   final void Function(String roleId, String? troopId) onTroopContextChanged;
 
+  /// When true, already assigned troop-scoped roles show read-only context instead of dropdown.
+  final bool lockTroopContextForExistingAssignments;
+
+  /// Existing assigned role IDs whose troop context can currently be edited.
+  final Set<String> editableExistingTroopContextRoleIds;
+
+  /// Callback when user requests to change troop context for an existing assignment.
+  final void Function(String roleId)? onRequestEditTroopContext;
+
   const RoleAssignmentSection({
     super.key,
     required this.selectedRoles,
@@ -74,6 +83,9 @@ class RoleAssignmentSection extends StatelessWidget {
     required this.isRolesReady,
     required this.onRoleToggled,
     required this.onTroopContextChanged,
+    this.lockTroopContextForExistingAssignments = false,
+    this.editableExistingTroopContextRoleIds = const {},
+    this.onRequestEditTroopContext,
   });
 
   @override
@@ -153,6 +165,11 @@ class RoleAssignmentSection extends StatelessWidget {
                 final assignment = assignmentMap[role.id];
                 final isTroopScoped = role.rank == 60 || role.rank == 70;
                 final selectedTroopId = roleTroopContext[role.id];
+                final shouldLockExistingContext =
+                    lockTroopContextForExistingAssignments &&
+                    wasAlreadyAssigned &&
+                    isTroopScoped &&
+                    !editableExistingTroopContextRoleIds.contains(role.id);
 
                 return Column(
                   children: [
@@ -181,46 +198,10 @@ class RoleAssignmentSection extends StatelessWidget {
                                 ),
                               ),
                             ),
-                          // Show troop context info for non-selected roles
-                          if (!isSelected &&
-                              assignment?.troopContextName != null) ...[
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.group,
-                                    size: 14,
-                                    color: colorScheme.secondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      'Current Troop: ${assignment!.troopContextName}',
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                            color: colorScheme.secondary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                           // Show indicator for troop-scoped roles when selected
-                          if (isSelected && isTroopScoped) ...[
+                          if (isSelected &&
+                              isTroopScoped &&
+                              !shouldLockExistingContext) ...[
                             const SizedBox(height: 4),
                             Row(
                               children: [
@@ -232,7 +213,7 @@ class RoleAssignmentSection extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    'Requires troop assignment (see below)',
+                                    'Requires troop assignment',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.tertiary,
                                       fontWeight: FontWeight.w500,
@@ -255,13 +236,35 @@ class RoleAssignmentSection extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    'Currently assigned',
+                                    assignment?.troopContextName != null
+                                        ? 'Currently assigned · ${assignment!.troopContextName}'
+                                        : 'Currently assigned',
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.primary,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
+                                if (shouldLockExistingContext &&
+                                    onRequestEditTroopContext != null)
+                                  IconButton(
+                                    onPressed: canEditRole
+                                        ? () => onRequestEditTroopContext!(
+                                            role.id,
+                                          )
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.swap_horiz,
+                                      size: 16,
+                                    ),
+                                    tooltip: 'Change troop context',
+                                    constraints: const BoxConstraints(
+                                      minWidth: 28,
+                                      minHeight: 28,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
                               ],
                             ),
                           ],
@@ -284,7 +287,7 @@ class RoleAssignmentSection extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Troop context dropdown for troop-scoped roles
+                    // Troop context area for troop-scoped roles
                     if (isSelected && isTroopScoped)
                       Padding(
                         padding: EdgeInsets.only(
@@ -293,14 +296,16 @@ class RoleAssignmentSection extends StatelessWidget {
                           top: 8,
                           bottom: 12,
                         ),
-                        child: _buildTroopContextDropdown(
-                          context,
-                          role,
-                          selectedTroopId,
-                          theme,
-                          colorScheme,
-                          screenWidth,
-                        ),
+                        child: shouldLockExistingContext
+                            ? const SizedBox.shrink()
+                            : _buildTroopContextDropdown(
+                                context,
+                                role,
+                                selectedTroopId,
+                                theme,
+                                colorScheme,
+                                screenWidth,
+                              ),
                       ),
                   ],
                 );

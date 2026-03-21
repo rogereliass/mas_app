@@ -12,6 +12,7 @@ import 'library/logic/library_provider.dart';
 import 'auth/logic/auth_provider.dart';
 import 'home/pages/user_approval/logic/admin_provider.dart';
 import 'home/pages/user_management/logic/user_management_provider.dart';
+import 'home/pages/role_management/logic/role_management_provider.dart';
 import 'home/pages/season_management/logic/season_management_provider.dart';
 import 'home/pages/patrols_management/logic/patrols_management_provider.dart';
 import 'home/logic/season_standings_provider.dart';
@@ -30,10 +31,7 @@ void main() async {
   // Load environment variables from .env asset file
   await dotenv.load(fileName: '.env');
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -78,6 +76,15 @@ void main() async {
           ),
           update: (context, auth, previous) =>
               previous ?? UserManagementProvider(authProvider: auth),
+        ),
+
+        // RoleManagementProvider depends on AuthProvider for rank checks
+        ChangeNotifierProxyProvider<AuthProvider, RoleManagementProvider>(
+          create: (context) => RoleManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? RoleManagementProvider(authProvider: auth),
         ),
 
         // PatrolsManagementProvider depends on AuthProvider for role-based scoping
@@ -132,9 +139,8 @@ void main() async {
 
         // NotificationsProvider powers in-app notifications + unread badge.
         ChangeNotifierProxyProvider<AuthProvider, NotificationsProvider>(
-          create: (context) => NotificationsProvider(
-            authProvider: context.read<AuthProvider>(),
-          ),
+          create: (context) =>
+              NotificationsProvider(authProvider: context.read<AuthProvider>()),
           update: (context, auth, previous) =>
               previous ?? NotificationsProvider(authProvider: auth),
         ),
@@ -159,4 +165,3 @@ void main() async {
     ),
   );
 }
-
