@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:masapp/core/config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'firebase_options.dart';
 import 'core/config/theme_provider.dart';
 import 'library/logic/library_provider.dart';
 import 'auth/logic/auth_provider.dart';
@@ -18,6 +20,7 @@ import 'home/pages/notifications/logic/notifications_provider.dart';
 import 'meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'meetings/pages/points/logic/points_provider.dart';
+import 'core/utils/fcm_service.dart';
 import 'offline/offline_storage.dart';
 import 'app.dart';
 
@@ -26,6 +29,12 @@ void main() async {
 
   // Load environment variables from .env asset file
   await dotenv.load(fileName: '.env');
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  await FcmService.instance.init();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([

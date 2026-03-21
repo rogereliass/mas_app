@@ -271,7 +271,7 @@ class _TroopOverviewCardState extends State<TroopOverviewCard>
             averageText: _formatAverage(
               insights.averageScoutsPresentPerMeeting,
             ),
-            onColor: AppColors.buttonSecondaryLight,
+            onColor: Colors.white,
           );
 
     return SmartStackCardBase(
@@ -280,7 +280,13 @@ class _TroopOverviewCardState extends State<TroopOverviewCard>
       subtitle: _subtitle,
       customSubtitle: customSubtitle,
       colors: _colors,
-      onColor: AppColors.buttonSecondaryLight,
+      onColor: Colors.white,
+      hideHeaderIcon: true,
+      titleWeight: FontWeight.w900,
+      backgroundIconSize: 90,
+      backgroundIconTop: null,
+      backgroundIconRight: -10,
+      backgroundIconBottom: -15,
     );
   }
 }
@@ -305,100 +311,104 @@ class _TroopInsightsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final patrolWord = stats.patrolCount == 1 ? 'patrol' : 'patrols';
-    final attendedWord = stats.lastMeetingPresentCount == 1
-        ? 'scout attended'
-        : 'scouts attended';
-    final lastMeetingLabel = stats.lastMeetingDate == null
-        ? 'your first meetup is still loading...'
-        : '${DateFormat('d MMM yyyy').format(stats.lastMeetingDate!)} (${
-            stats.lastMeetingPresentCount
-          } $attendedWord)';
+    final theme = Theme.of(context);
+    final lastMeetingDateText = stats.lastMeetingDate == null
+        ? '--'
+        : DateFormat('d MMM').format(stats.lastMeetingDate!);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _InsightLine(
-          icon: Icons.groups_2_rounded,
-          label: 'Troop has',
-          value: '${stats.patrolCount} $patrolWord ready to roll',
-          onColor: onColor,
-        ),
-        const SizedBox(height: 3),
-        _InsightLine(
-          icon: Icons.how_to_reg_rounded,
-          label: 'On average,',
-          value: '$averageText scouts attend each meeting',
-          onColor: onColor,
-        ),
-        const SizedBox(height: 3),
-        _InsightLine(
-          icon: Icons.event_rounded,
-          label: 'Last meetup was',
-          value: lastMeetingLabel,
-          onColor: onColor,
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StatItem(
+                label: 'PATROLS',
+                value: stats.patrolCount.toString(),
+                icon: Icons.groups_2_rounded,
+                onColor: onColor,
+              ),
+              _StatItem(
+                label: 'AVG ATTEND',
+                value: averageText,
+                icon: Icons.how_to_reg_rounded,
+                onColor: onColor,
+              ),
+              _StatItem(
+                label: 'LAST SESSION',
+                value: lastMeetingDateText,
+                icon: Icons.event_rounded,
+                onColor: onColor,
+              ),
+            ],
+          ),
+          if (stats.lastMeetingDate != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                '${stats.lastMeetingPresentCount} scouts attended last meeting',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: onColor.withValues(alpha: 0.7),
+                  fontStyle: FontStyle.italic,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _InsightLine extends StatelessWidget {
-  final IconData icon;
+class _StatItem extends StatelessWidget {
   final String label;
   final String value;
+  final IconData icon;
   final Color onColor;
 
-  const _InsightLine({
-    required this.icon,
+  const _StatItem({
     required this.label,
     required this.value,
+    required this.icon,
     required this.onColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final valueStyle = theme.textTheme.labelMedium?.copyWith(
-      color: onColor.withValues(alpha: 0.9),
-      height: 1.2,
-      fontWeight: FontWeight.w600,
-    );
-    final labelStyle = theme.textTheme.labelMedium?.copyWith(
-      color: onColor,
-      height: 1.2,
-      fontWeight: FontWeight.w900,
-    );
 
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(
-            icon,
-            size: 13,
-            color: onColor.withValues(alpha: 0.95),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label ',
-                  style: labelStyle,
-                ),
-                TextSpan(
-                  text: value,
-                  style: valueStyle,
-                ),
-              ],
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 12,
+              color: onColor.withValues(alpha: 0.8),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: onColor,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: onColor.withValues(alpha: 0.6),
+            fontWeight: FontWeight.w900,
+            fontSize: 8,
+            letterSpacing: 0.5,
           ),
         ),
       ],

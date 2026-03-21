@@ -25,14 +25,13 @@ Act as a senior production software engineer and review this implementation to e
 - tester account in sandbox enviroment
 
 - FCM & RateLimits
-- wire in Notifications card
 - user creation button for admin/troop head,leaders
 - role management for [system admin]
 - add reporting to library views
 - Eftekad Module
-- Clans & Rovers
+- Clans, Rovers & Leadership
 - QR code for attendance recording - [Troop Heads]
-
+- 
 ---------------------------------------------------------
 
 Homepage components:
@@ -77,12 +76,10 @@ Clan Leader: [Similar to troop head]
 - can manage multiple clans (similar to patrols)
 - Meeting Manager (clan-based instead of troops)
 
-
 Rover: [Similar to Scout]
 - View their meetings & history
 - View their attendance stats
 -
-
 
 Leadership:
 - view overall members
@@ -91,3 +88,6 @@ Leadership:
 Legan:
 - 3ohda tracking
 - events module
+
+General:
+- Gamification

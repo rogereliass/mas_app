@@ -8,6 +8,12 @@ class SmartStackCardBase extends StatelessWidget {
   final List<Color> colors;
   final Color onColor;
   final bool hideHeaderIcon;
+  final FontWeight titleWeight;
+  final double backgroundIconSize;
+  final double? backgroundIconTop;
+  final double? backgroundIconRight;
+  final double? backgroundIconBottom;
+  final double? backgroundIconLeft;
 
   const SmartStackCardBase({
     super.key,
@@ -18,6 +24,12 @@ class SmartStackCardBase extends StatelessWidget {
     required this.colors,
     required this.onColor,
     this.hideHeaderIcon = false,
+    this.titleWeight = FontWeight.bold,
+    this.backgroundIconSize = 120,
+    this.backgroundIconTop = -20,
+    this.backgroundIconRight = -20,
+    this.backgroundIconBottom,
+    this.backgroundIconLeft,
   });
 
   @override
@@ -25,6 +37,7 @@ class SmartStackCardBase extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -43,11 +56,18 @@ class SmartStackCardBase extends StatelessWidget {
         ],
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned(
-            right: -20,
-            top: -20,
-            child: Icon(icon, size: 120, color: onColor.withValues(alpha: 0.15)),
+            top: backgroundIconTop,
+            right: backgroundIconRight,
+            bottom: backgroundIconBottom,
+            left: backgroundIconLeft,
+            child: Icon(
+              icon,
+              size: backgroundIconSize,
+              color: onColor.withValues(alpha: 0.12),
+            ),
           ),
           SingleChildScrollView(
             physics: const NeverScrollableScrollPhysics(), // Prevent erratic scrolling 
@@ -68,8 +88,9 @@ class SmartStackCardBase extends StatelessWidget {
                 Text(
                   title,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontWeight: titleWeight,
                     color: onColor,
+                    letterSpacing: -0.5,
                   ),
                 ),
                 const SizedBox(height: 4),

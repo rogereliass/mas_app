@@ -18,8 +18,4 @@ class DeepLinkService {
     final model = DeepLinkParser.parse(data);
     return _handler.handle(model);
   }
-
-  // TODO(deep-link/fcm): Call handle(payload) from Firebase onMessageOpenedApp.
-  // TODO(deep-link/qr): Route decoded QR payloads into handle(payload).
-  // TODO(deep-link/external-url): Convert external URI query params to payload map.
 }
