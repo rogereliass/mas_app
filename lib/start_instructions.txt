@@ -25,7 +25,7 @@ Act as a senior production software engineer and review this implementation to e
 
 
 -🏗️ login process revisit- Check resend domain then test
-- tester account in sandbox enviroment
+-🏗️ tester account in sandbox enviroment
 -🏗️ user creation button for admin/troop head,leaders
 - add reporting to library views
 - Eftekad Module

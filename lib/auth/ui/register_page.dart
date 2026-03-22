@@ -272,7 +272,7 @@ class _RegisterPageState extends State<RegisterPage> {
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'signup_troop': _selectedTroopId, // Store the troop UUID
-        'generation': 'U', // Default generation until assigned by leader
+        'generation': 'U-', // Placeholder until assigned in user acceptance
         'signup_completed': true,
         'email': _emailController.text.trim(), // Email is required
       };

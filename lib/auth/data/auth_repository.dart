@@ -370,10 +370,17 @@ class AuthRepository {
     try {
       _logDebug('=== CREATE/UPDATE PROFILE ===');
 
+      // Keep explicit placeholders like U- for later approval assignment.
+      final sanitizedProfileData = Map<String, dynamic>.from(profileData);
+      final generationValue = sanitizedProfileData['generation'];
+      if (generationValue is String && generationValue.trim().isEmpty) {
+        sanitizedProfileData.remove('generation');
+      }
+
       // Prepare data for upsert
       final profileRecord = {
         'user_id': userId, // Foreign key to auth.users
-        ...profileData,
+        ...sanitizedProfileData,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -386,6 +393,21 @@ class AuthRepository {
           .upsert(profileRecord, onConflict: 'phone');
 
       _logDebug('✓ Profile upserted successfully');
+    } on PostgrestException catch (e, stackTrace) {
+      _logDebug('=== PROFILE CREATION POSTGREST ERROR ===');
+      _logDebug('Code: ${e.code}');
+      _logDebug('Message: ${e.message}');
+      _logDebug('Details: ${e.details}');
+      _logDebug('Hint: ${e.hint}');
+      _logDebug('Stack trace: $stackTrace');
+
+      if ((e.code == '42501') && e.message.contains('generation_counters')) {
+        throw AuthException(
+          'Failed to save profile: database access policy blocked generation counter updates. Please contact support.',
+        );
+      }
+
+      throw AuthException('Failed to save profile: ${e.message}');
     } catch (e, stackTrace) {
       _logDebug('=== PROFILE CREATION ERROR ===');
       _logDebug('Error: $e');
