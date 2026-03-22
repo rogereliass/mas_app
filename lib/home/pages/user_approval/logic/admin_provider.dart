@@ -392,7 +392,7 @@ class AdminProvider with ChangeNotifier {
     required List<String> roleIds,
     required String generation,
     String? comments,
-    String? troopContextId,
+    Map<String, String?>? roleTroopContextMap,
   }) async {
     // Validation
     if (roleIds.isEmpty) {
@@ -420,7 +420,7 @@ class AdminProvider with ChangeNotifier {
         roleIds: roleIds,
         generation: generation,
         comments: comments,
-        troopContextId: troopContextId,
+        roleTroopContextMap: roleTroopContextMap,
         currentUser: currentUser, // Pass for security validation
       );
 

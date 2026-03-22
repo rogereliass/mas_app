@@ -235,7 +235,7 @@ class AdminService with ScopedServiceMixin {
     required List<String> roleIds,
     required String generation,
     String? comments,
-    String? troopContextId,
+    Map<String, String?>? roleTroopContextMap,
     UserProfile? currentUser,
   }) async {
     // Input validation
@@ -258,26 +258,25 @@ class AdminService with ScopedServiceMixin {
         throw Exception('Profile not found: $profileId');
       }
       final signupTroopId = profile.signupTroopId;
-      final effectiveTroopContext = troopContextId ?? signupTroopId;
 
       debugPrint('🏕️ Troop context resolution:');
-      debugPrint('   troopContextId (from UI): $troopContextId');
+      debugPrint('   roleTroopContextMap (from UI): $roleTroopContextMap');
       debugPrint('   signupTroopId (from profile): $signupTroopId');
-      debugPrint('   effectiveTroopContext (final): $effectiveTroopContext');
 
       // SECURITY: Non-system users cannot assign a different troop context
       if (currentUser != null && !currentUser.hasSystemWideAccess) {
-        if (troopContextId != null && troopContextId != signupTroopId) {
-          throw Exception(
-            'Access Denied: Cannot assign a different troop context',
-          );
+        if (roleTroopContextMap != null) {
+          for (final troopId in roleTroopContextMap.values) {
+             if (troopId != null && troopId != signupTroopId) {
+                throw Exception('Access Denied: Cannot assign a different troop context');
+             }
+          }
         }
       }
 
       debugPrint('🔍 Fetching role ranks for ${roleIds.length} roles');
 
       // Fetch all roles and filter client-side
-      // (simpler than using .in_() which may have compatibility issues)
       final rolesResponse = await _supabase
           .from('roles')
           .select('id, role_rank');
@@ -288,7 +287,6 @@ class AdminService with ScopedServiceMixin {
         ),
       );
 
-      // Filter to only the roles we need
       final roleRanks = Map<String, int>.fromEntries(
         roleIds.map((id) => MapEntry(id, allRoles[id] ?? 0)),
       );
@@ -297,8 +295,9 @@ class AdminService with ScopedServiceMixin {
       for (final roleId in roleIds) {
         final rank = roleRanks[roleId] ?? 0;
         final isTroopScoped = rank == 60 || rank == 70;
+        final contextTroopId = roleTroopContextMap?[roleId] ?? signupTroopId;
 
-        if (isTroopScoped && effectiveTroopContext == null) {
+        if (isTroopScoped && contextTroopId == null) {
           throw ArgumentError(
             'Cannot assign troop-scoped role (rank $rank) without a troop assignment. '
             'Please select a troop before accepting.',
@@ -310,12 +309,13 @@ class AdminService with ScopedServiceMixin {
       final roleRecords = roleIds.map((roleId) {
         final rank = roleRanks[roleId] ?? 0;
         final isTroopScoped = rank == 60 || rank == 70;
+        final contextTroopId = roleTroopContextMap?[roleId] ?? signupTroopId;
 
         // CRITICAL: Set troop_context for troop-scoped roles
         return {
           'role_id': roleId,
-          'troop_context': (isTroopScoped && effectiveTroopContext != null)
-              ? effectiveTroopContext
+          'troop_context': (isTroopScoped && contextTroopId != null)
+              ? contextTroopId
               : 'null', // Use string 'null' for JSONB handling
         };
       }).toList();

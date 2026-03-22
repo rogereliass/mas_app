@@ -11,6 +11,8 @@ import '../data/models/pending_profile.dart';
 import '../data/models/profile_approval.dart';
 import '../../../../auth/models/role.dart';
 import 'package:intl/intl.dart';
+import '../../user_management/data/models/managed_user_profile.dart';
+import '../../user_management/ui/components/role_assignment_section.dart';
 
 /// User Acceptance Page
 ///
@@ -248,20 +250,37 @@ class _UserAcceptancePageState extends State<UserAcceptancePage> {
       );
     }
 
-    // Profiles list
     return Column(
       children: [
         // Summary header
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: colorScheme.primaryContainer,
-          child: Text(
-            '${provider.pendingCount} ${provider.pendingCount == 1 ? 'profile' : 'profiles'} awaiting review',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: colorScheme.onPrimaryContainer,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh,
+            border: Border(
+              bottom: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
             ),
-            textAlign: TextAlign.center,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.people_outline,
+                size: 18,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${provider.pendingCount} ${provider.pendingCount == 1 ? 'profile' : 'profiles'} awaiting review',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
 
@@ -316,9 +335,17 @@ class _ProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
@@ -331,19 +358,39 @@ class _ProfileCard extends StatelessWidget {
               Row(
                 children: [
                   // Avatar
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundImage: profile.photoUrl != null
-                        ? NetworkImage(profile.photoUrl!)
-                        : null,
-                    child: profile.photoUrl == null
-                        ? Text(
-                            profile.fullName.isNotEmpty
-                                ? profile.fullName[0].toUpperCase()
-                                : '?',
-                            style: theme.textTheme.titleLarge,
-                          )
-                        : null,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? [
+                                colorScheme.primaryContainer
+                                    .withValues(alpha: 0.3),
+                                colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.08),
+                              ]
+                            : [
+                                colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.25),
+                              ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      profile.fullName.isNotEmpty
+                          ? profile.fullName.substring(0, 1).toUpperCase()
+                          : '?',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
 
@@ -354,11 +401,15 @@ class _ProfileCard extends StatelessWidget {
                       children: [
                         Text(
                           profile.fullName,
-                          style: theme.textTheme.titleMedium,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
                           'Registered ${_formatDate(profile.createdAt)}',
-                          style: theme.textTheme.bodySmall,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -366,9 +417,9 @@ class _ProfileCard extends StatelessWidget {
 
                   // Arrow icon
                   Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                    Icons.chevron_right,
+                    size: 20,
+                    color: colorScheme.outline,
                   ),
                 ],
               ),
@@ -381,16 +432,22 @@ class _ProfileCard extends StatelessWidget {
               _InfoRow(
                 icon: Icons.email_outlined,
                 label: profile.email ?? 'No email',
+                iconColor: colorScheme.secondary,
               ),
               if (profile.phone != null) ...[
                 const SizedBox(height: 8),
-                _InfoRow(icon: Icons.phone_outlined, label: profile.phone!),
+                _InfoRow(
+                  icon: Icons.phone_outlined,
+                  label: profile.phone!,
+                  iconColor: colorScheme.secondary,
+                ),
               ],
               if (profile.signupTroopName != null) ...[
                 const SizedBox(height: 8),
                 _InfoRow(
                   icon: Icons.group_outlined,
                   label: profile.signupTroopName!,
+                  iconColor: colorScheme.secondary,
                 ),
               ],
             ],
@@ -415,18 +472,36 @@ class _ProfileCard extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color? iconColor;
 
-  const _InfoRow({required this.icon, required this.label});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Row(
       children: [
-        Icon(icon, size: 16, color: theme.textTheme.bodySmall?.color),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+        Icon(
+          icon,
+          size: 16,
+          color: iconColor ?? colorScheme.secondary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -452,13 +527,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   bool _commentInitialized = false;
   bool _troopContextInitialized = false;
   bool _isLoadingTroops = false;
-  String? _selectedTroopId;
+  final Map<String, String?> _roleTroopContextMap = {};
 
   @override
   void initState() {
     super.initState();
     _generationController.text = widget.profile.generation ?? '';
-    _selectedTroopId = widget.profile.signupTroopId;
 
     // Load profile details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -496,39 +570,58 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(28),
-                  topRight: Radius.circular(28),
+                color: colorScheme.surfaceContainerHigh,
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
+                  if (widget.profile.photoUrl != null && widget.profile.photoUrl!.isNotEmpty)
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundImage: NetworkImage(widget.profile.photoUrl!),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.how_to_reg,
+                        color: colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
                           'Review Registration',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.profile.fullName,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
+                        Text(
+                          widget.profile.fullName,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),
@@ -563,8 +656,11 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
                         setState(() {
-                          _selectedTroopId =
-                              provider.selectedProfileTroopContext;
+                          for (final role in _selectedRoles) {
+                            if (role.rank == 60 || role.rank == 70) {
+                              _roleTroopContextMap[role.id] = provider.selectedProfileTroopContext;
+                            }
+                          }
                         });
                       }
                     });
@@ -593,78 +689,140 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Profile details
-                        _buildDetailSection(
+                        _buildSectionHeader(
                           context,
                           title: 'Personal Information',
-                          children: [
-                            _buildDetailRow(
-                              'Full Name',
-                              widget.profile.fullName,
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant
+                                  .withValues(alpha: 0.5),
                             ),
-                            if (widget.profile.nameAr != null)
+                          ),
+                          child: Column(
+                            children: [
                               _buildDetailRow(
-                                'Arabic Name',
-                                widget.profile.nameAr!,
+                                'Full Name',
+                                widget.profile.fullName,
                               ),
-                            if (widget.profile.email != null)
-                              _buildDetailRow('Email', widget.profile.email!),
-                            if (widget.profile.phone != null)
-                              _buildDetailRow('Phone', widget.profile.phone!),
-                            if (widget.profile.birthdate != null)
+                              if (widget.profile.nameAr?.isNotEmpty == true) ...[
+                                const Divider(height: 24),
+                                _buildDetailRow(
+                                  'Arabic Name',
+                                  widget.profile.nameAr!,
+                                ),
+                              ],
+                              const Divider(height: 24),
                               _buildDetailRow(
-                                'Age',
-                                '${widget.profile.age} years (${DateFormat('MMM d, yyyy').format(widget.profile.birthdate!)})',
+                                'Email',
+                                widget.profile.email?.isNotEmpty == true ? widget.profile.email! : 'Not provided',
                               ),
-                            if (widget.profile.gender != null)
-                              _buildDetailRow('Gender', widget.profile.gender!),
-                            if (widget.profile.address != null)
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                'Phone',
+                                widget.profile.phone?.isNotEmpty == true ? widget.profile.phone! : 'Not provided',
+                              ),
+                              if (widget.profile.birthdate != null) ...[
+                                const Divider(height: 24),
+                                _buildDetailRow(
+                                  'Age',
+                                  '${widget.profile.age} years (${DateFormat('MMM d, yyyy').format(widget.profile.birthdate!)})',
+                                ),
+                              ],
+                              if (widget.profile.gender != null) ...[
+                                const Divider(height: 24),
+                                _buildDetailRow(
+                                  'Gender',
+                                  widget.profile.gender!,
+                                ),
+                              ],
+                              const Divider(height: 24),
                               _buildDetailRow(
                                 'Address',
-                                widget.profile.address!,
+                                widget.profile.address?.isNotEmpty == true ? widget.profile.address! : 'Not provided',
                               ),
-                          ],
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                'Registration Date',
+                                DateFormat('MMM d, yyyy h:mm a').format(widget.profile.createdAt),
+                              ),
+                              const Divider(height: 24),
+                              _buildDetailRow(
+                                'Signup Status',
+                                widget.profile.signupCompleted ? 'Completed' : 'Incomplete',
+                              ),
+                            ],
+                          ),
                         ),
 
                         const SizedBox(height: 20),
 
                         // Scout information
-                        _buildDetailSection(
+                        _buildSectionHeader(
                           context,
                           title: 'Scout Information',
-                          children: [
-                            if (widget.profile.scoutOrgId != null)
-                              _buildDetailRow(
-                                'Scout Org ID',
-                                widget.profile.scoutOrgId!,
-                              ),
-                            if (widget.profile.scoutCode != null)
-                              _buildDetailRow(
-                                'Scout Code',
-                                widget.profile.scoutCode!,
-                              ),
-                            if (widget.profile.signupTroopName != null)
-                              _buildDetailRow(
-                                'Signup Troop',
-                                widget.profile.signupTroopName!,
-                              ),
-                          ],
+                          icon: Icons.scuba_diving_outlined,
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant
+                                  .withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              if (widget.profile.scoutOrgId?.isNotEmpty == true)
+                                _buildDetailRow(
+                                  'Scout Org ID',
+                                  widget.profile.scoutOrgId!,
+                                ),
+                              if (widget.profile.scoutCode?.isNotEmpty == true) ...[
+                                if (widget.profile.scoutOrgId?.isNotEmpty == true)
+                                  const Divider(height: 24),
+                                _buildDetailRow(
+                                  'Scout Code',
+                                  widget.profile.scoutCode!,
+                                ),
+                              ],
+                              if (widget.profile.signupTroopName?.isNotEmpty == true) ...[
+                                if (widget.profile.scoutOrgId?.isNotEmpty == true ||
+                                    widget.profile.scoutCode?.isNotEmpty == true)
+                                  const Divider(height: 24),
+                                _buildDetailRow(
+                                  'Signup Troop',
+                                  widget.profile.signupTroopName!,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
 
                         const SizedBox(height: 20),
 
                         // Medical information
-                        if (widget.profile.medicalNotes != null ||
-                            widget.profile.allergies != null) ...[
+                        if (widget.profile.medicalNotes?.isNotEmpty == true ||
+                            widget.profile.allergies?.isNotEmpty == true) ...[
                           _buildDetailSection(
                             context,
                             title: 'Medical Information',
                             children: [
-                              if (widget.profile.medicalNotes != null)
+                              if (widget.profile.medicalNotes?.isNotEmpty == true)
                                 _buildDetailRow(
                                   'Medical Notes',
                                   widget.profile.medicalNotes!,
                                 ),
-                              if (widget.profile.allergies != null)
+                              if (widget.profile.allergies?.isNotEmpty == true)
                                 _buildDetailRow(
                                   'Allergies',
                                   widget.profile.allergies!,
@@ -674,15 +832,49 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                           const SizedBox(height: 20),
                         ],
 
-                        // Role selection (REQUIRED)
-                        _buildRoleDropdown(theme, provider),
-
+                        // Role selection (REQUIRED for Admins)
                         if (provider.isEffectiveSystemWideAccess) ...[
+                          RoleAssignmentSection(
+                            selectedRoles: _selectedRoles,
+                            availableRoles: provider.assignableRoles,
+                            profile: ManagedUserProfile(
+                              id: widget.profile.id,
+                              userId: widget.profile.userId,
+                              firstName: widget.profile.firstName,
+                              middleName: widget.profile.middleName,
+                              lastName: widget.profile.lastName,
+                              createdAt: widget.profile.createdAt,
+                              roles: const [],
+                              roleAssignments: const [],
+                            ),
+                            troops: _troops,
+                            roleTroopContext: _roleTroopContextMap,
+                            canEditRole: true,
+                            isLoadingTroops: _isLoadingTroops,
+                            isRolesReady: provider.isRolesReady,
+                            onRoleToggled: (role, isSelected) {
+                              setState(() {
+                                if (isSelected) {
+                                  if (!_selectedRoles.any((r) => r.id == role.id)) {
+                                    _selectedRoles.add(role);
+                                  }
+                                  if ((role.rank == 60 || role.rank == 70) && widget.profile.signupTroopId != null) {
+                                    _roleTroopContextMap[role.id] = widget.profile.signupTroopId;
+                                  }
+                                } else {
+                                  _selectedRoles.removeWhere((r) => r.id == role.id);
+                                  _roleTroopContextMap.remove(role.id);
+                                }
+                              });
+                            },
+                            onTroopContextChanged: (roleId, troopId) {
+                              setState(() {
+                                _roleTroopContextMap[roleId] = troopId;
+                              });
+                            },
+                          ),
                           const SizedBox(height: 20),
-                          _buildTroopAssignmentDropdown(theme),
                         ],
-
-                        const SizedBox(height: 20),
 
                         // Generation input
                         _buildGenerationInput(theme),
@@ -733,56 +925,57 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
+                    border: Border(
+                      top: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                       ),
-                    ],
+                    ),
                   ),
                   child: Row(
                     children: [
-                      // Add Comment button
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: provider.isProcessing
                               ? null
                               : _handleAddComment,
-                          icon: const Icon(Icons.comment),
+                          icon:
+                              const Icon(Icons.add_comment_outlined, size: 20),
                           label: const Text('Add Comment'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: colorScheme.secondary,
-                            side: BorderSide(color: colorScheme.secondary),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(
+                              color: colorScheme.outlineVariant,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-
-                      // Accept button
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: provider.isProcessing
-                              ? null
-                              : _handleAccept,
+                        child: FilledButton.icon(
+                          onPressed:
+                              provider.isProcessing ? null : _handleAccept,
                           icon: provider.isProcessing
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
+                              ? const SizedBox.shrink()
+                              : const Icon(Icons.check_circle_outline,
+                                  size: 20),
+                          label: provider.isProcessing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colorScheme.onPrimary,
-                                    ),
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.check),
-                          label: const Text('Accept'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                              : const Text('Accept'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -794,6 +987,33 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Use dark navy blue for better readability in light mode
+    final headerColor = isDark ? colorScheme.onSurface : const Color(0xFF001F3F);
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: headerColor),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: headerColor,
+          ),
+        ),
+      ],
     );
   }
 
@@ -820,6 +1040,10 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   }
 
   Widget _buildDetailRow(String label, String value) {
+    final isNotProvided = value == 'Not provided';
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -829,13 +1053,21 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
             width: 120,
             child: Text(
               '$label:',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).textTheme.bodySmall?.color,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           Expanded(
-            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isNotProvided ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+                fontWeight: isNotProvided ? FontWeight.normal : FontWeight.w600,
+                fontStyle: isNotProvided ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
           ),
         ],
       ),
@@ -848,38 +1080,35 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Assign Generation',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '*',
-              style: TextStyle(
-                color: colorScheme.error,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        _buildSectionHeader(
+          context,
+          title: 'Assign Generation',
+          icon: Icons.groups_outlined,
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Required - Enter the generation for this user',
-          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.error),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         TextField(
           controller: _generationController,
           decoration: InputDecoration(
             hintText: 'e.g., 2024, Gen 25, etc.',
-            border: const OutlineInputBorder(),
-            prefixIcon: const Icon(Icons.groups),
-            helperText: 'Generation or cohort identifier',
+            filled: true,
+            fillColor: colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.primary, width: 2),
+            ),
+            prefixIcon: Icon(Icons.tag_outlined, color: colorScheme.primary),
+            helperText: 'Required - Generation or cohort identifier',
+            helperStyle: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           textInputAction: TextInputAction.next,
         ),
@@ -887,315 +1116,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     );
   }
 
-  Widget _buildRoleDropdown(ThemeData theme, AdminProvider provider) {
-    final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Assign Roles',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '*',
-              style: TextStyle(
-                color: colorScheme.error,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          provider.selectedProfileRoles.isEmpty
-              ? 'Required - Select one or more roles to assign to this user'
-              : 'Required - User has ${provider.selectedProfileRoles.length} role(s) already assigned (checked below)',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: provider.selectedProfileRoles.isEmpty
-                ? colorScheme.error
-                : colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (!provider.isRolesReady)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          )
-        else if (provider.assignableRoles.isEmpty)
-          _buildNoRolesWidget(context, colorScheme)
-        else
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: colorScheme.outline.withValues(alpha: 0.3),
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: provider.assignableRoles.map((role) {
-                final isSelected = _selectedRoles.contains(role);
-                final wasAlreadyAssigned = provider.selectedProfileRoles
-                    .contains(role);
-                return CheckboxListTile(
-                  value: isSelected,
-                  onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        _selectedRoles.add(role);
-                      } else {
-                        _selectedRoles.remove(role);
-                      }
-                    });
-                  },
-                  title: Text(
-                    role.name,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (role.description != null)
-                        Text(
-                          role.description!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      if (wasAlreadyAssigned) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              size: 14,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Currently assigned',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                  secondary: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: colorScheme.error,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${role.rank}',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onError,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildTroopAssignmentDropdown(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    final requiresTroopContext = _selectedRoles.any(
-      (role) => role.rank == 60 || role.rank == 70,
-    );
-    final troopsById = <String, Map<String, dynamic>>{};
-    for (final troop in _troops) {
-      final troopId = troop['id']?.toString();
-      if (troopId == null || troopId.isEmpty) continue;
-      troopsById.putIfAbsent(troopId, () => troop);
-    }
-    final dropdownTroops = troopsById.values.toList();
-    final initialTroopId =
-        _selectedTroopId != null && troopsById.containsKey(_selectedTroopId)
-        ? _selectedTroopId
-        : null;
-
-    if (_selectedTroopId != null && initialTroopId == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _selectedTroopId = null;
-        });
-      });
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Assign Troop Context',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (requiresTroopContext) ...[
-              const SizedBox(width: 8),
-              Text(
-                '*',
-                style: TextStyle(
-                  color: colorScheme.error,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          requiresTroopContext
-              ? 'Required for Troop Head/Leader roles'
-              : 'Optional - Set troop context for troop-scoped roles (rank 60/70)',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: requiresTroopContext
-                ? colorScheme.error
-                : colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (_isLoadingTroops)
-          const Center(child: CircularProgressIndicator())
-        else
-          DropdownButtonFormField<String>(
-            initialValue: initialTroopId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: 'Troop',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            items: dropdownTroops.map((troop) {
-              return DropdownMenuItem<String>(
-                value: troop['id'] as String,
-                child: Text(
-                  troop['name'] as String,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedTroopId = newValue;
-                debugPrint('🏕️ Troop dropdown changed to: $newValue');
-              });
-            },
-            validator: (value) => requiresTroopContext && value == null
-                ? 'Please select a troop'
-                : null,
-          ),
-      ],
-    );
-  }
-
-  /// Build friendly no roles available widget
-  Widget _buildNoRolesWidget(BuildContext context, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            size: 64,
-            color: colorScheme.primary.withValues(alpha: 0.7),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Roles Available',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Your account currently has no roles assigned that can be used to assign roles to other users.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try refreshing the app to reload your permissions, or contact support if the issue persists.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Refresh the provider
-                  final adminProvider = Provider.of<AdminProvider>(
-                    context,
-                    listen: false,
-                  );
-                  adminProvider.loadRoles();
-                },
-                icon: const Icon(Icons.refresh, size: 20),
-                label: const Text('Refresh'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () => _contactSupport(),
-                icon: const Icon(Icons.email_outlined, size: 20),
-                label: const Text('Contact Support'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Open email client to contact support
   Future<void> _contactSupport() async {
@@ -1240,31 +1161,43 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   }
 
   Widget _buildCommentsInput(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Comments',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        _buildSectionHeader(
+          context,
+          title: 'Comments',
+          icon: Icons.notes_outlined,
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Optional - Add notes about this profile review',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         TextField(
           controller: _commentsController,
           maxLines: 3,
           maxLength: 500,
-          decoration: const InputDecoration(
-            hintText: 'Add notes or comments about this profile...',
-            border: OutlineInputBorder(),
-            helperText: 'Comments can be saved without accepting/rejecting',
+          decoration: InputDecoration(
+            hintText: 'Add notes or comments about this profile review...',
+            filled: true,
+            fillColor: colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colorScheme.primary, width: 2),
+            ),
+            prefixIcon:
+                Icon(Icons.notes_outlined, color: colorScheme.primary),
+            helperText: 'Comments can be saved without accepting',
+            helperStyle: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           textInputAction: TextInputAction.done,
         ),
@@ -1280,8 +1213,11 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: ListView.separated(
         shrinkWrap: true,
@@ -1289,25 +1225,35 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         itemCount: approvals.length,
         separatorBuilder: (_, index) => Divider(
           height: 1,
-          color: colorScheme.outline.withValues(alpha: 0.3),
+          indent: 16,
+          endIndent: 16,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
         itemBuilder: (context, index) {
           final approval = approvals[index];
-          final statusColor = approval.status
-              ? theme.colorScheme.primary
-              : theme.colorScheme.error;
+          final statusColor =
+              approval.status ? colorScheme.primary : colorScheme.error;
 
           return ListTile(
             dense: true,
-            leading: Icon(
-              approval.status ? Icons.check_circle : Icons.cancel,
-              color: statusColor,
-              size: 20,
+            leading: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                approval.status
+                    ? Icons.check_circle_outline
+                    : Icons.cancel_outlined,
+                color: statusColor,
+                size: 18,
+              ),
             ),
             title: Text(
               approval.statusLabel,
               style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
                 color: statusColor,
               ),
             ),
@@ -1315,12 +1261,41 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (approval.approvedByName != null)
-                  Text('By: ${approval.approvedByName}'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'By: ${approval.approvedByName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 if (approval.comments != null)
-                  Text('Comment: ${approval.comments}'),
-                Text(
-                  DateFormat('MMM d, yyyy h:mm a').format(approval.createdAt),
-                  style: theme.textTheme.bodySmall,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        approval.comments!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    DateFormat('MMM d, yyyy h:mm a').format(approval.createdAt),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1331,23 +1306,44 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   }
 
   Future<void> _handleAccept() async {
+    final adminProvider = context.read<AdminProvider>();
+    
+    List<String> roleIdsToAssign = _selectedRoles.map((r) => r.id).toList();
+
+    // Default to Scout role for non-moderators/non-admins
+    if (!adminProvider.isEffectiveSystemWideAccess && roleIdsToAssign.isEmpty) {
+      try {
+        final scoutRole = adminProvider.assignableRoles.firstWhere(
+          (r) => r.name.toLowerCase() == 'scout',
+        );
+        roleIdsToAssign = [scoutRole.id];
+      } catch (e) {
+        debugPrint('⚠️ Scout role not found in assignableRoles');
+      }
+    }
+
     // Validate role selection
-    if (_selectedRoles.isEmpty) {
+    if (roleIdsToAssign.isEmpty) {
       _showErrorDialog(
         'Please select at least one role before accepting the profile',
       );
       return;
     }
 
-    final adminProvider = context.read<AdminProvider>();
-    final requiresTroopContext = _selectedRoles.any(
-      (role) => role.rank == 60 || role.rank == 70,
-    );
-    if (adminProvider.isEffectiveSystemWideAccess &&
-        requiresTroopContext &&
-        _selectedTroopId == null) {
-      _showErrorDialog('Please select a troop for Troop Head/Leader roles');
-      return;
+    if (adminProvider.isEffectiveSystemWideAccess) {
+      for (final roleId in roleIdsToAssign) {
+        final role = _selectedRoles.firstWhere(
+          (r) => r.id == roleId, 
+          orElse: () => adminProvider.assignableRoles.firstWhere((r) => r.id == roleId)
+        );
+        final requiresTroopContext = role.rank == 60 || role.rank == 70;
+        final contextTroopId = _roleTroopContextMap[roleId] ?? widget.profile.signupTroopId;
+
+        if (requiresTroopContext && contextTroopId == null) {
+          _showErrorDialog('Please select a troop for Troop Head/Leader roles');
+          return;
+        }
+      }
     }
 
     // Validate generation
@@ -1359,13 +1355,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
       return;
     }
 
-    final selectedTroopName = _selectedTroopId == null
-        ? null
-        : _troops.firstWhere(
-                (troop) => troop['id'] == _selectedTroopId,
-                orElse: () => const {'name': 'Selected Troop'},
-              )['name']
-              as String?;
+    final selectedTroopName = null;
 
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
@@ -1374,7 +1364,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         title: const Text('Accept Profile'),
         content: Text(
           'Are you sure you want to accept ${widget.profile.fullName}\'s registration?\n\n'
-          'Roles (${_selectedRoles.length}): ${_selectedRoles.map((r) => r.name).join(', ')}\n'
+          'Roles (${roleIdsToAssign.length}): ${adminProvider.isEffectiveSystemWideAccess ? _selectedRoles.map((r) => r.name).join(', ') : 'Scout'}\n'
           'Generation: $generation'
           '${selectedTroopName != null ? '\nTroop Context: $selectedTroopName' : ''}',
         ),
@@ -1411,32 +1401,25 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     }
 
     final troopContextToSend = adminProvider.isEffectiveSystemWideAccess
-        ? _selectedTroopId
+        ? _roleTroopContextMap
         : null;
-    debugPrint(
-      '🏕️ Sending troopContextId to acceptProfile: $troopContextToSend',
-    );
-    debugPrint(
-      '   isEffectiveSystemWideAccess: ${adminProvider.isEffectiveSystemWideAccess}',
-    );
-    debugPrint('   _selectedTroopId: $_selectedTroopId');
 
     final success = await adminProvider.acceptProfile(
       profileId: widget.profile.id,
       approvedBy: adminProfileId,
-      roleIds: _selectedRoles.map((r) => r.id).toList(),
+      roleIds: roleIdsToAssign,
       generation: generation,
       comments: _commentsController.text.trim().isEmpty
           ? null
           : _commentsController.text.trim(),
-      troopContextId: troopContextToSend,
+      roleTroopContextMap: troopContextToSend,
     );
 
     if (!context.mounted) return;
 
     if (success) {
       Navigator.pop(context);
-      _showSnackBar('✅ Profile accepted with ${_selectedRoles.length} role(s)');
+      _showSnackBar('✅ Profile accepted with ${roleIdsToAssign.length} role(s)');
     } else {
       _showSnackBar(
         adminProvider.error ?? 'Failed to accept profile',
@@ -1544,9 +1527,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
         _troops
           ..clear()
           ..addAll(troops);
-        if (_selectedTroopId != null &&
-            _troops.every((troop) => troop['id'] != _selectedTroopId)) {
-          _selectedTroopId = null;
+        final validTroopIds = _troops.map((t) => t['id']).toSet();
+        for (final key in _roleTroopContextMap.keys.toList()) {
+          final troopId = _roleTroopContextMap[key];
+          if (troopId != null && !validTroopIds.contains(troopId)) {
+            _roleTroopContextMap.remove(key);
+          }
         }
         _isLoadingTroops = false;
       });
@@ -1575,21 +1561,22 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
     }
   }
 
+
   void _showSnackBar(String message, {bool isError = false}) {
+
     if (!mounted) return;
 
-    // Use root scaffold messenger to show above dialog
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: Duration(seconds: isError ? 4 : 2),
       ),
     );
   }
 
-  /// Show error dialog that appears on top of everything
   void _showErrorDialog(String message) {
     if (!mounted) return;
 
@@ -1602,11 +1589,12 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
               Icons.error_outline,
               color: Theme.of(context).colorScheme.error,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             const Text('Validation Error'),
           ],
         ),
         content: Text(message),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),

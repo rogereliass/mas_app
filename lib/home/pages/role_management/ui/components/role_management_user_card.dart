@@ -17,6 +17,7 @@ class RoleManagementUserCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final primaryRole = profile.primaryRole?.name ?? 'No roles';
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       elevation: 0,
@@ -42,10 +43,19 @@ class RoleManagementUserCard extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primaryContainer,
-                          colorScheme.secondaryContainer.withValues(alpha: 0.7),
-                        ],
+                        colors: isDark
+                            ? [
+                                colorScheme.primaryContainer
+                                    .withValues(alpha: 0.3),
+                                colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.08),
+                              ]
+                            : [
+                                colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.25),
+                              ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -96,7 +106,7 @@ class RoleManagementUserCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton.outlined(
+                  IconButton(
                     onPressed: onManageRoles,
                     icon: Icon(
                       Icons.tune_outlined,
