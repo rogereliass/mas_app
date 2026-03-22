@@ -31,6 +31,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
   Timer? _debounceTimer;
   String? _roleContext;
   int? _effectiveRank;
+  String _lastSubmittedQuery = '';
+  static const Duration _searchDebounce = Duration(milliseconds: 400);
 
   @override
   void initState() {
@@ -132,8 +134,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
   /// Debounced search handler to avoid filtering on every keystroke
   void _onSearchChanged(String query, UserManagementProvider provider) {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      provider.setSearchQuery(query);
+    _debounceTimer = Timer(_searchDebounce, () {
+      if (!mounted) return;
+      final normalized = query.trim();
+      if (_lastSubmittedQuery == normalized) return;
+      _lastSubmittedQuery = normalized;
+      provider.setSearchQuery(normalized);
     });
   }
 
@@ -240,134 +246,75 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
     final provider = context.watch<UserManagementProvider>();
-    // Use effective rank (accounts for role context)
     final effectiveRank = _effectiveRank ?? authProvider.currentUserRoleRank;
     final isSystemAdmin = effectiveRank >= 90;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surface,
-            theme.colorScheme.surfaceContainerLow,
-          ],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Search bar
-          TextField(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 600;
+
+          final searchField = TextField(
             controller: _searchController,
-            onChanged: (query) => _onSearchChanged(query, provider),
+            onChanged: (value) => _onSearchChanged(value, provider),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+            ),
             decoration: InputDecoration(
-              hintText: 'Search by name, phone number, or scout code...',
-              hintStyle: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-              ),
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                size: 22,
-                color: theme.colorScheme.primary.withOpacity(0.7),
-              ),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      onPressed: () {
-                        _searchController.clear();
-                        provider.setSearchQuery('');
-                      },
-                    )
-                  : null,
+              prefixIcon: const Icon(Icons.search, size: 20),
+              hintText: 'Search by name or email...',
               filled: true,
-              fillColor: theme.brightness == Brightness.light
-                  ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.5)
-                  : AppColors.cardDark.withOpacity(0.6),
+              fillColor: theme.colorScheme.surfaceContainerLow,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.outlineVariant.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.primary,
-                  width: 2,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Filter dropdowns - responsive layout
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Use vertical layout for narrow screens
-              final useVerticalLayout = constraints.maxWidth < 500;
-
-              if (useVerticalLayout) {
-                return Column(
-                  children: [
-                    _buildRoleFilter(theme, provider, constraints.maxWidth),
-                    if (isSystemAdmin) ...[
-                      const SizedBox(height: 12),
-                      _buildTroopFilter(theme, provider, constraints.maxWidth),
-                    ],
-                  ],
-                );
-              } else {
-                return Row(
-                  children: [
-                    Expanded(
-                      child: _buildRoleFilter(
-                        theme,
-                        provider,
-                        constraints.maxWidth / 2,
-                      ),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              suffixIcon: _searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _debounceTimer?.cancel();
+                        _searchController.clear();
+                        _lastSubmittedQuery = '';
+                        provider.setSearchQuery('');
+                        setState(() {});
+                      },
                     ),
-                    const SizedBox(width: 12),
-                    if (isSystemAdmin)
-                      Expanded(
-                        child: _buildTroopFilter(
-                          theme,
-                          provider,
-                          constraints.maxWidth / 2,
-                        ),
-                      ),
-                  ],
-                );
-              }
-            },
-          ),
-        ],
+            ),
+          );
+
+          final roleFilter = _buildRoleFilter(theme, provider, constraints.maxWidth);
+          final troopFilter = _buildTroopFilter(theme, provider, constraints.maxWidth);
+
+          if (compact) {
+            return Column(
+              children: [
+                searchField,
+                const SizedBox(height: 12),
+                roleFilter,
+                if (isSystemAdmin) ...[
+                  const SizedBox(height: 12),
+                  troopFilter,
+                ],
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(flex: 2, child: searchField),
+              const SizedBox(width: 12),
+              Expanded(child: roleFilter),
+              if (isSystemAdmin) ...[
+                const SizedBox(width: 12),
+                Expanded(child: troopFilter),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -390,8 +337,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final isTroopLeader = effectiveRank >= 60 && effectiveRank < 90;
 
     // Filter roles based on effective user rank
-    // Troop leaders (60-89) can only see/assign roles with rank 1-40
-    // System admins (90+) can see all roles
     final availableRoles = isTroopLeader
         ? provider.roles
               .where((role) => role.rank > 0 && role.rank <= 40)
@@ -423,79 +368,50 @@ class _UserManagementPageState extends State<UserManagementPage> {
       });
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withOpacity(0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String?>(
-        initialValue: dropdownSelectedValue,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: isNarrow ? null : 'Filter by Role',
-          hintText: isNarrow ? 'Role' : null,
-          labelStyle: TextStyle(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-          prefixIcon: Icon(
-            Icons.admin_panel_settings_rounded,
-            size: 20,
-            color: theme.colorScheme.primary.withOpacity(0.8),
-          ),
-          filled: true,
-          fillColor: theme.brightness == Brightness.light
-              ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.4)
-              : AppColors.cardDark.withOpacity(0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
-          ),
-          contentPadding: contentPadding,
+    return DropdownButtonFormField<String?>(
+      initialValue: dropdownSelectedValue,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Filter by role',
+        labelStyle: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        items: [
-          DropdownMenuItem<String?>(
-            value: null,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.all_inclusive,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('All Roles', overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-          ),
-          ...dedupedRoles.map((role) {
-            return DropdownMenuItem<String>(
-              value: role.id,
-              child: Text(role.name, overflow: TextOverflow.ellipsis),
-            );
-          }),
-        ],
-        onChanged: (value) => provider.setRoleFilter(value),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
       ),
+      items: [
+        DropdownMenuItem<String?>(
+          value: null,
+          child: Row(
+            children: [
+              Icon(
+                Icons.all_inclusive,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('All Roles', overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+        ...dedupedRoles.map((role) {
+          return DropdownMenuItem<String>(
+            value: role.id,
+            child: Text(role.name, overflow: TextOverflow.ellipsis),
+          );
+        }),
+      ],
+      onChanged: (value) => provider.setRoleFilter(value),
     );
   }
 
@@ -530,79 +446,50 @@ class _UserManagementPageState extends State<UserManagementPage> {
         ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withOpacity(0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String?>(
-        initialValue: dropdownSelectedTroop,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: isNarrow ? null : 'Filter by Troop',
-          hintText: isNarrow ? 'Troop' : null,
-          labelStyle: TextStyle(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-          prefixIcon: Icon(
-            Icons.groups_rounded,
-            size: 20,
-            color: theme.colorScheme.primary.withOpacity(0.8),
-          ),
-          filled: true,
-          fillColor: theme.brightness == Brightness.light
-              ? theme.colorScheme.surfaceContainerHighest.withOpacity(0.4)
-              : AppColors.cardDark.withOpacity(0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
-          ),
-          contentPadding: contentPadding,
+    return DropdownButtonFormField<String?>(
+      initialValue: dropdownSelectedTroop,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Filter by troop',
+        labelStyle: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        items: [
-          DropdownMenuItem<String?>(
-            value: null,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.all_inclusive,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('All Troops', overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-          ),
-          ...troops.map((troop) {
-            return DropdownMenuItem<String>(
-              value: troop['id'],
-              child: Text(troop['name']!, overflow: TextOverflow.ellipsis),
-            );
-          }),
-        ],
-        onChanged: (value) => provider.setTroopFilter(value),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
       ),
+      items: [
+        DropdownMenuItem<String?>(
+          value: null,
+          child: Row(
+            children: [
+              Icon(
+                Icons.all_inclusive,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('All Troops', overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+        ...troops.map((troop) {
+          return DropdownMenuItem<String>(
+            value: troop['id'],
+            child: Text(troop['name']!, overflow: TextOverflow.ellipsis),
+          );
+        }),
+      ],
+      onChanged: (value) => provider.setTroopFilter(value),
     );
   }
 
@@ -655,7 +542,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
             const SizedBox(width: 8),
             TextButton.icon(
               onPressed: () {
+                _debounceTimer?.cancel();
                 _searchController.clear();
+                _lastSubmittedQuery = '';
                 context.read<UserManagementProvider>().clearFilters();
               },
               icon: const Icon(Icons.clear, size: 16),
@@ -777,7 +666,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
               const SizedBox(height: 32),
               FilledButton.icon(
                 onPressed: () {
+                  _debounceTimer?.cancel();
                   _searchController.clear();
+                  _lastSubmittedQuery = '';
                   provider.clearFilters();
                 },
                 icon: const Icon(Icons.clear_all),

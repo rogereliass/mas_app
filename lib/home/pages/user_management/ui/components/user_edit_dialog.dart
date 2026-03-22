@@ -344,11 +344,12 @@ class _UserEditDialogState extends State<UserEditDialog> {
         }
       },
       child: Dialog(
-        insetPadding: EdgeInsets.all(dialogInset),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
         child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 520,
-          minWidth: screenWidth < 600 ? screenWidth - (dialogInset * 2) : 300,
+          maxWidth: 460,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+          minWidth: screenWidth < 600 ? screenWidth - 48 : 380,
         ),
         child: Padding(
           padding: EdgeInsets.all(dialogPadding),
@@ -385,17 +386,15 @@ class _UserEditDialogState extends State<UserEditDialog> {
                       ],
                     ],
                   ),
+                  _buildSectionHeader(context, title: 'Personal Information', icon: Icons.person_outline),
                   const SizedBox(height: 16),
-                  _buildTextField('First Name', _firstNameController, required: true, validator: _validateRequired),
-                  _buildTextField('Middle Name', _middleNameController),
-                  _buildTextField('Last Name', _lastNameController, required: true, validator: _validateRequired),
-                  _buildTextField('Arabic Name', _nameArController),
-                  _buildTextField('Email', _emailController, keyboardType: TextInputType.emailAddress, validator: _validateEmail),
-                  _buildReadOnlyField('Phone Number', widget.profile.phone ?? 'Not provided'),
-                  _buildReadOnlyField('Scout Code', widget.profile.scoutCode ?? 'Not provided'),
+                  _buildTextField('First Name', _firstNameController, required: true, validator: _validateRequired, prefixIcon: Icons.badge_outlined),
+                  _buildTextField('Middle Name', _middleNameController, prefixIcon: Icons.badge_outlined),
+                  _buildTextField('Last Name', _lastNameController, required: true, validator: _validateRequired, prefixIcon: Icons.badge_outlined),
+                  _buildTextField('Arabic Name', _nameArController, prefixIcon: Icons.translate_outlined),
                   _buildDateField(context),
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: 16),
                     child: GenderSelector(
                       initialValue: _selectedGender,
                       onChanged: (value) {
@@ -407,43 +406,106 @@ class _UserEditDialogState extends State<UserEditDialog> {
                       isRequired: true,
                     ),
                   ),
-                  _buildTextField('Generation', _generationController),
-                  _buildTextField('Address', _addressController, validator: _validateAddress),
+                  _buildTextField('Generation', _generationController, prefixIcon: Icons.tag_outlined),
+                  
+                  const SizedBox(height: 12),
+                  _buildSectionHeader(context, title: 'Contact Information', icon: Icons.contact_mail_outlined),
+                  const SizedBox(height: 16),
+                  _buildTextField('Email', _emailController, keyboardType: TextInputType.emailAddress, validator: _validateEmail, prefixIcon: Icons.email_outlined),
+                  _buildTextField('Address', _addressController, validator: _validateAddress, prefixIcon: Icons.home_work_outlined),
+                  _buildReadOnlyField('Phone Number', widget.profile.phone ?? 'Not provided', prefixIcon: Icons.phone_outlined),
+                  
+                  const SizedBox(height: 12),
+                  _buildSectionHeader(context, title: 'Assigned Roles & Troop Contexts', icon: Icons.admin_panel_settings_outlined),
+                  const SizedBox(height: 12),
+                  if (widget.profile.roleAssignments.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16, left: 4),
+                      child: Text(
+                        'No roles assigned',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else
+                    ...widget.profile.roleAssignments.map((assignment) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.shield_outlined, size: 16, color: theme.colorScheme.primary),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    assignment.role.name,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Rank ${assignment.role.rank}',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (assignment.troopContextName != null) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Icon(Icons.groups_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Troop Context: ${assignment.troopContextName}',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+
+                  const SizedBox(height: 12),
+                  _buildSectionHeader(context, title: 'Scout Information', icon: Icons.explore_outlined),
+                  const SizedBox(height: 16),
+                  _buildReadOnlyField('Scout Code', widget.profile.scoutCode ?? 'Not provided', prefixIcon: Icons.numbers_outlined),
+
+                  const SizedBox(height: 12),
+                  _buildSectionHeader(context, title: 'Medical Information', icon: Icons.medical_information_outlined),
+                  const SizedBox(height: 16),
                   _buildTextField('Medical Notes', _medicalNotesController, maxLines: 3),
                   _buildTextField('Allergies', _allergiesController, maxLines: 3),
-                  const SizedBox(height: 8),
-                  RoleAssignmentSection(
-                    selectedRoles: _selectedRoles,
-                    availableRoles: assignableRoles,
-                    profile: widget.profile,
-                    troops: _troops,
-                    roleTroopContext: _roleTroopContext,
-                    canEditRole: canEditRole,
-                    isLoadingTroops: _isLoadingTroops,
-                    isRolesReady: provider.isRolesReady,
-                    onRoleToggled: (role, isSelected) {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedRoles.add(role);
-                          // Initialize with existing troop context or user's signup troop
-                          final isTroopScoped = role.rank == 60 || role.rank == 70;
-                          if (isTroopScoped && !_roleTroopContext.containsKey(role.id)) {
-                            _roleTroopContext[role.id] = widget.profile.signupTroopId;
-                          }
-                        } else {
-                          _selectedRoles.remove(role);
-                          _roleTroopContext.remove(role.id);
-                        }
-                      });
-                      _checkForChanges();
-                    },
-                    onTroopContextChanged: (roleId, troopId) {
-                      setState(() {
-                        _roleTroopContext[roleId] = troopId;
-                      });
-                      _checkForChanges();
-                    },
-                  ),
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -488,9 +550,13 @@ class _UserEditDialogState extends State<UserEditDialog> {
     TextInputType? keyboardType,
     bool required = false,
     String? Function(String?)? validator,
+    IconData? prefixIcon,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: controller,
         maxLines: maxLines,
@@ -498,7 +564,34 @@ class _UserEditDialogState extends State<UserEditDialog> {
         validator: validator,
         decoration: InputDecoration(
           labelText: required ? '$label *' : label,
-          border: const OutlineInputBorder(),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: colorScheme.primary.withOpacity(0.7)) : null,
+          filled: true,
+          fillColor: theme.brightness == Brightness.light
+              ? colorScheme.surfaceContainerHighest.withOpacity(0.3)
+              : const Color(0xFF1E1E1E).withOpacity(0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.error, width: 1),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.error, width: 2),
+          ),
         ),
       ),
     );
@@ -536,15 +629,41 @@ class _UserEditDialogState extends State<UserEditDialog> {
   }
 
   /// Build a read-only field for non-editable data
-  Widget _buildReadOnlyField(String label, String value) {
+  Widget _buildReadOnlyField(String label, String value, {IconData? prefixIcon}) {
+    final isNotProvided = value == 'Not provided';
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         initialValue: value,
         readOnly: true,
+        style: isNotProvided ? theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontStyle: FontStyle.italic,
+        ) : null,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: colorScheme.onSurfaceVariant.withOpacity(0.7)) : null,
+          filled: true,
+          fillColor: theme.brightness == Brightness.light
+              ? colorScheme.surfaceContainerHighest.withOpacity(0.1)
+              : const Color(0xFF1E1E1E).withOpacity(0.2),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
         ),
       ),
     );
@@ -552,15 +671,37 @@ class _UserEditDialogState extends State<UserEditDialog> {
 
   /// Build the birthdate picker field
   Widget _buildDateField(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: _birthdateController,
         readOnly: true,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: 'Birthdate',
-          border: OutlineInputBorder(),
-          suffixIcon: Icon(Icons.calendar_today),
+          prefixIcon: Icon(Icons.cake_outlined, color: colorScheme.primary.withOpacity(0.7)),
+          suffixIcon: Icon(Icons.calendar_today, color: colorScheme.primary),
+          filled: true,
+          fillColor: theme.brightness == Brightness.light
+              ? colorScheme.surfaceContainerHighest.withOpacity(0.3)
+              : const Color(0xFF1E1E1E).withOpacity(0.5),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: colorScheme.outlineVariant.withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          ),
         ),
         onTap: () async {
           final selected = await showDatePicker(
@@ -697,5 +838,35 @@ class _UserEditDialogState extends State<UserEditDialog> {
         SnackBar(content: Text(provider.error ?? 'Unable to update user')),
       );
     }
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Use dark navy blue for better readability in light mode
+    final headerColor = isDark ? colorScheme.onSurface : const Color(0xFF001F3F);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: headerColor),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: headerColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

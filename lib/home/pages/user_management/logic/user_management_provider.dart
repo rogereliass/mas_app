@@ -26,6 +26,7 @@ class UserManagementProvider with ChangeNotifier {
   String _searchQuery = '';
   String? _selectedRoleFilter;
   String? _selectedTroopFilter;
+  final Map<String, String> _allTroops = {}; // Persistent cache of troop ID -> Name
 
   // Pagination state
   static const int _pageSize = 20;
@@ -122,16 +123,31 @@ class UserManagementProvider with ChangeNotifier {
 
   List<ManagedUserProfile> get filteredUsers => _users;
 
-  /// Get list of available troops from loaded users
+  /// Get list of available troops from across all loaded users (persistent cache)
   List<Map<String, String>> get availableTroops {
-    final troopMap = <String, String>{};
-    for (var user in _users) {
+    if (_allTroops.isEmpty) {
+      _updateTroopCache(_users);
+    }
+    return _allTroops.entries
+        .map((e) => {'id': e.key, 'name': e.value})
+        .toList()
+      ..sort((a, b) => a['name']!.compareTo(b['name']!));
+  }
+
+  void _updateTroopCache(List<ManagedUserProfile> users) {
+    bool changed = false;
+    for (var user in users) {
       if (user.signupTroopId != null && user.signupTroopName != null) {
-        troopMap[user.signupTroopId!] = user.signupTroopName!;
+        if (_allTroops[user.signupTroopId!] != user.signupTroopName) {
+          _allTroops[user.signupTroopId!] = user.signupTroopName!;
+          changed = true;
+        }
       }
     }
-    return troopMap.entries.map((e) => {'id': e.key, 'name': e.value}).toList()
-      ..sort((a, b) => a['name']!.compareTo(b['name']!));
+    if (changed) {
+      // We don't necessarily need to notifyListeners here because this is called 
+      // during loadUsers which notifies anyway, but it's safer for the getter.
+    }
   }
 
   /// Update search query
@@ -269,6 +285,7 @@ class UserManagementProvider with ChangeNotifier {
         troopFilter: _selectedTroopFilter,
       );
 
+      _updateTroopCache(_users);
       _hasMoreUsers = _users.length >= _pageSize;
       _usersCache.set(cacheKey, _users, _usersCacheTtl);
     } catch (e) {
@@ -312,6 +329,7 @@ class UserManagementProvider with ChangeNotifier {
         _hasMoreUsers = false;
       } else {
         _users.addAll(moreUsers);
+        _updateTroopCache(moreUsers);
         _hasMoreUsers = moreUsers.length >= _pageSize;
 
         // Update cache with the full list
