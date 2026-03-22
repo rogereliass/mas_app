@@ -369,6 +369,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
 
     return DropdownButtonFormField<String?>(
+      key: ValueKey('role-filter-${provider.selectedRoleFilter ?? 'all'}'),
       initialValue: dropdownSelectedValue,
       isExpanded: true,
       decoration: InputDecoration(
@@ -447,6 +448,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
 
     return DropdownButtonFormField<String?>(
+      key: ValueKey('troop-filter-${provider.selectedTroopFilter ?? 'all'}'),
       initialValue: dropdownSelectedTroop,
       isExpanded: true,
       decoration: InputDecoration(

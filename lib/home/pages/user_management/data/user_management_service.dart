@@ -24,16 +24,47 @@ class UserManagementService with ScopedServiceMixin {
 
   Future<List<ManagedUserProfile>> fetchUsers({
     required UserProfile currentUser,
-    int? limit,
-    int? offset,
+    int limit = 20,
+    int offset = 0,
     String? searchQuery,
     String? roleFilter,
     String? troopFilter,
   }) async {
     try {
-      var query = _supabase
-          .from(_profilesTable)
-          .select('''
+      final normalizedRoleFilter = roleFilter?.trim();
+
+      if (normalizedRoleFilter != null && normalizedRoleFilter.isNotEmpty) {
+        return _fetchUsersWithDeterministicRoleFilter(
+          currentUser: currentUser,
+          limit: limit,
+          offset: offset,
+          searchQuery: searchQuery,
+          roleFilter: normalizedRoleFilter,
+          troopFilter: troopFilter,
+        );
+      }
+
+      return _fetchUsersPage(
+        currentUser: currentUser,
+        limit: limit,
+        offset: offset,
+        searchQuery: searchQuery,
+        troopFilter: troopFilter,
+      );
+    } catch (e) {
+      _logError('fetchUsers', e);
+      rethrow;
+    }
+  }
+
+  Future<List<ManagedUserProfile>> _fetchUsersPage({
+    required UserProfile currentUser,
+    required int limit,
+    required int offset,
+    String? searchQuery,
+    String? troopFilter,
+  }) async {
+    var query = _supabase.from(_profilesTable).select('''
             id,
             user_id,
             first_name,
@@ -68,62 +99,108 @@ class UserManagementService with ScopedServiceMixin {
                 created_at
               )
             )
-          ''')
-          .eq('approved', true);
+          ''').eq('approved', true);
 
-      // Apply scope filter (system vs troop level)
-      query = applyScopeFilter(query, currentUser, 'signup_troop');
+    // Apply scope filter (system vs troop level)
+    query = applyScopeFilter(query, currentUser, 'signup_troop');
 
-      // Apply troop filter if provided (only for system admins who can see all)
-      if (troopFilter != null) {
-        query = query.eq('signup_troop', troopFilter);
+    // Apply troop filter if provided (only for system admins who can see all)
+    if (troopFilter != null) {
+      query = query.eq('signup_troop', troopFilter);
+    }
+
+    // Apply search query
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final q = '%${searchQuery.trim()}%';
+      query = query.or(
+        'first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q',
+      );
+    }
+
+    // Sort by last name and apply range
+    final response = await query.order('last_name', ascending: true).range(
+      offset,
+      offset + limit - 1,
+    );
+
+    return _parseUsers(response);
+  }
+
+  Future<List<ManagedUserProfile>> _fetchUsersWithDeterministicRoleFilter({
+    required UserProfile currentUser,
+    required int limit,
+    required int offset,
+    required String roleFilter,
+    String? searchQuery,
+    String? troopFilter,
+  }) async {
+    const int chunkSize = 80;
+
+    final collected = <ManagedUserProfile>[];
+    var rawOffset = 0;
+    var matchedSeen = 0;
+    var reachedEnd = false;
+
+    while (!reachedEnd && collected.length < limit) {
+      final pageUsers = await _fetchUsersPage(
+        currentUser: currentUser,
+        limit: chunkSize,
+        offset: rawOffset,
+        searchQuery: searchQuery,
+        troopFilter: troopFilter,
+      );
+
+      if (pageUsers.isEmpty) {
+        reachedEnd = true;
+        break;
       }
 
-      // Apply role filter if provided
-      if (roleFilter != null) {
-        // We use a subquery/filter on the joined profile_roles
-        // In Supabase/Postgrest, filtering by a joined table can be done via '.inner' or just referencing the column if using the correct syntax
-        // However, a simpler way for roles is to filter profiles that have a specific role_id in their profile_roles
-        query = query.filter('profile_roles.role_id', 'eq', roleFilter);
+      final pageProfileIds = pageUsers.map((u) => u.id).toList();
+      final matchedRows = await _supabase
+          .from(_profileRolesTable)
+          .select('profile_id')
+          .eq('role_id', roleFilter)
+          .inFilter('profile_id', pageProfileIds);
+
+      final matchedProfileIds = (matchedRows as List)
+          .map((row) => (row as Map<String, dynamic>)['profile_id'] as String?)
+          .whereType<String>()
+          .toSet();
+
+      for (final user in pageUsers) {
+        if (!matchedProfileIds.contains(user.id)) continue;
+
+        if (matchedSeen < offset) {
+          matchedSeen++;
+          continue;
+        }
+
+        collected.add(user);
+        if (collected.length >= limit) break;
       }
 
-      // Apply search query
-      if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final q = '%${searchQuery.trim()}%';
-        query = query.or(
-          'first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q',
+      rawOffset += chunkSize;
+      if (pageUsers.length < chunkSize) {
+        reachedEnd = true;
+      }
+    }
+
+    return collected;
+  }
+
+  List<ManagedUserProfile> _parseUsers(dynamic response) {
+    final users = <ManagedUserProfile>[];
+    for (final row in (response as List)) {
+      try {
+        users.add(ManagedUserProfile.fromJson(row as Map<String, dynamic>));
+      } catch (error) {
+        final profileId = row is Map<String, dynamic> ? row['id'] : null;
+        debugPrint(
+          '⚠️ Skipping invalid profile row in fetchUsers. id=$profileId error=$error',
         );
       }
-
-      // Sort by last name
-      var sortedQuery = query.order('last_name', ascending: true);
-
-      // Apply pagination if provided
-      if (limit != null) {
-        final start = offset ?? 0;
-        final end = start + limit - 1;
-        sortedQuery = sortedQuery.range(start, end);
-      }
-
-      final response = await sortedQuery;
-
-      final users = <ManagedUserProfile>[];
-      for (final row in (response as List)) {
-        try {
-          users.add(ManagedUserProfile.fromJson(row as Map<String, dynamic>));
-        } catch (error) {
-          final profileId = row is Map<String, dynamic> ? row['id'] : null;
-          debugPrint(
-            '⚠️ Skipping invalid profile row in fetchUsers. id=$profileId error=$error',
-          );
-        }
-      }
-
-      return users;
-    } catch (e) {
-      _logError('fetchUsers', e);
-      rethrow;
     }
+    return users;
   }
 
   Future<ManagedUserProfile?> getProfileById(String profileId) async {

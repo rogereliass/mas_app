@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../../auth/logic/auth_provider.dart';
-import '../../../../auth/models/user_profile.dart';
 import '../data/models/notification_models.dart';
 import '../data/notification_repository.dart';
 import 'notification_cache_manager.dart';
@@ -328,6 +327,26 @@ class NotificationsProvider with ChangeNotifier {
     Object error, {
     required String fallback,
   }) {
+    if (error is NotificationSendRateLimitException) {
+      final details = error.details;
+      if (details.reason == 'cooldown') {
+        final seconds = details.retryAfterSeconds < 1 ? 1 : details.retryAfterSeconds;
+        return 'Rate limit active. Please wait $seconds seconds before sending again.';
+      }
+
+      if (details.reason == 'daily_quota') {
+        final totalSeconds = details.retryAfterSeconds < 1 ? 1 : details.retryAfterSeconds;
+        final hours = totalSeconds ~/ 3600;
+        final minutes = (totalSeconds % 3600) ~/ 60;
+        if (hours > 0) {
+          return 'Daily limit reached. Try again in ${hours}h ${minutes}m.';
+        }
+        return 'Daily limit reached. Try again in ${minutes}m.';
+      }
+
+      return 'Rate limit active. Please try again later.';
+    }
+
     final raw = error.toString().trim();
     if (raw.isEmpty) {
       return fallback;

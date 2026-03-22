@@ -219,6 +219,48 @@ class NotificationCreateResult {
 }
 
 @immutable
+class NotificationSendRateLimitResult {
+  final bool allowed;
+  final String reason;
+  final int retryAfterSeconds;
+  final int? remainingQuota;
+  final DateTime? windowResetAt;
+
+  const NotificationSendRateLimitResult({
+    required this.allowed,
+    required this.reason,
+    required this.retryAfterSeconds,
+    required this.remainingQuota,
+    required this.windowResetAt,
+  });
+
+  factory NotificationSendRateLimitResult.fromJson(Map<String, dynamic> json) {
+    final retry = json['retry_after_seconds'];
+    final quota = json['remaining_quota'];
+    final resetAtRaw = json['window_reset_at'];
+
+    return NotificationSendRateLimitResult(
+      allowed: json['allowed'] as bool? ?? false,
+      reason: (json['reason'] as String? ?? 'unknown').trim().toLowerCase(),
+      retryAfterSeconds: retry is num ? retry.toInt() : 0,
+      remainingQuota: quota is num ? quota.toInt() : null,
+      windowResetAt: DateTime.tryParse(resetAtRaw as String? ?? ''),
+    );
+  }
+}
+
+class NotificationSendRateLimitException implements Exception {
+  final NotificationSendRateLimitResult details;
+
+  NotificationSendRateLimitException(this.details);
+
+  @override
+  String toString() {
+    return 'Notification send rate limited: ${details.reason}';
+  }
+}
+
+@immutable
 class NotificationCreateRequest {
   final String title;
   final String body;

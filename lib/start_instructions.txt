@@ -22,15 +22,15 @@ Act as a senior production software engineer and review this implementation to e
 - file views & download stats
 
 ---------------------------------------------------------
-- tester account in sandbox enviroment
 
-- RateLimits
+
 - login process revisit- replace Twilio with email
-- user creation button for admin/troop head,leaders
+- tester account in sandbox enviroment
+-🏗️ user creation button for admin/troop head,leaders
 - add reporting to library views
 - Eftekad Module
 - Clans, Rovers & Leadership
-- QR code for attendance recording - [Troop Heads]
+-🏗️ QR code for attendance recording - [Troop Heads]
 - 
 ---------------------------------------------------------
 

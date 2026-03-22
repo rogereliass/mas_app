@@ -119,6 +119,20 @@ class NotificationService {
     return response['id'] as String;
   }
 
+  Future<NotificationSendRateLimitResult> checkAndConsumeSendRateLimit() async {
+    final response = await _supabase.rpc(
+      'notification_send_rate_limit_check_and_consume',
+    );
+
+    if (response is! Map) {
+      throw Exception('Invalid response from notification rate-limit RPC.');
+    }
+
+    return NotificationSendRateLimitResult.fromJson(
+      Map<String, dynamic>.from(response),
+    );
+  }
+
   Future<void> deleteNotificationById(String notificationId) async {
     await _supabase.from(_notificationsTable).delete().eq('id', notificationId);
   }

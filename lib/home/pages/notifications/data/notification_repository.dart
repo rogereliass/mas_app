@@ -114,6 +114,14 @@ class NotificationRepository {
       }
     }
 
+    if (senderRoleRank < 90) {
+      final rateLimit = await _service.checkAndConsumeSendRateLimit();
+
+      if (!rateLimit.allowed) {
+        throw NotificationSendRateLimitException(rateLimit);
+      }
+    }
+
     final notificationId = await _service.createNotificationRow(
       createdByProfileId: senderProfile.id,
       seasonId: seasonId,
