@@ -1121,7 +1121,7 @@ class _ProfileDetailsDialogState extends State<_ProfileDetailsDialog> {
   /// Open email client to contact support
   Future<void> _contactSupport() async {
     final emailAddress =
-        dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support@example.com';
+        dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support.masdigitalteam@gmail.com';
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUserProfile;
 

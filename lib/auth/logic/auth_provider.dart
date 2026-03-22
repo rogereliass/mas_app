@@ -8,6 +8,8 @@ import '../models/user_profile.dart';
 import '../models/role.dart';
 import '../../core/utils/ttl_cache.dart';
 import '../../core/utils/fcm_service.dart';
+import '../../routing/app_router.dart';
+import '../../routing/navigation_service.dart';
 
 /// Authentication state management provider
 ///
@@ -208,6 +210,16 @@ class AuthProvider with ChangeNotifier {
       AuthState data,
     ) async {
       _currentUser = data.session?.user;
+
+      if (data.event == AuthChangeEvent.passwordRecovery && _currentUser != null) {
+        final email = _currentUser!.email;
+        if (email != null && email.isNotEmpty) {
+          NavigationService.navigatorKey.currentState?.pushNamed(
+            AppRouter.resetPassword,
+            arguments: {'email': email},
+          );
+        }
+      }
 
       _logDebug('[AUTH] Auth state changed');
 
@@ -599,20 +611,20 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Sign in with phone number and password (no OTP)
+  /// Sign in with email and password (no OTP)
   Future<bool> signInWithPassword({
-    required String phoneNumber,
+    required String email,
     required String password,
   }) async => _executeAuthMethod(
     () => _authRepository.signInWithPassword(
-      phoneNumber: phoneNumber,
+      email: email,
       password: password,
     ),
   );
 
-  /// Sign up with phone - sends OTP for verification
-  Future<bool> signUpWithPhone({
-    required String phoneNumber,
+  /// Sign up with email OTP - sends OTP for verification
+  Future<bool> signUpWithEmailOtp({
+    required String email,
     required String password,
     Map<String, dynamic>? metadata,
   }) async {
@@ -620,8 +632,8 @@ class AuthProvider with ChangeNotifier {
     _clearError();
 
     try {
-      await _authRepository.signUpWithPhone(
-        phoneNumber: phoneNumber,
+      await _authRepository.signUpWithEmailOtp(
+        email: email,
         password: password,
         metadata: metadata,
       );
@@ -639,11 +651,11 @@ class AuthProvider with ChangeNotifier {
 
   /// Verify OTP for sign up
   Future<bool> verifySignUpOtp({
-    required String phoneNumber,
+    required String email,
     required String otpCode,
   }) async => _executeAuthMethod(
     () => _authRepository.verifySignUpOtp(
-      phoneNumber: phoneNumber,
+      email: email,
       otpCode: otpCode,
     ),
     errorMessage: 'An unexpected error occurred during verification',
@@ -736,17 +748,16 @@ class AuthProvider with ChangeNotifier {
   // PASSWORD RESET FLOW
   // ============================================================================
 
-  /// Send OTP for password reset (Step 1)
+  /// Send password reset OTP (Step 1)
   ///
-  /// Initiates password reset flow by sending OTP to registered phone number
-  /// Returns true if OTP sent successfully
-  Future<bool> sendPasswordResetOtp({required String phoneNumber}) async {
+  /// Sends a verification code to the registered email address.
+  Future<bool> sendPasswordResetOtp({required String email}) async {
     _setLoading(true);
     _clearError();
 
     try {
       final success = await _authRepository.sendPasswordResetOtp(
-        phoneNumber: phoneNumber,
+        email: email,
       );
       return success;
     } on AuthException catch (e) {
@@ -760,12 +771,12 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Verify OTP for password reset (Step 2)
+  /// Verify password reset OTP (Step 2)
   ///
-  /// Verifies OTP code and returns true if successful
-  /// User will have active session after verification (but NO profile/roles loaded)
+  /// Verifies OTP code and creates a temporary authenticated session
+  /// to allow password update.
   Future<bool> verifyPasswordResetOtp({
-    required String phoneNumber,
+    required String email,
     required String otpCode,
   }) async {
     _setLoading(true);
@@ -773,14 +784,11 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final user = await _authRepository.verifyPasswordResetOtp(
-        phoneNumber: phoneNumber,
+        email: email,
         otpCode: otpCode,
       );
 
-      // Set current user for password update (but don't load profile/roles)
-      // This is a temporary session just for password reset
       _currentUser = user;
-
       return true;
     } on AuthException catch (e) {
       _setError(e.message);
@@ -817,6 +825,29 @@ class AuthProvider with ChangeNotifier {
       return false;
     } catch (e) {
       _setError('Failed to update password');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Set initial password after signup OTP verification.
+  ///
+  /// Unlike reset flow, this does not sign the user out.
+  Future<bool> setInitialPassword({required String password}) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final success = await _authRepository.setInitialPassword(
+        password: password,
+      );
+      return success;
+    } on AuthException catch (e) {
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      _setError('Failed to set account password');
       return false;
     } finally {
       _setLoading(false);

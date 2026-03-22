@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Beautiful error dialog for authentication errors
 ///
@@ -6,11 +7,15 @@ import 'package:flutter/material.dart';
 class AuthErrorDialog extends StatelessWidget {
   final String title;
   final String message;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
 
   const AuthErrorDialog({
     super.key,
     required this.title,
     required this.message,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
   });
 
   /// Show error dialog with custom title and message
@@ -31,6 +36,28 @@ class AuthErrorDialog extends StatelessWidget {
     required String message,
   }) {
     return show(context: context, title: 'Error', message: message);
+  }
+
+  static Future<void> showEmailOtpFallback({required BuildContext context}) {
+    return showDialog(
+      context: context,
+      builder: (context) => AuthErrorDialog(
+        title: 'Unable to Send Email',
+        message:
+            'We couldn\'t send the verification email right now.\nPlease try again later or contact support.',
+        secondaryActionLabel: 'Contact Support',
+        onSecondaryAction: () {
+          _openSupportEmail();
+        },
+      ),
+    );
+  }
+
+  static Future<void> _openSupportEmail() async {
+    final uri = Uri.parse('mailto:support.masdigitalteam@gmail.com');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   @override
@@ -75,27 +102,47 @@ class AuthErrorDialog extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // OK button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.error,
-                  foregroundColor: colorScheme.onError,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Actions
+            Row(
+              children: [
+                if (secondaryActionLabel != null && onSecondaryAction != null)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        onSecondaryAction?.call();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(secondaryActionLabel!),
+                    ),
+                  ),
+                if (secondaryActionLabel != null && onSecondaryAction != null)
+                  const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorScheme.error,
+                      foregroundColor: colorScheme.onError,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'OK',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onError,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-                child: Text(
-                  'OK',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onError,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              ],
             ),
           ],
         ),

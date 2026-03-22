@@ -141,10 +141,11 @@ class AppRouter {
     // Handle OTP verification with arguments
     if (settings.name == otpVerification) {
       final args = settings.arguments as Map<String, dynamic>?;
-      if (args != null && args['phoneNumber'] != null) {
+      final email = args?['email'] as String? ?? args?['phoneNumber'] as String?;
+      if (args != null && email != null) {
         return MaterialPageRoute(
           builder: (context) => OtpVerificationPage(
-            phoneNumber: args['phoneNumber'] as String,
+            email: email,
             password: args['password'] as String?,
             isSignUp: args['isSignUp'] as bool? ?? false,
             isPasswordReset: args['isPasswordReset'] as bool? ?? false,
@@ -157,10 +158,11 @@ class AppRouter {
     // Handle Reset Password with arguments
     if (settings.name == resetPassword) {
       final args = settings.arguments as Map<String, dynamic>?;
-      if (args != null && args['phoneNumber'] != null) {
+      final email = args?['email'] as String? ?? args?['phoneNumber'] as String?;
+      if (args != null && email != null) {
         return MaterialPageRoute(
           builder: (context) => ResetPasswordPage(
-            phoneNumber: args['phoneNumber'] as String,
+            email: email,
           ),
         );
       }

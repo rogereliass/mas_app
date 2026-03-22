@@ -12,11 +12,11 @@ import 'components/auth_error_dialog.dart';
 /// Allows users to enter and confirm their new password after OTP verification
 /// Security: Strong password validation with complexity requirements
 class ResetPasswordPage extends StatefulWidget {
-  final String phoneNumber;
+  final String email;
 
   const ResetPasswordPage({
     super.key,
-    required this.phoneNumber,
+    required this.email,
   });
 
   @override

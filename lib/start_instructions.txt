@@ -18,20 +18,19 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
-- login process revisit- replace Twilio Account
 - file views & download stats
+- Clans, Rovers & Leadership
 
 ---------------------------------------------------------
 
 
-- login process revisit- replace Twilio with email
+-🏗️ login process revisit- Check resend domain then test
 - tester account in sandbox enviroment
 -🏗️ user creation button for admin/troop head,leaders
 - add reporting to library views
 - Eftekad Module
-- Clans, Rovers & Leadership
 -🏗️ QR code for attendance recording - [Troop Heads]
-- 
+
 ---------------------------------------------------------
 
 Homepage components:

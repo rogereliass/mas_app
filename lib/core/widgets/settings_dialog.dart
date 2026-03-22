@@ -273,7 +273,7 @@ class SettingsDialog extends StatelessWidget {
 
   /// Report issue via email
   Future<void> _reportIssue() async {
-    final emailAddress = dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support@example.com';
+    final emailAddress = dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support.masdigitalteam@gmail.com';
     final uri = Uri(
       scheme: 'mailto',
       path: emailAddress,

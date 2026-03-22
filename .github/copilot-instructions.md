@@ -51,6 +51,8 @@ Template:
 | YYYY-MM-DD | Example: Broke dropdown layout on narrow screen | Missing `isExpanded: true` | Add dropdown checklist item before submit |
 
 Current lessons:
+- 2026-03-22 | Signup OTP flow could complete without persisting a password for future login | Switched signup request to `signInWithOtp(email)` but did not set password after OTP verification | After successful signup OTP verification, call `updateUser(password: ...)` before profile finalization so email+password login remains valid
+- 2026-03-22 | Signup/reset auth flow was tightly coupled to phone OTP and SMS provider assumptions | Auth repository/provider/UI reused `phone` + `OtpType.sms` paths for all auth cases | Keep auth flows explicit by intent: signup email OTP, login email+password, reset email link; add friendly OTP-email fallback with support CTA instead of surfacing raw provider failures
 - 2026-03-21 | Role filter looked broken in role management search UI | Relied on embedded relation filtering (`profile_roles.role_id`) with pagination and stale dropdown form state | Use deterministic two-phase filtering (fetch candidate profiles then intersect with `profile_roles` by `role_id`), preserve filtered offset/limit semantics, and key role filter dropdown by selected value to keep UI state synchronized
 - 2026-03-20 | Wrote memory file content with escaped newlines | Used literal `\\n` text in initial create payload | Verify memory file formatting immediately after create and fix if needed
 

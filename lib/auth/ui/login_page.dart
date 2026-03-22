@@ -9,7 +9,7 @@ import 'components/auth_error_dialog.dart';
 
 /// Login Page
 ///
-/// Allows users to sign in with phone number and password
+/// Allows users to sign in with email and password
 /// Includes field validation and error handling
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -20,35 +20,26 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  String? _validatePhoneNumber(String? value) {
+  String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Phone number is required';
+      return 'Email is required';
     }
 
-    // Remove spaces, dashes, parentheses for validation
-    final cleanNumber = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-
-    // Check if it contains only digits and optional + at start
-    if (!RegExp(r'^\+?\d+$').hasMatch(cleanNumber)) {
-      return 'Please enter a valid phone number';
-    }
-
-    // Check minimum length (10 digits for US numbers)
-    final digitsOnly = cleanNumber.replaceAll('+', '');
-    if (digitsOnly.length < 10) {
-      return 'Phone number must be at least 10 digits';
+    final emailRegex = RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value.trim())) {
+      return 'Please enter a valid email';
     }
 
     return null;
@@ -82,9 +73,9 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Attempt login with phone number and password
+      // Attempt login with email and password
       final success = await authProvider.signInWithPassword(
-        phoneNumber: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
@@ -145,13 +136,13 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 48),
 
-                // Phone number field
+                // Email field
                 CustomTextField(
-                  label: 'Phone Number',
-                  placeholder: '01001234567',
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  validator: _validatePhoneNumber,
+                  label: 'Email',
+                  placeholder: 'name@example.com',
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _validateEmail,
                 ),
 
                 const SizedBox(height: 20),

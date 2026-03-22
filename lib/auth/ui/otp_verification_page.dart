@@ -3,15 +3,16 @@ import 'package:masapp/core/constants/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../auth/logic/auth_provider.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../routing/app_router.dart';
 import 'components/auth_error_dialog.dart';
 
 /// OTP Verification Screen
 ///
-/// Allows users to enter the OTP code sent to their phone
+/// Allows users to enter the OTP code sent to their email
 /// Supports both signup and password reset flows
 class OtpVerificationPage extends StatefulWidget {
-  final String phoneNumber;
+  final String email;
   final String? password;
   final bool isSignUp;
   final bool isPasswordReset;
@@ -19,7 +20,7 @@ class OtpVerificationPage extends StatefulWidget {
 
   const OtpVerificationPage({
     super.key,
-    required this.phoneNumber,
+    required this.email,
     this.password,
     this.isSignUp = false,
     this.isPasswordReset = false,
@@ -42,9 +43,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
   int _attemptCount = 0;
   int _resendCount = 0;
   
-  // Rate limiting: stricter for password reset (2 OTPs) vs signup (3 OTPs)
-  int get _maxAttempts => widget.isPasswordReset ? 3 : 3;
-  int get _maxResends => widget.isPasswordReset ? 2 : 3;
+  int get _maxAttempts => 3;
+  int get _maxResends => 3;
 
   @override
   void initState() {
@@ -90,8 +90,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
     // Check if max resend limit reached
     if (_resendCount >= _maxResends) {
-      final errorMessage = widget.isPasswordReset
-          ? 'Maximum OTP resend limit reached. Please try again later or contact support.'
+        final errorMessage = widget.isPasswordReset
+          ? 'Maximum reset email resend limit reached. Please try again later or contact support.'
           : 'Maximum OTP resend limit reached. Please try registering again later.';
       
       await AuthErrorDialog.showError(
@@ -119,14 +119,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         _attemptCount = 0;
       });
 
-      // Resend OTP based on flow type
+      // Resend verification based on flow type
       if (widget.isPasswordReset) {
-        // Password reset flow
         final success = await authProvider.sendPasswordResetOtp(
-          phoneNumber: widget.phoneNumber,
+          email: widget.email,
         );
 
-        if (!context.mounted) return;
+        if (!mounted) return;
 
         if (success) {
           // Increment resend counter
@@ -147,20 +146,26 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           );
           _startResendTimer();
         } else {
-          await AuthErrorDialog.showError(
-            context: context,
-            message: authProvider.errorMessage ?? 'Failed to resend OTP',
-          );
+          final errorMessage =
+              authProvider.errorMessage ?? 'Failed to resend OTP';
+          if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
+            await AuthErrorDialog.showEmailOtpFallback(context: context);
+          } else {
+            await AuthErrorDialog.showError(
+              context: context,
+              message: errorMessage,
+            );
+          }
         }
       } else if (widget.password != null) {
         // Signup flow
-        final success = await authProvider.signUpWithPhone(
-          phoneNumber: widget.phoneNumber,
+        final success = await authProvider.signUpWithEmailOtp(
+          email: widget.email,
           password: widget.password!,
           metadata: widget.metadata,
         );
 
-        if (!context.mounted) return;
+        if (!mounted) return;
 
         if (success) {
           // Increment resend counter
@@ -181,10 +186,16 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           );
           _startResendTimer();
         } else {
-          await AuthErrorDialog.showError(
-            context: context,
-            message: authProvider.errorMessage ?? 'Failed to resend OTP',
-          );
+          final errorMessage =
+              authProvider.errorMessage ?? 'Failed to resend OTP';
+          if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
+            await AuthErrorDialog.showEmailOtpFallback(context: context);
+          } else {
+            await AuthErrorDialog.showError(
+              context: context,
+              message: errorMessage,
+            );
+          }
         }
       } else {
         // Password not available - user needs to go back
@@ -229,30 +240,26 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Handle password reset flow differently
+      // Password reset flow: verify OTP then proceed to password update.
       if (widget.isPasswordReset) {
-        // Password reset: verify OTP and navigate to reset password page
         final otpSuccess = await authProvider.verifyPasswordResetOtp(
-          phoneNumber: widget.phoneNumber,
+          email: widget.email,
           otpCode: otpCode,
         );
 
-        if (!context.mounted) return;
+        if (!mounted) return;
 
         if (!otpSuccess) {
-          // Increment attempt counter
           setState(() {
             _attemptCount++;
             _isLoading = false;
           });
 
-          // Clear OTP fields for retry
           for (var controller in _otpControllers) {
             controller.clear();
           }
           _focusNodes[0].requestFocus();
 
-          // Show error with attempt count
           final remainingAttempts = _maxAttempts - _attemptCount;
           await AuthErrorDialog.showError(
             context: context,
@@ -263,21 +270,20 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           return;
         }
 
-        // Navigate to reset password page
         Navigator.of(context).pushReplacementNamed(
           AppRouter.resetPassword,
-          arguments: {'phoneNumber': widget.phoneNumber},
+          arguments: {'email': widget.email},
         );
         return;
       }
 
       // Signup flow: verify OTP
       final otpSuccess = await authProvider.verifySignUpOtp(
-        phoneNumber: widget.phoneNumber,
+        email: widget.email,
         otpCode: otpCode,
       );
 
-      if (!context.mounted) return;
+      if (!mounted) return;
 
       if (!otpSuccess) {
         // Increment attempt counter
@@ -308,7 +314,29 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       debugPrint('Has metadata: ${widget.metadata != null}');
       debugPrint('Metadata fields: ${widget.metadata?.keys.toList()}');
 
-      // Step 2: Create/update profile with metadata
+      // Step 2: Set initial password for future email+password sign-ins.
+      if (widget.password != null && widget.password!.isNotEmpty) {
+        final passwordSet = await authProvider.setInitialPassword(
+          password: widget.password!,
+        );
+
+        if (!mounted) return;
+
+        if (!passwordSet) {
+          await authProvider.deleteCurrentUser();
+
+          if (!mounted) return;
+
+          await AuthErrorDialog.showError(
+            context: context,
+            message:
+                authProvider.errorMessage ?? 'Failed to finalize account setup.',
+          );
+          return;
+        }
+      }
+
+      // Step 3: Create/update profile with metadata
       if (widget.metadata != null && widget.metadata!.isNotEmpty) {
         debugPrint('Creating profile with metadata...');
         
@@ -316,7 +344,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           profileData: widget.metadata!,
         );
 
-        if (!context.mounted) return;
+        if (!mounted) return;
 
         if (!profileSuccess) {
           debugPrint('⚠️ Profile creation failed!');
@@ -326,7 +354,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           // Either both auth user AND profile exist, or neither
           await authProvider.deleteCurrentUser();
           
-          if (!context.mounted) return;
+          if (!mounted) return;
           
           await AuthErrorDialog.showError(
             context: context,
@@ -334,7 +362,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           );
           
           // Navigate back to registration page
-          if (!context.mounted) return;
+          if (!mounted) return;
           Navigator.of(context).pop();
           return;
         }
@@ -344,12 +372,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         debugPrint('⚠️ No metadata provided, skipping profile creation');
       }
 
-      if (!context.mounted) return;
+      if (!mounted) return;
 
-      // Step 3: Navigate to success page
+      // Step 4: Navigate to success page
       Navigator.of(context).pushReplacementNamed(AppRouter.registerSuccess);
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
 
       await AuthErrorDialog.showError(
         context: context,
@@ -372,8 +400,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         : 'Enter Verification Code';
     
     final String subtitle = widget.isPasswordReset
-        ? 'We sent a 6-digit verification code to\n${widget.phoneNumber}'
-        : 'We sent a 6-digit code to\n${widget.phoneNumber}';
+      ? 'We sent a 6-digit verification code to\n${widget.email}'
+      : 'We sent a 6-digit code to\n${widget.email}';
     
     return PopScope(
       // Prevent accidental back navigation during password reset
@@ -383,6 +411,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         
         // Show confirmation for password reset flow
         if (widget.isPasswordReset) {
+          final navigator = Navigator.of(context);
           final shouldPop = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
@@ -403,14 +432,14 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
             ),
           ) ?? false;
           
-          if (shouldPop && context.mounted) {
-            Navigator.pop(context);
+          if (shouldPop && mounted) {
+            navigator.pop();
           }
         }
       },
       child: Scaffold(
       appBar: AppBar(
-        title: Text(widget.isPasswordReset ? 'Reset Password' : 'Verify OTP'),
+        title: Text(widget.isPasswordReset ? 'Reset Password' : 'Verify Email'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -421,7 +450,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
             children: [
               const SizedBox(height: 32),
               Icon(
-                widget.isPasswordReset ? Icons.lock_reset : Icons.phone_android,
+                widget.isPasswordReset ? Icons.lock_reset : Icons.email_outlined,
                 size: 80,
                 color: Theme.of(context).primaryColor,
               ),

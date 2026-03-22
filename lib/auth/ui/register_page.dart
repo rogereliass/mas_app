@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart' as intl;
 import '../logic/auth_provider.dart';
+import '../data/auth_repository.dart';
 import '../../core/constants/app_colors.dart';
 import '../../routing/app_router.dart';
 import 'components/custom_text_field.dart';
@@ -277,13 +278,12 @@ class _RegisterPageState extends State<RegisterPage> {
       };
 
       debugPrint('=== STARTING REGISTRATION ===');
-      debugPrint('Phone: ${_phoneController.text.trim()}');
-      debugPrint('Has email: ${_emailController.text.trim().isNotEmpty}');
+      debugPrint('Email: ${_emailController.text.trim()}');
       debugPrint('Troop ID: $_selectedTroopId');
 
-      // Attempt registration - this will send OTP
-      final success = await authProvider.signUpWithPhone(
-        phoneNumber: _phoneController.text.trim(),
+      // Request verification OTP for email sign-up flow
+      final success = await authProvider.signUpWithEmailOtp(
+        email: _emailController.text.trim(),
         password: _passwordController.text,
         metadata: metadata,
       );
@@ -296,20 +296,24 @@ class _RegisterPageState extends State<RegisterPage> {
           context,
           AppRouter.otpVerification,
           arguments: {
-            'phoneNumber': _phoneController.text.trim(),
+            'email': _emailController.text.trim(),
             'password': _passwordController.text,
             'isSignUp': true,
             'metadata': metadata,
           },
         );
       } else {
-        // Show error dialog
-        await AuthErrorDialog.showError(
-          context: context,
-          message:
-              authProvider.errorMessage ??
-              'Failed to send OTP. Please try again.',
-        );
+        final errorMessage =
+            authProvider.errorMessage ?? 'Failed to send OTP. Please try again.';
+
+        if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
+          await AuthErrorDialog.showEmailOtpFallback(context: context);
+        } else {
+          await AuthErrorDialog.showError(
+            context: context,
+            message: errorMessage,
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;

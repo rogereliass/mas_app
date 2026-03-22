@@ -29,19 +29,19 @@ class AuthRepository {
     }
   }
 
-  /// Sign in with phone number and password (no OTP required)
+  static const String otpEmailSendFailureMessage =
+      'We couldn\'t send the verification email right now. Please try again later or contact support.';
+
+  /// Sign in with email and password (no OTP required)
   ///
   /// Returns the user if successful, throws exception if failed
   Future<User> signInWithPassword({
-    required String phoneNumber,
+    required String email,
     required String password,
   }) async {
     try {
-      // Format phone number
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
       final response = await _supabase.auth
-          .signInWithPassword(phone: formattedPhone, password: password)
+          .signInWithPassword(email: email.trim(), password: password)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -63,29 +63,19 @@ class AuthRepository {
     }
   }
 
-  /// Register new user with phone - sends OTP for verification
+  /// Request email OTP for new user registration.
   ///
-  /// Step 1: Send OTP to phone number
-  Future<bool> signUpWithPhone({
-    required String phoneNumber,
+  /// Step 1: Send OTP to email address.
+  Future<bool> signUpWithEmailOtp({
+    required String email,
     required String password,
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      // Format phone number
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
       _logDebug('=== SIGNUP REQUEST ===');
 
-      // Sign up with phone - Supabase will send OTP
-      // Pass metadata to Supabase auth for redundancy (also available immediately on currentUser)
-      // All user data will also be stored in profiles table after OTP verification
-      final response = await _supabase.auth
-          .signUp(
-            phone: formattedPhone,
-            password: password,
-            data: metadata, // Pass metadata to Supabase auth
-          )
+      await _supabase.auth
+          .signInWithOtp(email: email.trim(), shouldCreateUser: true)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -97,38 +87,34 @@ class AuthRepository {
           );
 
       _logDebug('=== SIGNUP RESPONSE ===');
-      _logDebug('Session: ${response.session != null}');
+  _logDebug('OTP email request accepted by Supabase');
 
-      // Return true to indicate OTP was sent
       return true;
     } on AuthException catch (e) {
       _logDebug('=== AUTH EXCEPTION ===');
       _logDebug('Message: ${e.message}');
       _logDebug('Status code: ${e.statusCode}');
-      throw _handleAuthException(e);
+      throw _handleOtpEmailAuthException(e);
     } catch (e, stackTrace) {
       _logDebug('=== UNEXPECTED ERROR ===');
       _logDebug('Error: $e');
       _logDebug('Stack trace: $stackTrace');
-      throw AuthException('Failed to send OTP: ${e.toString()}');
+      throw AuthException(otpEmailSendFailureMessage);
     }
   }
 
-  /// Verify OTP code for sign up
+  /// Verify email OTP code for sign up.
   ///
-  /// Step 2: Verify the OTP code sent to user's phone
+  /// Step 2: Verify the OTP code sent to user's email.
   Future<User> verifySignUpOtp({
-    required String phoneNumber,
+    required String email,
     required String otpCode,
   }) async {
     try {
-      // Format phone number
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
       _logDebug('=== OTP VERIFICATION REQUEST ===');
 
       final response = await _supabase.auth
-          .verifyOTP(phone: formattedPhone, token: otpCode, type: OtpType.sms)
+          .verifyOTP(email: email.trim(), token: otpCode, type: OtpType.email)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -204,23 +190,16 @@ class AuthRepository {
   // PASSWORD RESET FLOW
   // ============================================================================
 
-  /// Send OTP for password reset (Step 1)
+  /// Send password reset OTP (Step 1)
   ///
-  /// - Phone number must be registered
-  /// - Sends OTP to user's phone
-  /// - Rate limited on client side (max 2 attempts)
-  Future<bool> sendPasswordResetOtp({required String phoneNumber}) async {
+  /// - Email must be registered
+  /// - Sends OTP code to email
+  Future<bool> sendPasswordResetOtp({required String email}) async {
     try {
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
       _logDebug('=== PASSWORD RESET OTP REQUEST ===');
 
-      // Use Supabase's signInWithOtp for existing users (password reset flow)
       await _supabase.auth
-          .signInWithOtp(
-            phone: formattedPhone,
-            // OTP will be sent to the phone number
-          )
+          .signInWithOtp(email: email.trim(), shouldCreateUser: false)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -235,30 +214,28 @@ class AuthRepository {
     } on AuthException catch (e) {
       _logDebug('=== AUTH EXCEPTION ===');
       _logDebug('Message: ${e.message}');
-      throw _handleAuthException(e);
+      throw _handleOtpEmailAuthException(e);
     } catch (e, stackTrace) {
       _logDebug('=== UNEXPECTED ERROR ===');
       _logDebug('Error: $e');
       _logDebug('Stack trace: $stackTrace');
-      throw AuthException('Failed to send OTP: ${e.toString()}');
+      throw AuthException(otpEmailSendFailureMessage);
     }
   }
 
-  /// Verify OTP for password reset (Step 2)
+  /// Verify password reset OTP (Step 2)
   ///
-  /// - Verifies the OTP code
-  /// - Returns authenticated session for password update
+  /// - Verifies OTP code sent to email
+  /// - Returns authenticated session user for password update
   Future<User> verifyPasswordResetOtp({
-    required String phoneNumber,
+    required String email,
     required String otpCode,
   }) async {
     try {
-      final formattedPhone = _formatPhoneNumber(phoneNumber);
-
       _logDebug('=== PASSWORD RESET OTP VERIFICATION ===');
 
       final response = await _supabase.auth
-          .verifyOTP(phone: formattedPhone, token: otpCode, type: OtpType.sms)
+          .verifyOTP(email: email.trim(), token: otpCode, type: OtpType.email)
           .timeout(
             const Duration(seconds: 60),
             onTimeout: () {
@@ -268,7 +245,7 @@ class AuthRepository {
             },
           );
 
-      _logDebug('✓ OTP verified successfully');
+      _logDebug('✓ Password reset OTP verified successfully');
 
       if (response.user == null) {
         throw AuthException('Verification failed: No user returned');
@@ -278,6 +255,7 @@ class AuthRepository {
     } on AuthException catch (e) {
       _logDebug('=== AUTH EXCEPTION ===');
       _logDebug('Message: ${e.message}');
+      _logDebug('Status code: ${e.statusCode}');
       throw _handleAuthException(e);
     } catch (e, stackTrace) {
       _logDebug('=== UNEXPECTED ERROR ===');
@@ -324,6 +302,35 @@ class AuthRepository {
       _logDebug('Error: $e');
       _logDebug('Stack trace: $stackTrace');
       throw AuthException('Failed to update password: ${e.toString()}');
+    }
+  }
+
+  /// Set initial password right after signup OTP verification.
+  ///
+  /// Keeps the session active for profile creation and post-signup navigation.
+  Future<bool> setInitialPassword({required String password}) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        throw AuthException('No active session. Please verify OTP first.');
+      }
+
+      final response = await _supabase.auth
+          .updateUser(UserAttributes(password: password))
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw AuthException(
+                'Request timed out. Please check your internet connection.',
+              );
+            },
+          );
+
+      return response.user != null;
+    } on AuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw AuthException('Failed to set account password: ${e.toString()}');
     }
   }
 
@@ -413,47 +420,6 @@ class AuthRepository {
     }
   }
 
-  /// Format phone number with proper handling for spaces and country code
-  /// Default country code is +20 (Egypt)
-  String _formatPhoneNumber(String phoneNumber) {
-    // Remove all spaces, dashes, parentheses, and other non-digit characters except +
-    String cleaned = phoneNumber.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
-
-    if (cleaned.isEmpty) {
-      throw AuthException('Phone number cannot be empty');
-    }
-
-    // If already has country code, validate and return
-    if (cleaned.startsWith('+')) {
-      final digits = cleaned.substring(1);
-      if (digits.isEmpty || !RegExp(r'^\d+$').hasMatch(digits)) {
-        throw AuthException('Invalid phone number format');
-      }
-      if (digits.length < 10) {
-        throw AuthException('Phone number must be at least 10 digits');
-      }
-      return cleaned;
-    }
-
-    // For Egyptian numbers starting with 0, remove the leading 0
-    // Example: 01234567890 -> 1234567890
-    if (cleaned.startsWith('0') && cleaned.length == 11) {
-      cleaned = cleaned.substring(1);
-    }
-
-    // Ensure we have digits only
-    if (!RegExp(r'^\d+$').hasMatch(cleaned)) {
-      throw AuthException('Invalid phone number format');
-    }
-
-    if (cleaned.length < 10) {
-      throw AuthException('Phone number must be at least 10 digits');
-    }
-
-    // Default to +20 (Egypt) if no country code provided
-    return '+20$cleaned';
-  }
-
   /// Handle auth exceptions and provide user-friendly messages
   AuthException _handleAuthException(AuthException e) {
     String message;
@@ -463,7 +429,7 @@ class AuthRepository {
 
     switch (e.message.toLowerCase()) {
       case String msg when msg.contains('invalid login credentials'):
-        message = 'Invalid phone number or password';
+        message = 'Invalid email or password';
         break;
       case String msg when msg.contains('email not confirmed'):
         message = 'Please verify your email address';
@@ -472,7 +438,7 @@ class AuthRepository {
         message = 'Account not found. Please register first';
         break;
       case String msg when msg.contains('user already registered'):
-        message = 'This phone number is already registered';
+        message = 'This email is already registered';
         break;
       case String msg when msg.contains('invalid email'):
         message = 'Please enter a valid email address';
@@ -483,17 +449,25 @@ class AuthRepository {
       case String msg when msg.contains('network'):
         message = 'Network error. Please check your connection';
         break;
-      case String msg when msg.contains('phone') && msg.contains('not enabled'):
-        message =
-            'Phone authentication is not enabled. Please contact support.';
-        break;
-      case String msg when msg.contains('sms') || msg.contains('provider'):
-        message = 'SMS service not configured. Please contact support.';
-        break;
       default:
         message = e.message;
     }
 
     return AuthException(message);
+  }
+
+  AuthException _handleOtpEmailAuthException(AuthException e) {
+    final lowerMessage = e.message.toLowerCase();
+
+    if (lowerMessage.contains('rate limit') ||
+        lowerMessage.contains('smtp') ||
+        lowerMessage.contains('email') ||
+        lowerMessage.contains('provider') ||
+        lowerMessage.contains('timeout') ||
+        lowerMessage.contains('network')) {
+      return const AuthException(otpEmailSendFailureMessage);
+    }
+
+    return _handleAuthException(e);
   }
 }

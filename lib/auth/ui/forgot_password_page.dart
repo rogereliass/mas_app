@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/auth_provider.dart';
+import '../data/auth_repository.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routing/app_router.dart';
 import 'components/custom_text_field.dart';
@@ -9,8 +10,7 @@ import 'components/auth_error_dialog.dart';
 
 /// Forgot Password Page - Step 1
 ///
-/// Allows users to enter their phone number to receive password reset OTP
-/// Security: Rate limiting implemented in OTP verification page (max 2 attempts)
+/// Allows users to enter their email to receive password reset OTP
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
 
@@ -20,32 +20,23 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  String? _validatePhoneNumber(String? value) {
+  String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Phone number is required';
+      return 'Email is required';
     }
 
-    // Remove spaces, dashes, parentheses for validation
-    final cleanNumber = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-
-    // Check if it contains only digits and optional + at start
-    if (!RegExp(r'^\+?\d+$').hasMatch(cleanNumber)) {
-      return 'Please enter a valid phone number';
-    }
-
-    // Check minimum length (10 digits)
-    final digitsOnly = cleanNumber.replaceAll('+', '');
-    if (digitsOnly.length < 10) {
-      return 'Phone number must be at least 10 digits';
+    final emailRegex = RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value.trim())) {
+      return 'Please enter a valid email';
     }
 
     return null;
@@ -69,27 +60,31 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
       // Send password reset OTP
       final success = await authProvider.sendPasswordResetOtp(
-        phoneNumber: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
       );
 
       if (!mounted) return;
 
       if (success) {
-        // Navigate to OTP verification page
         Navigator.pushNamed(
           context,
           AppRouter.otpVerification,
           arguments: {
-            'phoneNumber': _phoneController.text.trim(),
+            'email': _emailController.text.trim(),
             'isPasswordReset': true,
           },
         );
       } else {
-        // Show error dialog
-        await AuthErrorDialog.showError(
-          context: context,
-          message: authProvider.errorMessage ?? 'Failed to send verification code',
-        );
+        final errorMessage =
+            authProvider.errorMessage ?? 'Failed to send verification code';
+        if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
+          await AuthErrorDialog.showEmailOtpFallback(context: context);
+        } else {
+          await AuthErrorDialog.showError(
+            context: context,
+            message: errorMessage,
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -125,13 +120,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
                 const SizedBox(height: 48),
 
-                // Phone number field
+                // Email field
                 CustomTextField(
-                  controller: _phoneController,
-                  label: 'Phone Number',
-                  placeholder: '+20 123 456 7890',
-                  keyboardType: TextInputType.phone,
-                  validator: _validatePhoneNumber,
+                  controller: _emailController,
+                  label: 'Email',
+                  placeholder: 'name@example.com',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _validateEmail,
                 ),
 
                 const SizedBox(height: 24),
@@ -167,7 +162,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'We\'ll send a verification code to your phone number. '
+                          'We\'ll send a verification code to your email address. '
                           'You\'ll be able to set a new password after verification.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurface,
@@ -249,7 +244,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
         // Subtitle
         Text(
-          'Enter your phone number and we\'ll send\nyou a verification code to reset your password.',
+          'Enter your email and we\'ll send\nyou a verification code to reset your password.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.textTheme.bodySmall?.color,
