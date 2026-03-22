@@ -740,6 +740,9 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _logDebug('Delete user error: $e');
+      _setError(
+        'Could not fully clean up the failed registration account. Please contact support before retrying.',
+      );
       return false;
     }
   }

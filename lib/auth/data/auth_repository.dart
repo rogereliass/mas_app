@@ -171,18 +171,40 @@ class AuthRepository {
   Future<void> deleteCurrentUser() async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
-      throw AuthException('No user logged in');
+      _logDebug('No user logged in for rollback');
+      return;
     }
 
+    Object? deleteError;
+
     try {
-      _logDebug('Rolling back auth user');
-      // Sign out to clear session (in free tier, we can't delete users via API)
-      // In production, you'd use admin API to delete the user
-      await _supabase.auth.signOut();
-      _logDebug('✓ User signed out (rollback complete)');
+      _logDebug('Rolling back auth user via delete_signup_user edge function');
+      final response = await _supabase.functions.invoke('delete_signup_user');
+      _logDebug('delete_signup_user status: ${response.status}');
+
+      if (response.status < 200 || response.status >= 300) {
+        throw AuthException(
+          'Edge function delete failed with status ${response.status}',
+        );
+      }
+
+      _logDebug('✓ Auth user deleted successfully');
     } catch (e) {
-      _logDebug('Error during rollback: $e');
-      throw AuthException('Failed to rollback user: ${e.toString()}');
+      deleteError = e;
+      _logDebug('Rollback deletion failed: $e');
+    } finally {
+      try {
+        await _supabase.auth.signOut();
+        _logDebug('✓ Session cleared after rollback attempt');
+      } catch (signOutError) {
+        _logDebug('Failed to clear session after rollback attempt: $signOutError');
+      }
+    }
+
+    if (deleteError != null) {
+      throw AuthException(
+        'Failed to fully remove signup auth user. Please contact support before retrying registration.',
+      );
     }
   }
 

@@ -51,6 +51,7 @@ Template:
 | YYYY-MM-DD | Example: Broke dropdown layout on narrow screen | Missing `isExpanded: true` | Add dropdown checklist item before submit |
 
 Current lessons:
+- 2026-03-22 | Failed-signup rollback left orphan auth users and blocked re-registration | deleteCurrentUser only signed out and did not remove auth.users row | Route rollback through a secured service-role edge function that verifies caller JWT, deletes related profile row, then deletes auth user
 - 2026-03-22 | Signup profile save failed with generation_counters RLS error (42501) | Registration payload persisted placeholder generation and DB counter path lacked authenticated policy coverage | Avoid writing placeholder generation during signup and keep explicit generation_counters RLS/grant migration aligned with trigger/function runtime role
 - 2026-03-22 | Signup OTP flow could complete without persisting a password for future login | Switched signup request to `signInWithOtp(email)` but did not set password after OTP verification | After successful signup OTP verification, call `updateUser(password: ...)` before profile finalization so email+password login remains valid
 - 2026-03-22 | Signup/reset auth flow was tightly coupled to phone OTP and SMS provider assumptions | Auth repository/provider/UI reused `phone` + `OtpType.sms` paths for all auth cases | Keep auth flows explicit by intent: signup email OTP, login email+password, reset email link; add friendly OTP-email fallback with support CTA instead of surfacing raw provider failures

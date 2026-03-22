@@ -85,14 +85,41 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     });
   }
 
+  Future<void> _rollbackSignupAuthIfNeeded({
+    required AuthProvider authProvider,
+    required String reason,
+  }) async {
+    if (widget.isPasswordReset) {
+      return;
+    }
+
+    if (authProvider.currentUser == null) {
+      return;
+    }
+
+    debugPrint('⚠️ Signup rollback triggered: $reason');
+    final rollbackSuccess = await authProvider.deleteCurrentUser();
+    if (!rollbackSuccess) {
+      debugPrint('⚠️ Signup rollback failed; auth user may still exist.');
+    }
+  }
+
   Future<void> _resendOtp() async {
     if (!_canResend || _isLoading) return;
 
     // Check if max resend limit reached
     if (_resendCount >= _maxResends) {
-        final errorMessage = widget.isPasswordReset
+      final errorMessage = widget.isPasswordReset
           ? 'Maximum reset email resend limit reached. Please try again later or contact support.'
           : 'Maximum OTP resend limit reached. Please try registering again later.';
+
+      if (!widget.isPasswordReset) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await _rollbackSignupAuthIfNeeded(
+          authProvider: authProvider,
+          reason: 'max OTP resends reached',
+        );
+      }
       
       await AuthErrorDialog.showError(
         context: context,
@@ -148,6 +175,10 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         } else {
           final errorMessage =
               authProvider.errorMessage ?? 'Failed to resend OTP';
+          await _rollbackSignupAuthIfNeeded(
+            authProvider: authProvider,
+            reason: 'resend OTP request failed',
+          );
           if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
             await AuthErrorDialog.showEmailOtpFallback(context: context);
           } else {
@@ -199,6 +230,10 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         }
       } else {
         // Password not available - user needs to go back
+        await _rollbackSignupAuthIfNeeded(
+          authProvider: authProvider,
+          reason: 'signup resend requested without password',
+        );
         await AuthErrorDialog.showError(
           context: context,
           message: 'Please go back and submit registration form again',
@@ -226,6 +261,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
     // Check if max attempts reached
     if (_attemptCount >= _maxAttempts) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await _rollbackSignupAuthIfNeeded(
+        authProvider: authProvider,
+        reason: 'max OTP attempts reached',
+      );
+
       await AuthErrorDialog.showError(
         context: context,
         message: 'Too many failed attempts. Please request a new OTP.',
@@ -300,6 +341,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
         // Show error with attempt count
         final remainingAttempts = _maxAttempts - _attemptCount;
+        await _rollbackSignupAuthIfNeeded(
+          authProvider: authProvider,
+          reason: 'OTP verification failed',
+        );
+
         await AuthErrorDialog.showError(
           context: context,
           message: authProvider.errorMessage ?? 'Invalid OTP code${remainingAttempts > 0 
@@ -323,7 +369,10 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         if (!mounted) return;
 
         if (!passwordSet) {
-          await authProvider.deleteCurrentUser();
+          await _rollbackSignupAuthIfNeeded(
+            authProvider: authProvider,
+            reason: 'setInitialPassword failed',
+          );
 
           if (!mounted) return;
 
@@ -349,10 +398,11 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         if (!profileSuccess) {
           debugPrint('⚠️ Profile creation failed!');
           debugPrint('Rolling back - deleting auth user...');
-          
-          // CRITICAL: Delete the auth user to maintain consistency
-          // Either both auth user AND profile exist, or neither
-          await authProvider.deleteCurrentUser();
+
+          await _rollbackSignupAuthIfNeeded(
+            authProvider: authProvider,
+            reason: 'createOrUpdateProfile failed',
+          );
           
           if (!mounted) return;
           
@@ -378,6 +428,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
       Navigator.of(context).pushReplacementNamed(AppRouter.registerSuccess);
     } catch (e) {
       if (!mounted) return;
+
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await _rollbackSignupAuthIfNeeded(
+        authProvider: authProvider,
+        reason: 'unexpected signup verification exception',
+      );
 
       await AuthErrorDialog.showError(
         context: context,
