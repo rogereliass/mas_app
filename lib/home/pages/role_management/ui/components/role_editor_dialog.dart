@@ -217,105 +217,144 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
         await _attemptClose();
       },
       child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 760),
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 720),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(28),
-                    topRight: Radius.circular(28),
+                  color: colorScheme.surfaceContainerHigh,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
                 child: Row(
                   children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.manage_accounts,
+                        color: colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Manage User Roles',
-                            style: theme.textTheme.titleLarge?.copyWith(
+                            'Manage Roles',
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: colorScheme.onPrimaryContainer,
                             ),
                           ),
-                          const SizedBox(height: 4),
                           Text(
                             widget.profile.fullName,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onPrimaryContainer,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
                     IconButton(
                       onPressed: _isSaving ? null : _attemptClose,
-                      icon: const Icon(Icons.close),
-                      color: colorScheme.onPrimaryContainer,
+                      icon: const Icon(Icons.close, size: 20),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Assigned Roles and Context',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      _buildSectionHeader(
+                        context,
+                        title: 'Assigned Roles',
+                        icon: Icons.verified_user_outlined,
                       ),
-                      const SizedBox(height: 8),
-                      ...widget.profile.roleAssignments.map((assignment) {
-                        final contextText = assignment.troopContextName == null
-                            ? 'No troop context'
-                            : 'Troop: ${assignment.troopContextName}';
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            widget.profile.roleAssignments.map((assignment) {
+                          final contextText =
+                              assignment.troopContextName == null
+                                  ? 'Global'
+                                  : assignment.troopContextName;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.verified_user_outlined,
-                                size: 18,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${assignment.role.name} ($contextText)',
-                                  style: theme.textTheme.bodyMedium,
-                                  overflow: TextOverflow.ellipsis,
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant.withValues(
+                                  alpha: 0.5,
                                 ),
                               ),
-                            ],
-                          ),
-                        );
-                      }),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    '${assignment.role.name} ($contextText)',
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 24),
+                      const Divider(),
                       const SizedBox(height: 16),
-                      Text(
-                        'Editable Roles',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      _buildSectionHeader(
+                        context,
+                        title: 'Edit Assignments',
+                        icon: Icons.edit_note_outlined,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Assigned troop-scoped roles are read-only by default. Use Change context when needed.',
+                        'Assigned troop-scoped roles are read-only. Use the edit icon to change context.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       RoleAssignmentSection(
                         selectedRoles: selectedVisibleRoles,
                         availableRoles: assignableRoles,
@@ -362,10 +401,35 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
                       ),
                       if (_inlineError != null) ...[
                         const SizedBox(height: 12),
-                        Text(
-                          _inlineError!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.error,
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer.withValues(
+                              alpha: 0.3,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colorScheme.error.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 16,
+                                color: colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _inlineError!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.error,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -374,9 +438,9 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
                 ),
               ),
               Container(
-                width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
+                  color: colorScheme.surface,
                   border: Border(
                     top: BorderSide(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.5),
@@ -386,24 +450,37 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: TextButton(
                         onPressed: _isSaving ? null : _attemptClose,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
                         child: const Text('Cancel'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton(
+                      child: FilledButton.icon(
                         onPressed: _isSaving ? null : _save,
-                        child: _isSaving
+                        icon: _isSaving
+                            ? const SizedBox.shrink()
+                            : const Icon(Icons.save_outlined, size: 20),
+                        label: _isSaving
                             ? const SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: 20,
+                                height: 20,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
                                 ),
                               )
-                            : const Text('Save Changes'),
+                            : const Text('Save'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -413,6 +490,29 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
 }

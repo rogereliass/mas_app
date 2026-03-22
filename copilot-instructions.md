@@ -9,17 +9,13 @@ MAS App is a community management tool for scouts and similar organizations, bui
 The notifications system allows for sending and receiving targeted messages.
 - **UI/UX**: Premium aesthetic with rounded corners (20px-24px), subtle gradients, and refined typography.
 - **Stability**: Bulletproof layout designs using `Flexible`, `Expanded`, and `SingleChildScrollView` to prevent `RenderFlex` overflows on various screen sizes.
-- **Role-Based Access**: 
-    - Management buttons ("Send", "Audit") are only visible to roles with **Rank 60+**.
-    - For **Troop Leaders (Rank 60/70)**, the system automatically infers their troop context, hides the troop selection dropdown, and filters recipients (Patrols/Members) accordingly.
-    - System-wide admins (Rank 90+) maintain full visibility of all troops.
-- **Simplified Compose**: Notification types default to `announcement`, and the metadata JSON field is removed for better UX.
-- **Components**:
-    - `NotificationsPanel`: Main container with dynamic button visibility.
-    - `NotificationItem`: Individual notification card with unread status indicators.
-    - `NotificationDetailModal`: Detailed view tested for stability with long content.
-    - `NotificationComposeModal`: Simplified, role-scoped form.
-    - `NotificationAudit`: Complete audit trail of sent notifications.
+
+### Role Management (Enhanced UI/UX)
+Centralized interface for managing user roles and permissions with senior-level UI polish.
+- **Visuals**: Modern card-based layout with gradient avatars, integrated status badges, and icon-based information hierarchy.
+- **Rank Indicators**: Professional neutral-themed badges (e.g., "Rank 60") replacing outdated "error-like" red circles.
+- **Dialogs**: Clean, structured modals with distinct sections for "Assigned Roles" and "Editable Roles", featuring persistent state feedback and improved typography.
+- **Filters**: Integrated, borderless search and filter bar using `surfaceContainerLow` for a lightweight feel.
 
 ### Admin Features
 - Scoped data access for Troop Leaders (rank 60-70).

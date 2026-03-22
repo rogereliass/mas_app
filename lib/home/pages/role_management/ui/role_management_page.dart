@@ -98,10 +98,12 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Role Management'),
+        centerTitle: false,
         actions: [
           Consumer<RoleManagementProvider>(
             builder: (context, provider, _) {
@@ -114,11 +116,15 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
               );
             },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          const AdminScopeBanner(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: AdminScopeBanner(),
+          ),
           _buildSearchAndFilter(theme),
           Expanded(
             child: Consumer<RoleManagementProvider>(
@@ -145,7 +151,10 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount:
                       provider.users.length + (provider.hasMoreUsers ? 1 : 0),
                   itemBuilder: (context, index) {
@@ -173,17 +182,12 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
   }
 
   Widget _buildSearchAndFilter(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
+
     return Consumer<RoleManagementProvider>(
       builder: (context, provider, _) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
-          ),
+          padding: const EdgeInsets.all(16),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 600;
@@ -191,13 +195,23 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
               final searchField = TextField(
                 controller: _searchController,
                 onChanged: (value) => _onSearchChanged(value, provider),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: 'Search by name or mobile number',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  hintText: 'Search name or mobile...',
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   suffixIcon: _searchController.text.isEmpty
                       ? null
                       : IconButton(
-                          icon: const Icon(Icons.clear),
+                          icon: const Icon(Icons.clear, size: 18),
                           onPressed: () {
                             _debounceTimer?.cancel();
                             _searchController.clear();
@@ -213,9 +227,27 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
                 key: ValueKey(
                   'role-filter-${provider.selectedRoleFilter ?? 'all'}',
                 ),
-                initialValue: provider.selectedRoleFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Filter by role'),
+                value: provider.selectedRoleFilter,
+                isExpanded: false,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Filter by role',
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
                 items: [
                   const DropdownMenuItem<String?>(
                     value: null,

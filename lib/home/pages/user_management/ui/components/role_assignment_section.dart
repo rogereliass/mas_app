@@ -173,120 +173,135 @@ class RoleAssignmentSection extends StatelessWidget {
 
                 return Column(
                   children: [
-                    CheckboxListTile(
-                      value: isSelected,
-                      onChanged: canEditRole
-                          ? (value) {
-                              onRoleToggled(role, value ?? false);
-                            }
-                          : null,
-                      title: Text(
-                        role.name,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (role.description != null)
-                            Text(
-                              role.description!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.7,
-                                ),
-                              ),
-                            ),
-                          // Show indicator for troop-scoped roles when selected
-                          if (isSelected &&
-                              isTroopScoped &&
-                              !shouldLockExistingContext) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline,
-                                  size: 14,
-                                  color: colorScheme.tertiary,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    'Requires troop assignment',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.tertiary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (wasAlreadyAssigned) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 14,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    assignment?.troopContextName != null
-                                        ? 'Currently assigned · ${assignment!.troopContextName}'
-                                        : 'Currently assigned',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                                if (shouldLockExistingContext &&
-                                    onRequestEditTroopContext != null)
-                                  IconButton(
-                                    onPressed: canEditRole
-                                        ? () => onRequestEditTroopContext!(
-                                            role.id,
-                                          )
-                                        : null,
-                                    icon: const Icon(
-                                      Icons.swap_horiz,
-                                      size: 16,
-                                    ),
-                                    tooltip: 'Change troop context',
-                                    constraints: const BoxConstraints(
-                                      minWidth: 28,
-                                      minHeight: 28,
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                      secondary: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: colorScheme.error,
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${role.rank}',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: colorScheme.onError,
-                            fontWeight: FontWeight.bold,
+                    Theme(
+                      data: theme.copyWith(
+                        checkboxTheme: theme.checkboxTheme.copyWith(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                       ),
+                      child: CheckboxListTile(
+                        value: isSelected,
+                        onChanged: canEditRole
+                            ? (value) {
+                                onRoleToggled(role, value ?? false);
+                              }
+                            : null,
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                role.name,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Rank ${role.rank}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (role.description != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  role.description!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            if (isSelected && isTroopScoped && !shouldLockExistingContext)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 14,
+                                      color: colorScheme.tertiary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Requires troop assignment',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.tertiary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (wasAlreadyAssigned)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_outline,
+                                      size: 14,
+                                      color: colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        assignment?.troopContextName != null
+                                            ? 'Assigned · ${assignment!.troopContextName}'
+                                            : 'Currently assigned',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: colorScheme.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    if (shouldLockExistingContext && onRequestEditTroopContext != null)
+                                      IconButton(
+                                        onPressed: canEditRole
+                                            ? () => onRequestEditTroopContext!(role.id)
+                                            : null,
+                                        icon: const Icon(Icons.edit_location_alt_outlined, size: 16),
+                                        tooltip: 'Change troop',
+                                        constraints: const BoxConstraints(
+                                          minWidth: 28,
+                                          minHeight: 28,
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        visualDensity: VisualDensity.compact,
+                                        color: colorScheme.primary,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+
                     // Troop context area for troop-scoped roles
                     if (isSelected && isTroopScoped)
                       Padding(

@@ -33,6 +33,7 @@ Current preferences:
 - 2026-03-20 | Prefer instruction docs to be scan-first with a rapid workflow at the top | Active | Added from chat
 - 2026-03-20 | Keep dedicated sections for persistent preferences and agent lessons | Active | Added from chat
 - 2026-03-20 | Allow proactive useful defaults when explicitly approved | Active | "add anything if needed"
+- 2026-03-21 | Auto-log major fixes into Agent Lessons entries when user asks to fix significant issues | Active | Added from chat
 
 ## 3) Agent Lessons Learned (Ongoing Notes)
 
@@ -50,6 +51,7 @@ Template:
 | YYYY-MM-DD | Example: Broke dropdown layout on narrow screen | Missing `isExpanded: true` | Add dropdown checklist item before submit |
 
 Current lessons:
+- 2026-03-21 | Role filter looked broken in role management search UI | Relied on embedded relation filtering (`profile_roles.role_id`) with pagination and stale dropdown form state | Use deterministic two-phase filtering (fetch candidate profiles then intersect with `profile_roles` by `role_id`), preserve filtered offset/limit semantics, and key role filter dropdown by selected value to keep UI state synchronized
 - 2026-03-20 | Wrote memory file content with escaped newlines | Used literal `\\n` text in initial create payload | Verify memory file formatting immediately after create and fix if needed
 
 ## 4) Project Snapshot
