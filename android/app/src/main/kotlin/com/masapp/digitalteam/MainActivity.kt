@@ -1,4 +1,4 @@
-package com.example.masapp
+package com.masapp.digitalteam
 
 import io.flutter.embedding.android.FlutterActivity
 

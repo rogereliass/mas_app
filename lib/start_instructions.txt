@@ -11,6 +11,7 @@ cd C:\path\to\your\flutter_project
 flutter clean
 flutter pub get
 flutter run
+flutter build appbundle --release
 
 ---------------------------------------------------------
 
@@ -21,6 +22,8 @@ Act as a senior production software engineer and review this implementation to e
 - Library Review - file views & download stats
 - Clans, Rovers & Leadership
 - Security Review - SQLInj & XSS, Sanitize User Inputs, secure paths & routes
+- review packages & validity
+
 ---------------------------------------------------------
 
 

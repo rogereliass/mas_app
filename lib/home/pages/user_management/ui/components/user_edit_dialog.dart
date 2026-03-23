@@ -11,7 +11,6 @@ import '../../../../../core/utils/review_mode.dart';
 import '../../../../../core/widgets/gender_selector.dart';
 import '../../data/models/managed_user_profile.dart';
 import '../../logic/user_management_provider.dart';
-import 'role_assignment_section.dart';
 
 /// User Edit Dialog Component
 ///

@@ -226,7 +226,7 @@ class _RoleManagementPageState extends State<RoleManagementPage> {
                 key: ValueKey(
                   'role-filter-${provider.selectedRoleFilter ?? 'all'}',
                 ),
-                value: provider.selectedRoleFilter,
+                initialValue: provider.selectedRoleFilter,
                 isExpanded: false,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurface,

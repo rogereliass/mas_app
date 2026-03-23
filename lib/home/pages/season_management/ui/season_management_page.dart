@@ -361,7 +361,7 @@ class _SeasonManagementPageState extends State<SeasonManagementPage> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedSeasonId,
+                        initialValue: selectedSeasonId,
                         isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Season',

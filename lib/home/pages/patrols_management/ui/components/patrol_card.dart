@@ -81,8 +81,9 @@ class PatrolCard extends StatelessWidget {
                 else
                   ...item.members.map((member) {
                     int stars = 0;
-                    if (member.id == item.patrol.patrolLeaderProfileId) stars = 3;
-                    else if (member.id == item.patrol.assistant1ProfileId) stars = 2;
+                    if (member.id == item.patrol.patrolLeaderProfileId) {
+                      stars = 3;
+                    } else if (member.id == item.patrol.assistant1ProfileId) stars = 2;
                     else if (member.id == item.patrol.assistant2ProfileId) stars = 1;
 
                     return Padding(

@@ -296,9 +296,7 @@ class _RoleEditorDialogState extends State<RoleEditorDialog> {
                         children:
                             widget.profile.roleAssignments.map((assignment) {
                           final contextText =
-                              assignment.troopContextName == null
-                                  ? 'Global'
-                                  : assignment.troopContextName;
+                              assignment.troopContextName ?? 'Global';
 
                           return Container(
                             padding: const EdgeInsets.symmetric(

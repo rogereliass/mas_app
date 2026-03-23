@@ -1,4 +1,4 @@
-{
+﻿{
   "project_info": {
     "project_number": "444962361160",
     "project_id": "mas-app-1dc45",
@@ -10,6 +10,44 @@
         "mobilesdk_app_id": "1:444962361160:android:4f863c3eb3d3f862772d7d",
         "android_client_info": {
           "package_name": "com.example.masapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKos3MlwdLZvr8NEVsd2nEB7GfiOBoCtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444962361160:android:b6428e0bc3f51aa0772d7d",
+        "android_client_info": {
+          "package_name": "com.mas.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKos3MlwdLZvr8NEVsd2nEB7GfiOBoCtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444962361160:android:59fa2a1cfbeebd23772d7d",
+        "android_client_info": {
+          "package_name": "com.masapp.digitalteam"
         }
       },
       "oauth_client": [],

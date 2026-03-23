@@ -447,7 +447,7 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                   icon: Icons.group_add_rounded,
                   children: [
                     DropdownButtonFormField<NotificationTargetType>(
-                      value: _selectedTargetType,
+                      initialValue: _selectedTargetType,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Target Type'),
                       items: availableTargets.map((type) {
@@ -476,7 +476,7 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                         isSystemSender) ...[
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _selectedTroopId,
+                        initialValue: _selectedTroopId,
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Filter by Troop'),
                         items: _troopOptions.map((troop) {
@@ -511,7 +511,7 @@ class _NotificationComposeModalState extends State<NotificationComposeModal> {
                         _selectedTargetType != NotificationTargetType.all) ...[
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _selectedTargetId,
+                        initialValue: _selectedTargetId,
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: _targetSelectionLabel(_selectedTargetType!),

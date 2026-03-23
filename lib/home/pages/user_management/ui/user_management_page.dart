@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/models/role.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/admin_scope_banner.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_view.dart';

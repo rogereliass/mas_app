@@ -160,7 +160,7 @@ class _AdminNotificationsAuditScreenState
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<NotificationType?>(
-                              value: _selectedType,
+                              initialValue: _selectedType,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Sender Type',
@@ -175,7 +175,7 @@ class _AdminNotificationsAuditScreenState
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<NotificationTargetType?>(
-                              value: _selectedTargetType,
+                              initialValue: _selectedTargetType,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Target Type',
@@ -197,7 +197,7 @@ class _AdminNotificationsAuditScreenState
                       if (_selectedTargetType != NotificationTargetType.all) ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String?>(
-                          value: _selectedTroopId,
+                          initialValue: _selectedTroopId,
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Specific Troop Scope',
