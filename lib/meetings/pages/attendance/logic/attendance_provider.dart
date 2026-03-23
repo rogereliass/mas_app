@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
+import 'package:masapp/routing/navigation_service.dart';
 import '../data/models/attendance_record.dart';
 import '../data/attendance_service.dart';
 import '../../meeting_creation/data/meetings_service.dart';
@@ -160,6 +162,7 @@ class AttendanceProvider with ChangeNotifier {
   /// Rank < 60 — regular member view (only sees own record).
   /// Uses globally selected role context from AuthProvider.
   bool get isRegularMember => _authProvider.selectedRoleRank < 60;
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
 
   /// Returns the current local [AttendanceStatus] for [profileId].
   /// Defaults to [AttendanceStatus.absent] when no record exists.
@@ -276,6 +279,15 @@ class AttendanceProvider with ChangeNotifier {
   /// Immediately persists a note for [profileId]'s current attendance record.
   /// Updates the in-memory cache and notifies listeners on success.
   Future<void> updateNotes(String profileId, String? notes) async {
+    if (_isReviewDemoAccount) {
+      _localNotes[profileId] = (notes?.trim().isEmpty ?? true)
+          ? null
+          : notes!.trim();
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return;
+    }
+
     final recordId = _recordIdByProfileId[profileId];
     if (recordId == null) {
       debugPrint(
@@ -297,6 +309,20 @@ class AttendanceProvider with ChangeNotifier {
   /// Persists all locally modified records via a single batch update.
   Future<void> saveChanges() async {
     if (_modifiedProfileIds.isEmpty || _isSaving) return;
+
+    if (_isReviewDemoAccount) {
+      for (final profileId in _modifiedProfileIds) {
+        final current = _localAttendance[profileId];
+        if (current != null) {
+          _originalAttendance[profileId] = current;
+        }
+      }
+      _modifiedProfileIds.clear();
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return;
+    }
 
     _isSaving = true;
     notifyListeners();

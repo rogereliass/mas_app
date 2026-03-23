@@ -125,7 +125,7 @@ class _SmartStackState extends State<SmartStack> {
   }
 
   List<Widget> _buildCardsForRole(String role) {
-    final theme = Theme.of(context);
+    //final theme = Theme.of(context);
     // Determine rank to know role type as in home_page.dart
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final selectedRoleRank = authProvider.getRankForRole(role);

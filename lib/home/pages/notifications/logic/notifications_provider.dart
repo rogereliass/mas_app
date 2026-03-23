@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:masapp/core/utils/review_mode.dart';
+import 'package:masapp/routing/navigation_service.dart';
 
 import '../../../../auth/logic/auth_provider.dart';
 import '../data/models/notification_models.dart';
@@ -41,6 +43,8 @@ class NotificationsProvider with ChangeNotifier {
 
   bool get canSendNotifications =>
       _repository.canUserSendNotifications(_authProvider.selectedRoleRank);
+
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
 
   List<NotificationTargetType> get availableTargetTypes {
     final rank = _authProvider.selectedRoleRank;
@@ -148,6 +152,10 @@ class NotificationsProvider with ChangeNotifier {
     _syncCurrentCacheSnapshot();
     notifyListeners();
 
+    if (_isReviewDemoAccount) {
+      return;
+    }
+
     try {
       await _repository.markNotificationRead(recipientId: recipientId);
     } catch (_) {
@@ -181,6 +189,10 @@ class NotificationsProvider with ChangeNotifier {
     _syncCurrentCacheSnapshot();
     notifyListeners();
 
+    if (_isReviewDemoAccount) {
+      return;
+    }
+
     try {
       await _repository.markAllRead(profileId: profile.id);
     } catch (_) {
@@ -204,6 +216,17 @@ class NotificationsProvider with ChangeNotifier {
     _isSending = true;
     _error = null;
     notifyListeners();
+
+    if (_isReviewDemoAccount) {
+      _isSending = false;
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return NotificationCreateResult(
+        notificationId: 'review-${DateTime.now().microsecondsSinceEpoch}',
+        recipientCount: 0,
+      );
+    }
 
     try {
       final result = await _repository.sendNotification(

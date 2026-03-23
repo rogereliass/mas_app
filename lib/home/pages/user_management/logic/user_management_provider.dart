@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../../../../core/utils/ttl_cache.dart';
+import '../../../../core/utils/review_mode.dart';
 import '../../../../auth/data/role_repository.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/models/role.dart';
 import '../../../../auth/models/user_profile.dart';
+import '../../../../routing/navigation_service.dart';
 import '../data/models/managed_user_profile.dart';
 import '../data/user_management_service.dart';
 
@@ -405,6 +407,12 @@ class UserManagementProvider with ChangeNotifier {
       final currentUser = _effectiveUserProfile;
       if (currentUser == null) {
         throw Exception('No authenticated user');
+      }
+
+      if (isReviewDemoEmail(_authProvider.userEmail)) {
+        _error = null;
+        NavigationService.showMessage(kReviewModeSuccessMessage);
+        return true;
       }
 
       // Update basic profile fields (name, email, address, etc.)

@@ -1,3 +1,7 @@
+def keystoreProperties = new Properties()
+    def keystorePropertiesFile = rootProject.file("key.properties")
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -9,6 +13,7 @@ plugins {
 }
 
 android {
+    
     namespace = "com.example.masapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -35,11 +40,20 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
         }
     }
+
+    signingConfigs {
+    release {
+        keyAlias keystoreProperties['keyAlias']
+        keyPassword keystoreProperties['keyPassword']
+        storeFile file(keystoreProperties['storeFile'])
+        storePassword keystoreProperties['storePassword']
+    }
+}
 }
 
 flutter {

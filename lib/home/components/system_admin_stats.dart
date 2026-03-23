@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+// ignore: unused_import
 import '../../core/constants/app_colors.dart';
 import '../../routing/app_router.dart';
 import '../logic/home_overview_stats_provider.dart';
@@ -48,6 +49,7 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // ignore: unused_local_variable
     final colorScheme = theme.colorScheme;
 
     return Consumer<HomeOverviewStatsProvider>(
@@ -233,6 +235,7 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
 }
 
 /// Individual Stat Card Widget
+// ignore: unused_element
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String label;

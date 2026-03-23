@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../../../auth/logic/auth_provider.dart';
 import '../../../../../auth/models/role.dart';
 import '../../../../../core/constants/app_colors.dart';
+import '../../../../../core/utils/review_mode.dart';
 import '../../../../../core/widgets/gender_selector.dart';
 import '../../data/models/managed_user_profile.dart';
 import '../../logic/user_management_provider.dart';
@@ -825,10 +826,19 @@ class _UserEditDialogState extends State<UserEditDialog> {
       // Reset flags before closing to prevent warning
       _hasUnsavedChanges = false;
       _isSaving = false;
+
+      final authProvider = context.read<AuthProvider>();
+      final isReviewAccount = isReviewDemoEmail(authProvider.userEmail);
       
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User updated successfully')),
+        SnackBar(
+          content: Text(
+            isReviewAccount
+                ? kReviewModeSuccessMessage
+                : 'User updated successfully',
+          ),
+        ),
       );
     } else {
       setState(() {

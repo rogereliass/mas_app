@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../auth/logic/auth_provider.dart';
+import '../../../../core/utils/review_mode.dart';
 import '../../../../core/widgets/admin_scope_banner.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_view.dart';
@@ -595,11 +596,20 @@ class _PatrolsManagementPageState extends State<PatrolsManagementPage> {
     required String successMessage,
     required String errorMessage,
   }) {
+    final authProvider = context.read<AuthProvider>();
+    final isReviewAccount = isReviewDemoEmail(authProvider.userEmail);
+
     final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(success ? successMessage : errorMessage),
-        backgroundColor: success ? colorScheme.primary : colorScheme.error,
+        content: Text(
+          isReviewAccount
+              ? kReviewModeSuccessMessage
+              : (success ? successMessage : errorMessage),
+        ),
+        backgroundColor: (success || isReviewAccount)
+            ? colorScheme.primary
+            : colorScheme.error,
       ),
     );
   }

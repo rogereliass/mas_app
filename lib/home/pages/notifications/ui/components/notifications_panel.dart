@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/routing/deep_link/deep_link_service.dart';
 
 import '../../../../../auth/logic/auth_provider.dart';
@@ -270,10 +271,15 @@ class _NotificationsPanelState extends State<NotificationsPanel> {
       return;
     }
 
+    final authProvider = context.read<AuthProvider>();
+    final isReviewAccount = isReviewDemoEmail(authProvider.userEmail);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Notification sent to ${result.recipientCount} recipient(s).',
+          isReviewAccount
+              ? kReviewModeSuccessMessage
+              : 'Notification sent to ${result.recipientCount} recipient(s).',
         ),
         duration: const Duration(seconds: 2),
       ),

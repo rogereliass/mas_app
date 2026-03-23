@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/utils/review_mode.dart';
+import 'package:masapp/routing/navigation_service.dart';
 import '../data/models/meeting.dart';
 import '../data/meetings_service.dart';
 
@@ -110,6 +112,8 @@ class MeetingsProvider with ChangeNotifier {
   /// Uses globally selected role context from AuthProvider.
   bool get isAdmin => _authProvider.selectedRoleRank >= 90;
 
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
+
   /// Admin who hasn't selected a troop yet — UI should show troop picker.
   bool get needsTroopSelection => isAdmin && _selectedTroopId == null;
 
@@ -217,6 +221,11 @@ class MeetingsProvider with ChangeNotifier {
     String? description,
     int? price,
   }) async {
+    if (_isReviewDemoAccount) {
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      return;
+    }
+
     if (_isCreating || effectiveTroopId == null || activeSeasonId == null) {
       return;
     }
@@ -267,6 +276,11 @@ class MeetingsProvider with ChangeNotifier {
     String? description,
     int? price,
   }) async {
+    if (_isReviewDemoAccount) {
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      return;
+    }
+
     if (!canEdit || _isUpdating) return;
     if (!_meetings.any((m) => m.id == meetingId)) {
       _error = 'Could not update meeting: meeting not found.';
@@ -308,6 +322,11 @@ class MeetingsProvider with ChangeNotifier {
 
   /// Deletes a meeting and removes it from local state.
   Future<void> deleteMeeting(String meetingId) async {
+    if (_isReviewDemoAccount) {
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      return;
+    }
+
     if (!canEdit || _deletingMeetingIds.contains(meetingId)) return;
 
     _deletingMeetingIds.add(meetingId);

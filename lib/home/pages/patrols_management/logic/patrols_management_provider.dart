@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/utils/review_mode.dart';
 
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/models/user_profile.dart';
@@ -119,6 +120,7 @@ class PatrolsManagementProvider with ChangeNotifier {
   bool get isProcessing => _isProcessing;
   bool get hasError => _error != null;
   String? get error => _error;
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
 
   bool get isSystemScoped {
     final user = _effectiveUserProfile;
@@ -284,6 +286,12 @@ class PatrolsManagementProvider with ChangeNotifier {
     String? assistant1ProfileId,
     String? assistant2ProfileId,
   }) async {
+    if (_isReviewDemoAccount) {
+      _error = null;
+      notifyListeners();
+      return true;
+    }
+
     return _processMutation(() async {
       final context = _mutationContext();
 
@@ -310,6 +318,12 @@ class PatrolsManagementProvider with ChangeNotifier {
     String? assistant1ProfileId,
     String? assistant2ProfileId,
   }) async {
+    if (_isReviewDemoAccount) {
+      _error = null;
+      notifyListeners();
+      return true;
+    }
+
     return _processMutation(() async {
       final context = _mutationContext();
 
@@ -330,6 +344,12 @@ class PatrolsManagementProvider with ChangeNotifier {
   }
 
   Future<bool> deletePatrol(String patrolId) async {
+    if (_isReviewDemoAccount) {
+      _error = null;
+      notifyListeners();
+      return true;
+    }
+
     return _processMutation(() async {
       final context = _mutationContext();
 
@@ -348,6 +368,12 @@ class PatrolsManagementProvider with ChangeNotifier {
     required String memberProfileId,
     required String patrolId,
   }) async {
+    if (_isReviewDemoAccount) {
+      _error = null;
+      notifyListeners();
+      return true;
+    }
+
     return _processMutation(() async {
       final context = _mutationContext();
 
@@ -376,6 +402,12 @@ class PatrolsManagementProvider with ChangeNotifier {
     required String patrolId,
     required List<String> memberIds,
   }) async {
+    if (_isReviewDemoAccount) {
+      _error = null;
+      notifyListeners();
+      return true;
+    }
+
     return _processMutation(() async {
       final context = _mutationContext();
 

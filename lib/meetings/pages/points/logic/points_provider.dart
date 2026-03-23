@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
+import 'package:masapp/routing/navigation_service.dart';
 
 import '../data/models/patrol_option.dart';
 import '../data/models/patrol_points_summary.dart';
@@ -93,6 +95,7 @@ class PointsProvider with ChangeNotifier {
   bool get canTogglePointsVisibility => _authProvider.selectedRoleRank >= 60;
   bool get isSystemAdmin => _authProvider.selectedRoleRank >= 90;
   bool get isReadOnlyMember => _authProvider.selectedRoleRank < 60;
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
 
   Meeting? get selectedMeeting {
     if (_meetings.isEmpty) return null;
@@ -234,6 +237,45 @@ class PointsProvider with ChangeNotifier {
       throw Exception('Could not determine your profile for this action.');
     }
 
+    if (_isReviewDemoAccount) {
+      final patrolName = _patrolsByTroop[troopId]
+          ?.where((patrol) => patrol.id == formData.patrolId)
+          .map((patrol) => patrol.name)
+          .cast<String?>()
+          .firstWhere((_) => true, orElse: () => null);
+      final categoryName = _categoriesByTroop[troopId]
+          ?.where((category) => category.id == formData.categoryId)
+          .map((category) => category.name)
+          .cast<String?>()
+          .firstWhere((_) => true, orElse: () => null);
+
+      final simulated = PointEntry(
+        id: 'review-${DateTime.now().microsecondsSinceEpoch}',
+        meetingId: meetingId,
+        patrolId: formData.patrolId,
+        categoryId: formData.categoryId,
+        value: formData.value,
+        reason: formData.reason,
+        awardedByProfileId: profileId,
+        createdAt: DateTime.now(),
+        approved: false,
+        patrolName: patrolName ?? 'Selected Patrol',
+        categoryName: categoryName ?? 'Selected Category',
+        awardedByName:
+            _authProvider.currentUserProfile?.fullName ??
+            _authProvider.fullName ??
+            'Reviewer',
+      );
+
+      _points = [simulated, ..._points]
+        ..sort((a, b) => b.sortTimestamp.compareTo(a.sortTimestamp));
+      _cachedSelectedMeetingSummary = null;
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return;
+    }
+
     _isCreatingPoint = true;
     _error = null;
     notifyListeners();
@@ -279,6 +321,49 @@ class PointsProvider with ChangeNotifier {
     }
     if (meetingId == null || meetingId.isEmpty) {
       throw Exception('Please select a meeting first.');
+    }
+
+    if (_isReviewDemoAccount) {
+      final existingIndex = _points.indexWhere((entry) => entry.id == pointId);
+      if (existingIndex >= 0) {
+        final existing = _points[existingIndex];
+        final patrolName = _patrolsByTroop[troopId]
+            ?.where((patrol) => patrol.id == formData.patrolId)
+            .map((patrol) => patrol.name)
+            .cast<String?>()
+            .firstWhere((_) => true, orElse: () => null);
+        final categoryName = _categoriesByTroop[troopId]
+            ?.where((category) => category.id == formData.categoryId)
+            .map((category) => category.name)
+            .cast<String?>()
+            .firstWhere((_) => true, orElse: () => null);
+
+        final updated = PointEntry(
+          id: existing.id,
+          meetingId: existing.meetingId,
+          patrolId: formData.patrolId,
+          categoryId: formData.categoryId,
+          value: formData.value,
+          reason: formData.reason,
+          awardedByProfileId: existing.awardedByProfileId,
+          createdAt: existing.createdAt,
+          approved: existing.approved,
+          patrolName: patrolName ?? existing.patrolName,
+          categoryName: categoryName ?? existing.categoryName,
+          awardedByName: existing.awardedByName,
+        );
+
+        final nextPoints = [..._points];
+        nextPoints[existingIndex] = updated;
+        _points = nextPoints
+          ..sort((a, b) => b.sortTimestamp.compareTo(a.sortTimestamp));
+        _cachedSelectedMeetingSummary = null;
+      }
+
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return;
     }
 
     _updatingPointIds.add(pointId);
@@ -332,6 +417,14 @@ class PointsProvider with ChangeNotifier {
 
     final nextHiddenState = !_troopPointsHidden;
 
+    if (_isReviewDemoAccount) {
+      _troopPointsHidden = nextHiddenState;
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return;
+    }
+
     _isTogglingPointsVisibility = true;
     _error = null;
     notifyListeners();
@@ -367,6 +460,22 @@ class PointsProvider with ChangeNotifier {
     final troopId = _activeTroopId;
     if (troopId == null || troopId.isEmpty) {
       throw Exception('Could not determine troop context for this action.');
+    }
+
+    if (_isReviewDemoAccount) {
+      final created = PointCategory(
+        id: 'review-category-${DateTime.now().microsecondsSinceEpoch}',
+        name: name.trim(),
+        description: description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
+        troopId: troopId,
+      );
+      _upsertCategoryInCache(troopId: troopId, category: created);
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return created;
     }
 
     _isCreatingCategory = true;
@@ -407,6 +516,32 @@ class PointsProvider with ChangeNotifier {
     final troopId = _activeTroopId;
     if (troopId == null || troopId.isEmpty) {
       throw Exception('Could not determine troop context for this action.');
+    }
+
+    if (_isReviewDemoAccount) {
+      final existing = (_categoriesByTroop[troopId] ?? const <PointCategory>[])
+          .where((category) => category.id == categoryId)
+          .cast<PointCategory?>()
+          .firstWhere((_) => true, orElse: () => null);
+
+      final updated = (existing ??
+              PointCategory(
+                id: categoryId,
+                name: name.trim(),
+                troopId: troopId,
+              ))
+          .copyWith(
+            name: name.trim(),
+            description: description?.trim().isEmpty == true
+                ? null
+                : description?.trim(),
+          );
+
+      _upsertCategoryInCache(troopId: troopId, category: updated);
+      _error = null;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return updated;
     }
 
     _updatingCategoryIds.add(categoryId);
