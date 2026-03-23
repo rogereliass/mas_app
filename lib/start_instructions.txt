@@ -28,11 +28,12 @@ Act as a senior production software engineer and review this implementation to e
 ---------------------------------------------------------
 
 
+-🏗️ QR code for attendance recording - [Troop Heads]
 -🏗️ user creation button for admin/troop head,leaders
+-🏗️ FCM notification issue
 - add reporting to library views
 - Eftekad Module
 - Leadership View & Stats
--🏗️ QR code for attendance recording - [Troop Heads]
 
 ---------------------------------------------------------
 
