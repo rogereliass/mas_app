@@ -76,7 +76,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         );
       } else {
         final errorMessage =
-            authProvider.errorMessage ?? 'Failed to send verification code';
+            authProvider.errorMessage ?? 'We couldn\'t send the verification code.';
         if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
           await AuthErrorDialog.showEmailOtpFallback(context: context);
         } else {

@@ -30,7 +30,7 @@ class AuthRepository {
   }
 
   static const String otpEmailSendFailureMessage =
-      'We couldn\'t send the verification email right now. Please try again later or contact support.';
+      'We couldn\'t send the verification email. Please try again in a few minutes or contact support.';
 
   /// Sign in with email and password (no OTP required)
   ///
@@ -52,14 +52,14 @@ class AuthRepository {
           );
 
       if (response.user == null) {
-        throw AuthException('Login failed: No user returned');
+        throw AuthException('We couldn\'t sign you in. Please try again.');
       }
 
       return response.user!;
     } on AuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
-      throw AuthException('Login failed: ${e.toString()}');
+      throw AuthException('Login failed. Please try again.');
     }
   }
 
@@ -473,25 +473,25 @@ class AuthRepository {
 
     switch (e.message.toLowerCase()) {
       case String msg when msg.contains('invalid login credentials'):
-        message = 'Invalid email or password';
+        message = 'Wrong email or password. Please try again.';
         break;
       case String msg when msg.contains('email not confirmed'):
-        message = 'Please verify your email address';
+        message = 'You need to confirm your email before signing in.';
         break;
       case String msg when msg.contains('user not found'):
-        message = 'Account not found. Please register first';
+        message = 'We couldn\'t find an account with that email. Would you like to register?';
         break;
       case String msg when msg.contains('user already registered'):
-        message = 'This email is already registered';
+        message = 'This email is already in use. Try signing in instead.';
         break;
       case String msg when msg.contains('invalid email'):
-        message = 'Please enter a valid email address';
+        message = 'That doesn\'t look like a valid email. Please check it.';
         break;
       case String msg when msg.contains('weak password'):
-        message = 'Password is too weak. Use at least 8 characters';
+        message = 'Your password needs to be stronger. Please use at least 8 characters.';
         break;
       case String msg when msg.contains('network'):
-        message = 'Network error. Please check your connection';
+        message = 'Connection issue. Please check your internet and try again.';
         break;
       default:
         message = e.message;

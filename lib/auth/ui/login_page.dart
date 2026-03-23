@@ -89,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
         await AuthErrorDialog.showError(
           context: context,
           message:
-              authProvider.errorMessage ?? 'Login failed. Please try again.',
+              authProvider.errorMessage ?? 'Something went wrong. Please try again.',
         );
       }
     } catch (e) {
@@ -111,16 +111,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushNamedAndRemoveUntil(
-            context,
-            AppRouter.startup,
-            (route) => false,
-          ),
-        ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -129,8 +119,6 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 40),
-
                 // Logo and branding
                 _buildHeader(),
 
@@ -256,22 +244,6 @@ class _LoginPageState extends State<LoginPage> {
             borderRadius: BorderRadius.circular(24),
           ),
           child: Icon(Icons.menu_book, size: 56, color: colorScheme.onPrimary),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Badge
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: theme.cardTheme.color,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.dividerTheme.color!, width: 1),
-          ),
-          child: Text(
-            'SCOUT LIBRARY',
-            style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.5),
-          ),
         ),
 
         const SizedBox(height: 32),

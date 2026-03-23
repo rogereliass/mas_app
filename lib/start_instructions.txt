@@ -19,6 +19,7 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
+- ⚠️ App Offline Use ⚠️
 - Library Review - file views & download stats
 - Clans, Rovers & Leadership
 - Security Review - SQLInj & XSS, Sanitize User Inputs, secure paths & routes

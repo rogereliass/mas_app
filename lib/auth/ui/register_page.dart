@@ -228,7 +228,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (_selectedBirthdate == null) {
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Please select your birthdate',
+        message: 'Please pick your birthdate to continue.',
       );
       return;
     }
@@ -237,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (_selectedGender == null) {
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Please select your gender',
+        message: 'Please select your gender to continue.',
       );
       return;
     }
@@ -246,7 +246,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (_selectedTroopId == null) {
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Please select your troop',
+        message: 'Please select your troop to continue.',
       );
       return;
     }
@@ -304,7 +304,7 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       } else {
         final errorMessage =
-            authProvider.errorMessage ?? 'Failed to send OTP. Please try again.';
+            authProvider.errorMessage ?? 'We couldn\'t send the code. Please try again.';
 
         if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
           await AuthErrorDialog.showEmailOtpFallback(context: context);
@@ -320,7 +320,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       await AuthErrorDialog.showError(
         context: context,
-        message: 'An unexpected error occurred during registration.',
+        message: 'Something went wrong. Please try registering again.',
       );
     } finally {
       if (mounted) {

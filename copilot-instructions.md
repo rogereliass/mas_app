@@ -1,7 +1,14 @@
 # MAS App - Copilot Instructions
 
 ## General Overview
-MAS App is a community management tool for scouts and similar organizations, built with Flutter and Supabase. It features role-based access control, troop-scoped admin features, and a modern Material 3 design.
+MAS App is a community management tool for scouts and similar organizations, built with Flutter and Supabase. It features role-based access control, troop-scoped admin features, and a modern Material 3 design with a clean, compact authentication flow.
+
+### Login & Authentication (Refined & Modernized)
+The login and registration flows have been optimized for clarity and focus.
+- **Top Layout**: Minimalist top padding using `SafeArea` without redundant `AppBar` gaps for a more immersive feel.
+- **Branding**: Clean logo representation without redundant badges.
+- **Error Handling**: Authentication updates and notices use a softened `AuthErrorDialog` with `Icons.info_outline` and primary/neutral colors instead of aggressive red "Error" banners. This provides a more graceful experience for common issues like typos.
+- **Responsiveness**: Scrollable layouts (`SingleChildScrollView`) to ensure all content is visible on any screen size, especially when the keyboard is active.
 
 ## Features & Modules
 

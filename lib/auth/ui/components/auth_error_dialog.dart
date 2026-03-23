@@ -30,12 +30,12 @@ class AuthErrorDialog extends StatelessWidget {
     );
   }
 
-  /// Show error dialog with only message (title defaults to "Error")
+  /// Show error dialog with only message (title defaults to "Notice")
   static Future<void> showError({
     required BuildContext context,
     required String message,
   }) {
-    return show(context: context, title: 'Error', message: message);
+    return show(context: context, title: 'Notice', message: message);
   }
 
   static Future<void> showEmailOtpFallback({required BuildContext context}) {
@@ -126,8 +126,8 @@ class AuthErrorDialog extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.error,
-                      foregroundColor: colorScheme.onError,
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -136,7 +136,7 @@ class AuthErrorDialog extends StatelessWidget {
                     child: Text(
                       'OK',
                       style: theme.textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onError,
+                        color: colorScheme.onPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -154,14 +154,14 @@ class AuthErrorDialog extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 80,
-      height: 80,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: colorScheme.error.withValues(alpha: 0.1),
-        border: Border.all(color: colorScheme.error.withValues(alpha: 0.3), width: 2),
+        color: colorScheme.primary.withValues(alpha: 0.1),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2), width: 1.5),
       ),
-      child: Icon(Icons.error_outline, size: 40, color: colorScheme.error),
+      child: Icon(Icons.info_outline, size: 36, color: colorScheme.primary),
     );
   }
 }

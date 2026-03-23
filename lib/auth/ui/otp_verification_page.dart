@@ -174,7 +174,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           _startResendTimer();
         } else {
           final errorMessage =
-              authProvider.errorMessage ?? 'Failed to resend OTP';
+              authProvider.errorMessage ?? 'We couldn\'t resend the code.';
           await _rollbackSignupAuthIfNeeded(
             authProvider: authProvider,
             reason: 'resend OTP request failed',
@@ -218,7 +218,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           _startResendTimer();
         } else {
           final errorMessage =
-              authProvider.errorMessage ?? 'Failed to resend OTP';
+              authProvider.errorMessage ?? 'We couldn\'t resend the code.';
           if (errorMessage == AuthRepository.otpEmailSendFailureMessage) {
             await AuthErrorDialog.showEmailOtpFallback(context: context);
           } else {
@@ -236,7 +236,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
         );
         await AuthErrorDialog.showError(
           context: context,
-          message: 'Please go back and submit registration form again',
+          message: 'Please try submitting the registration form again.',
         );
       }
     } finally {
@@ -254,7 +254,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     if (otpCode.length != 6) {
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Please enter all 6 digits',
+        message: 'Please enter all 6 digits of the code.',
       );
       return;
     }
@@ -269,7 +269,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Too many failed attempts. Please request a new OTP.',
+        message: 'Too many attempts. Please request a new code.',
       );
       return;
     }
@@ -304,8 +304,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           final remainingAttempts = _maxAttempts - _attemptCount;
           await AuthErrorDialog.showError(
             context: context,
-            message: authProvider.errorMessage ?? 'Invalid OTP code${remainingAttempts > 0 
-                    ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} remaining'
+            message: authProvider.errorMessage ?? 'That code doesn\'t seem right${remainingAttempts > 0 
+                    ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} left'
                     : ''}',
           );
           return;
@@ -348,8 +348,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
         await AuthErrorDialog.showError(
           context: context,
-          message: authProvider.errorMessage ?? 'Invalid OTP code${remainingAttempts > 0 
-                  ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} remaining'
+          message: authProvider.errorMessage ?? 'That code doesn\'t seem right${remainingAttempts > 0 
+                  ? '\n$remainingAttempts attempt${remainingAttempts != 1 ? "s" : ""} left'
                   : ''}',
         );
         return;
@@ -379,7 +379,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           await AuthErrorDialog.showError(
             context: context,
             message:
-                authProvider.errorMessage ?? 'Failed to finalize account setup.',
+                authProvider.errorMessage ?? 'We couldn\'t finish setting up your account.',
           );
           return;
         }
@@ -408,7 +408,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           
           await AuthErrorDialog.showError(
             context: context,
-            message: 'Registration failed: ${authProvider.errorMessage ?? "Could not save profile"}. Please try again.',
+            message: 'Registration update: ${authProvider.errorMessage ?? "We couldn't save your profile"}. Please try again.',
           );
           
           // Navigate back to registration page
@@ -437,7 +437,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
       await AuthErrorDialog.showError(
         context: context,
-        message: 'Verification failed. Please try again.',
+        message: 'Verification didn\'t work. Please try again.',
       );
     } finally {
       if (mounted) {
