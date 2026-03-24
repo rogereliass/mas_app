@@ -51,6 +51,7 @@ Template:
 | YYYY-MM-DD | Example: Broke dropdown layout on narrow screen | Missing `isExpanded: true` | Add dropdown checklist item before submit |
 
 Current lessons:
+- 2026-03-24 | Attendance QR scanner could keep camera active across lifecycle transitions and generate unstable offline batch fingerprints | Scanner screen lacked app lifecycle camera gating and modified profile IDs were iterated from an unordered set | Add WidgetsBindingObserver-based start/stop handling for scanner state and sort modified profile IDs before building batch payloads
 - 2026-03-22 | Failed-signup rollback left orphan auth users and blocked re-registration | deleteCurrentUser only signed out and did not remove auth.users row | Route rollback through a secured service-role edge function that verifies caller JWT, deletes related profile row, then deletes auth user
 - 2026-03-22 | Signup profile save failed with generation_counters RLS error (42501) | Registration payload persisted placeholder generation and DB counter path lacked authenticated policy coverage | Avoid writing placeholder generation during signup and keep explicit generation_counters RLS/grant migration aligned with trigger/function runtime role
 - 2026-03-22 | Signup OTP flow could complete without persisting a password for future login | Switched signup request to `signInWithOtp(email)` but did not set password after OTP verification | After successful signup OTP verification, call `updateUser(password: ...)` before profile finalization so email+password login remains valid

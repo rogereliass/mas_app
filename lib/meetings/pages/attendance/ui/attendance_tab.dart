@@ -10,6 +10,7 @@ import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart'
 import 'package:masapp/meetings/pages/attendance/logic/attendance_provider.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
 import 'package:masapp/meetings/pages/attendance/ui/components/attendance_row.dart';
+import 'package:masapp/meetings/pages/attendance/ui/qr_scanner_screen.dart';
 import 'package:masapp/profile/ui/profile_qr_code_screen.dart';
 
 /// The "Attendance" tab inside MeetingsPage's TabBarView.
@@ -80,13 +81,18 @@ class _AttendanceTabState extends State<AttendanceTab> {
       _lastAppliedMeetingId = null;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        final provider = Provider.of<AttendanceProvider>(context, listen: false);
+        final provider = Provider.of<AttendanceProvider>(
+          context,
+          listen: false,
+        );
         await _applyInitialMeetingSelection(provider);
       });
     }
   }
 
-  Future<void> _applyInitialMeetingSelection(AttendanceProvider provider) async {
+  Future<void> _applyInitialMeetingSelection(
+    AttendanceProvider provider,
+  ) async {
     final initialMeetingId = widget.initialMeetingId?.trim();
     if (initialMeetingId == null || initialMeetingId.isEmpty) {
       return;
@@ -96,8 +102,9 @@ class _AttendanceTabState extends State<AttendanceTab> {
       return;
     }
 
-    final existsInCurrentList =
-        provider.meetings.any((meeting) => meeting.id == initialMeetingId);
+    final existsInCurrentList = provider.meetings.any(
+      (meeting) => meeting.id == initialMeetingId,
+    );
     if (!existsInCurrentList) {
       return;
     }
@@ -362,8 +369,10 @@ class _ScanQrCodesButton extends StatelessWidget {
 
     return OutlinedButton.icon(
       onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('QR scanning will be added soon.')),
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => QrScannerScreen(attendanceProvider: provider),
+          ),
         );
       },
       icon: const Icon(Icons.qr_code_scanner_outlined, size: 18),

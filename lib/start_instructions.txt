@@ -19,9 +19,10 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
-- ⚠️ App Offline Use Test on Phone
-- ⚠️ Security Review | SQLInj & XSS, Sanitize User Inputs, secure paths & routes
-- ⚠️ FCM notification issue TEST
+-⚠️ App Offline Use Test on Phone
+-⚠️ Security Review | SQLInj & XSS, Sanitize User Inputs, secure paths & routes
+-⚠️ FCM notification issue TEST
+-🏗️ QR code for attendance recording - [Troop Heads]
 
 - Library Review | file views & download stats
 - Clans, Rovers & Leadership
@@ -29,8 +30,6 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
-
--🏗️ QR code for attendance recording - [Troop Heads]
 -🏗️ user creation button for admin/troop head,leaders
 - add reporting to library views
 - Eftekad Module

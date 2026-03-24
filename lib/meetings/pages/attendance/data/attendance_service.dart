@@ -193,10 +193,16 @@ class AttendanceService {
     required String? notes,
   }) async {
     try {
-        await _withTimeout(_supabase
+      var updateQuery = _supabase
           .from('attendance')
           .update({'notes': (notes?.trim().isEmpty ?? true) ? null : notes!.trim()})
-          .eq('id', recordId));
+          .eq('id', recordId);
+
+      if (meetingId != null && meetingId.trim().isNotEmpty) {
+        updateQuery = updateQuery.eq('meeting_id', meetingId.trim());
+      }
+
+      await _withTimeout(updateQuery);
 
       if (meetingId != null && meetingId.trim().isNotEmpty) {
         _attendanceCache.invalidate(meetingId.trim());
@@ -224,7 +230,7 @@ class AttendanceService {
             'status': r.status.dbValue,
             'marked_by_profile_id': r.markedByProfileId,
             'marked_at': DateTime.now().toIso8601String(),
-          }).eq('id', r.id)),
+          }).eq('id', r.id).eq('meeting_id', r.meetingId).eq('profile_id', r.profileId)),
         ),
       );
 

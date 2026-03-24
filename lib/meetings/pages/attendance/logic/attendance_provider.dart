@@ -10,6 +10,26 @@ import '../data/models/attendance_record.dart';
 import '../data/attendance_service.dart';
 import '../../meeting_creation/data/meetings_service.dart';
 
+enum AttendanceScanMarkResultType {
+  markedPresent,
+  alreadyPresent,
+  invalidContext,
+  unauthorized,
+  error,
+}
+
+class AttendanceScanMarkResult {
+  const AttendanceScanMarkResult({
+    required this.type,
+    this.memberName,
+    this.errorMessage,
+  });
+
+  final AttendanceScanMarkResultType type;
+  final String? memberName;
+  final String? errorMessage;
+}
+
 /// Provider for the Attendance feature.
 ///
 /// Loads meetings for a given troop+season, lets the user navigate between
@@ -322,7 +342,9 @@ class AttendanceProvider with ChangeNotifier {
       _localNotes[profileId] = (notes?.trim().isEmpty ?? true)
           ? null
           : notes!.trim();
-      NavigationService.showMessage('Action saved offline and will sync automatically');
+      NavigationService.showMessage(
+        'Action saved offline and will sync automatically',
+      );
       notifyListeners();
       return;
     }
@@ -363,7 +385,9 @@ class AttendanceProvider with ChangeNotifier {
       final currentUserProfileId = _authProvider.currentUserProfile?.id;
       final changedRecords = <AttendanceRecord>[];
 
-      for (final profileId in _modifiedProfileIds) {
+      final orderedProfileIds = _modifiedProfileIds.toList()..sort();
+
+      for (final profileId in orderedProfileIds) {
         final recordId = _recordIdByProfileId[profileId];
         if (recordId == null) {
           // Shouldn't happen after lazy-fill, but skip gracefully.
@@ -413,7 +437,9 @@ class AttendanceProvider with ChangeNotifier {
           if (current != null) _originalAttendance[profileId] = current;
         }
         _modifiedProfileIds.clear();
-        NavigationService.showMessage('Action saved offline and will sync automatically');
+        NavigationService.showMessage(
+          'Action saved offline and will sync automatically',
+        );
         return;
       }
 
@@ -432,6 +458,65 @@ class AttendanceProvider with ChangeNotifier {
       _isSaving = false;
       notifyListeners();
     }
+  }
+
+  /// Handles a single scanned profile by marking it Present and persisting immediately.
+  /// Reuses existing status update + save flow, including offline queue behavior.
+  Future<AttendanceScanMarkResult> markPresentFromScan(String profileId) async {
+    if (!isEditor) {
+      return const AttendanceScanMarkResult(
+        type: AttendanceScanMarkResultType.unauthorized,
+      );
+    }
+
+    if (_selectedMeetingId == null) {
+      return const AttendanceScanMarkResult(
+        type: AttendanceScanMarkResultType.invalidContext,
+      );
+    }
+
+    MemberWithAttendance? member;
+    for (final currentMember in _members) {
+      if (currentMember.profileId == profileId) {
+        member = currentMember;
+        break;
+      }
+    }
+
+    if (member == null) {
+      return const AttendanceScanMarkResult(
+        type: AttendanceScanMarkResultType.invalidContext,
+      );
+    }
+
+    if (statusFor(profileId) == AttendanceStatus.present) {
+      return AttendanceScanMarkResult(
+        type: AttendanceScanMarkResultType.alreadyPresent,
+        memberName: member.displayName,
+      );
+    }
+
+    final previousStatus = statusFor(profileId);
+    updateStatus(profileId, AttendanceStatus.present);
+
+    _error = null;
+    await saveChanges();
+
+    if (_error != null) {
+      // Preserve data integrity for unexpected online failures by restoring local state.
+      updateStatus(profileId, previousStatus);
+
+      return AttendanceScanMarkResult(
+        type: AttendanceScanMarkResultType.error,
+        memberName: member.displayName,
+        errorMessage: 'Failed to mark attendance. Please try again.',
+      );
+    }
+
+    return AttendanceScanMarkResult(
+      type: AttendanceScanMarkResultType.markedPresent,
+      memberName: member.displayName,
+    );
   }
 
   /// Clears the current error and notifies listeners.
@@ -686,20 +771,23 @@ class AttendanceProvider with ChangeNotifier {
           );
           break;
         case 'batch_update':
-          final rows = (payload['records'] as List<dynamic>? ?? const <dynamic>[])
-              .whereType<Map>()
-              .map((row) => AttendanceRecord(
-                    id: row['id'] as String,
-                    meetingId: row['meetingId'] as String,
-                    profileId: row['profileId'] as String,
-                    status: AttendanceStatusX.fromString(
-                      (row['status'] as String?) ?? 'absent',
+          final rows =
+              (payload['records'] as List<dynamic>? ?? const <dynamic>[])
+                  .whereType<Map>()
+                  .map(
+                    (row) => AttendanceRecord(
+                      id: row['id'] as String,
+                      meetingId: row['meetingId'] as String,
+                      profileId: row['profileId'] as String,
+                      status: AttendanceStatusX.fromString(
+                        (row['status'] as String?) ?? 'absent',
+                      ),
+                      markedByProfileId: row['markedByProfileId'] as String?,
+                      markedAt: DateTime.now(),
+                      notes: null,
                     ),
-                    markedByProfileId: row['markedByProfileId'] as String?,
-                    markedAt: DateTime.now(),
-                    notes: null,
-                  ))
-              .toList(growable: false);
+                  )
+                  .toList(growable: false);
 
           await _attendanceService.batchUpdateAttendance(rows);
           break;
