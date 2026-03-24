@@ -1,15 +1,29 @@
 import 'package:flutter/foundation.dart';
 
 import '../../auth/data/role_repository.dart';
+import '../../auth/models/user_profile.dart';
 import '../app_router.dart';
 import '../navigation_service.dart';
 import 'deep_link_model.dart';
 
 class DeepLinkHandler {
-  DeepLinkHandler({RoleRepository? roleRepository})
-      : _roleRepository = roleRepository ?? RoleRepository();
+  DeepLinkHandler({
+    RoleRepository? roleRepository,
+    Future<UserProfile?> Function()? currentUserProfileLoader,
+  }) : _roleRepository = roleRepository,
+       _currentUserProfileLoader = currentUserProfileLoader;
 
-  final RoleRepository _roleRepository;
+  RoleRepository? _roleRepository;
+  final Future<UserProfile?> Function()? _currentUserProfileLoader;
+
+  Future<UserProfile?> _getCurrentUserProfile() {
+    final loader = _currentUserProfileLoader;
+    if (loader != null) {
+      return loader();
+    }
+    _roleRepository ??= RoleRepository();
+    return _roleRepository!.getCurrentUserProfile();
+  }
 
   Future<DeepLinkHandleResult> handle(DeepLinkModel link) async {
     if (!link.isValid) {
@@ -55,10 +69,18 @@ class DeepLinkHandler {
   }
 
   Future<DeepLinkHandleResult> _openMeetingsManagement(DeepLinkModel link) async {
-    if (!await _isAuthenticated()) {
+    final profile = await _getCurrentUserProfile();
+    if (profile == null) {
       return const DeepLinkHandleResult(
         handled: false,
         message: 'Please sign in to open this notification.',
+      );
+    }
+
+    if (profile.roleRank < 60) {
+      return const DeepLinkHandleResult(
+        handled: false,
+        message: 'You are not allowed to open meeting management.',
       );
     }
 
@@ -93,7 +115,7 @@ class DeepLinkHandler {
   }
 
   Future<DeepLinkHandleResult> _openPatrols() async {
-    final profile = await _roleRepository.getCurrentUserProfile();
+    final profile = await _getCurrentUserProfile();
     if (profile == null) {
       return const DeepLinkHandleResult(
         handled: false,
@@ -126,7 +148,7 @@ class DeepLinkHandler {
 
   Future<bool> _isAuthenticated() async {
     try {
-      final profile = await _roleRepository.getCurrentUserProfile();
+      final profile = await _getCurrentUserProfile();
       final isAuthenticated = profile != null;
       if (!isAuthenticated && kDebugMode) {
         debugPrint('DeepLinkHandler: ignored request because user is not authenticated.');

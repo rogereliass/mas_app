@@ -15,6 +15,10 @@ import 'models/point_entry.dart';
 
 /// Service responsible for all Supabase operations related to meeting points.
 class PointsService {
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  );
+
   final SupabaseClient _supabase;
   final MeetingsService _meetingsService;
 
@@ -539,23 +543,24 @@ class PointsService {
   Future<List<PatrolOption>> _refreshPatrolsCacheInternal({
     required String troopId,
   }) async {
+    final normalizedTroopId = _normalizeTroopId(troopId);
     _logDataSource(
       operation: 'fetchPatrols',
       source: 'SUPABASE',
-      scope: troopId.trim(),
+      scope: normalizedTroopId,
     );
 
     final result = await _withTimeout(_supabase
         .from('patrols')
         .select('id, troop_id, name')
-        .eq('troop_id', troopId)
+        .eq('troop_id', normalizedTroopId)
       .order('name', ascending: true));
 
     final patrols = (result as List)
         .map((row) => PatrolOption.fromJson(row as Map<String, dynamic>))
         .toList();
 
-    _patrolsCache.set(troopId.trim(), patrols, CacheTtl.patrols);
+    _patrolsCache.set(normalizedTroopId, patrols, CacheTtl.patrols);
     return patrols;
   }
 
@@ -576,39 +581,45 @@ class PointsService {
   Future<List<PointCategory>> _refreshCategoriesCacheInternal({
     required String troopId,
   }) async {
+    final normalizedTroopId = _normalizeTroopId(troopId);
     _logDataSource(
       operation: 'fetchCategories',
       source: 'SUPABASE',
-      scope: troopId.trim(),
+      scope: normalizedTroopId,
     );
 
     final result = await _withTimeout(_supabase
         .from('point_categories')
         .select('id, slug, name, description, troop_id')
-        .or('troop_id.is.null,troop_id.eq.$troopId')
+        .or('troop_id.is.null,troop_id.eq.$normalizedTroopId')
       .order('name', ascending: true));
 
     final categories = (result as List)
         .map((row) => PointCategory.fromJson(row as Map<String, dynamic>))
         .toList();
 
-    _categoriesCache.set(troopId.trim(), categories, CacheTtl.pointCategories);
+    _categoriesCache.set(
+      normalizedTroopId,
+      categories,
+      CacheTtl.pointCategories,
+    );
     return categories;
   }
 
   Future<bool> _refreshTroopPointsHiddenCache({required String troopId}) async {
+    final normalizedTroopId = _normalizeTroopId(troopId);
     _logDataSource(
       operation: 'fetchTroopPointsHidden',
       source: 'SUPABASE',
-      scope: troopId.trim(),
+      scope: normalizedTroopId,
     );
 
-    _assertTroopContextAvailable(troopId);
+    _assertTroopContextAvailable(normalizedTroopId);
 
     final row = await _withTimeout(_supabase
         .from('troops')
         .select('id, points_hidden')
-        .eq('id', troopId)
+        .eq('id', normalizedTroopId)
       .maybeSingle());
 
     if (row == null) {
@@ -617,7 +628,7 @@ class PointsService {
 
     final hidden = row['points_hidden'] as bool? ?? false;
     _pointsVisibilityCache.set(
-      troopId.trim(),
+      normalizedTroopId,
       hidden,
       CacheTtl.troopPointsVisibility,
     );
@@ -984,6 +995,14 @@ class PointsService {
     if (troopId.trim().isEmpty) {
       throw Exception('Could not determine troop context for this action.');
     }
+  }
+
+  String _normalizeTroopId(String troopId) {
+    final normalized = troopId.trim();
+    if (!_uuidPattern.hasMatch(normalized)) {
+      throw Exception('Invalid troop id provided for points operation.');
+    }
+    return normalized;
   }
 
   Future<void> _assertNoCategoryConflicts({

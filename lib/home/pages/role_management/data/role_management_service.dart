@@ -104,10 +104,12 @@ class RoleManagementService with ScopedServiceMixin {
 
     final normalizedSearch = searchQuery?.trim() ?? '';
     if (normalizedSearch.isNotEmpty) {
-      final q = '%$normalizedSearch%';
-      query = query.or(
-        'first_name.ilike.$q,middle_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q',
-      );
+      final q = _toSafeIlikePattern(normalizedSearch);
+      if (q != null) {
+        query = query.or(
+          'first_name.ilike.$q,middle_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q',
+        );
+      }
     }
 
     final response = await query
@@ -115,6 +117,24 @@ class RoleManagementService with ScopedServiceMixin {
         .range(offset, offset + limit - 1);
 
     return _parseUsers(response);
+  }
+
+  String? _toSafeIlikePattern(String? raw) {
+    final trimmed = raw?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+
+    final sanitized = trimmed
+      .replaceAll(',', ' ')
+      .replaceAll('(', ' ')
+      .replaceAll(')', ' ')
+      .replaceAll("'", ' ')
+      .replaceAll('"', ' ')
+      .replaceAll('\\', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (sanitized.isEmpty) return null;
+    return '%$sanitized%';
   }
 
   Future<List<ManagedUserProfile>> _fetchUsersWithDeterministicRoleFilter({

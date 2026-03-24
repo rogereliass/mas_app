@@ -111,10 +111,12 @@ class UserManagementService with ScopedServiceMixin {
 
     // Apply search query
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      final q = '%${searchQuery.trim()}%';
-      query = query.or(
-        'first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q',
-      );
+      final q = _toSafeIlikePattern(searchQuery);
+      if (q != null) {
+        query = query.or(
+          'first_name.ilike.$q,last_name.ilike.$q,name_ar.ilike.$q,phone.ilike.$q,scout_code.ilike.$q',
+        );
+      }
     }
 
     // Sort by last name and apply range
@@ -124,6 +126,24 @@ class UserManagementService with ScopedServiceMixin {
     );
 
     return _parseUsers(response);
+  }
+
+  String? _toSafeIlikePattern(String? raw) {
+    final trimmed = raw?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+
+    final sanitized = trimmed
+      .replaceAll(',', ' ')
+      .replaceAll('(', ' ')
+      .replaceAll(')', ' ')
+      .replaceAll("'", ' ')
+      .replaceAll('"', ' ')
+      .replaceAll('\\', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (sanitized.isEmpty) return null;
+    return '%$sanitized%';
   }
 
   Future<List<ManagedUserProfile>> _fetchUsersWithDeterministicRoleFilter({

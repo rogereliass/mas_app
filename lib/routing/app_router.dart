@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../auth/logic/auth_provider.dart';
 import '../startup/startup_page.dart';
 import '../auth/ui/login_page.dart';
 import '../auth/ui/register_page.dart';
@@ -37,6 +40,53 @@ class MeetingsRouteArgs {
 
   final int initialTabIndex;
   final String? meetingId;
+}
+
+enum ProtectedRouteState {
+  allow,
+  denyUnauthenticated,
+  pendingProfile,
+  denyProfileUnavailable,
+  denyInsufficientRole,
+}
+
+class ProtectedRouteEvaluation {
+  const ProtectedRouteEvaluation(this.state);
+
+  final ProtectedRouteState state;
+
+  bool get isAllowed => state == ProtectedRouteState.allow;
+}
+
+ProtectedRouteEvaluation evaluateProtectedRouteState({
+  required bool isAuthenticated,
+  required bool profileLoading,
+  required bool hasProfile,
+  required int currentUserRoleRank,
+  required int? minRoleRank,
+  required Duration unresolvedProfileDuration,
+  required Duration unresolvedProfileTimeout,
+}) {
+  if (!isAuthenticated) {
+    return const ProtectedRouteEvaluation(ProtectedRouteState.denyUnauthenticated);
+  }
+
+  if (profileLoading) {
+    return const ProtectedRouteEvaluation(ProtectedRouteState.pendingProfile);
+  }
+
+  if (!hasProfile) {
+    if (unresolvedProfileDuration >= unresolvedProfileTimeout) {
+      return const ProtectedRouteEvaluation(ProtectedRouteState.denyProfileUnavailable);
+    }
+    return const ProtectedRouteEvaluation(ProtectedRouteState.pendingProfile);
+  }
+
+  if (minRoleRank != null && currentUserRoleRank < minRoleRank) {
+    return const ProtectedRouteEvaluation(ProtectedRouteState.denyInsufficientRole);
+  }
+
+  return const ProtectedRouteEvaluation(ProtectedRouteState.allow);
 }
 
 /// Centralized routing configuration for the application
@@ -170,29 +220,41 @@ class AppRouter {
     
     // Handle User Acceptance with role context
     if (settings.name == userAcceptance) {
-      return MaterialPageRoute(
-        builder: (context) => const UserAcceptancePage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 60,
+        routeLabel: 'User Acceptance',
+        child: const UserAcceptancePage(),
       );
     }
 
     // Handle User Management with role context
     if (settings.name == userManagement) {
-      return MaterialPageRoute(
-        builder: (context) => const UserManagementPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 60,
+        routeLabel: 'User Management',
+        child: const UserManagementPage(),
       );
     }
     
     // Handle Season Management
     if (settings.name == seasonManagement) {
-      return MaterialPageRoute(
-        builder: (context) => const SeasonManagementPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 90,
+        routeLabel: 'Season Management',
+        child: const SeasonManagementPage(),
       );
     }
 
     // Handle Patrols Management with role context
     if (settings.name == patrolsManagement) {
-      return MaterialPageRoute(
-        builder: (context) => const PatrolsManagementPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 60,
+        routeLabel: 'Patrols Management',
+        child: const PatrolsManagementPage(),
       );
     }
     
@@ -200,30 +262,40 @@ class AppRouter {
     if (settings.name == meetings) {
       final args = settings.arguments;
       if (args is MeetingsRouteArgs) {
-        return MaterialPageRoute(
-          builder: (context) => MeetingsPage(
+        return _buildProtectedRoute(
+          settings: settings,
+          routeLabel: 'Meetings',
+          child: MeetingsPage(
             initialTabIndex: args.initialTabIndex,
             initialMeetingId: args.meetingId,
           ),
         );
       }
 
-      return MaterialPageRoute(
-        builder: (context) => const MeetingsPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        routeLabel: 'Meetings',
+        child: const MeetingsPage(),
       );
     }
 
     // Handle Eftekad placeholder page
     if (settings.name == eftekad) {
-      return MaterialPageRoute(
-        builder: (context) => const EftekadPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 60,
+        routeLabel: 'Eftekad',
+        child: const EftekadPage(),
       );
     }
 
     // Handle Manage Roles placeholder page
     if (settings.name == manageRoles) {
-      return MaterialPageRoute(
-        builder: (context) => const RoleManagementPage(),
+      return _buildProtectedRoute(
+        settings: settings,
+        minRoleRank: 100,
+        routeLabel: 'Role Management',
+        child: const RoleManagementPage(),
       );
     }
 
@@ -268,6 +340,22 @@ class AppRouter {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  static MaterialPageRoute _buildProtectedRoute({
+    required RouteSettings settings,
+    required String routeLabel,
+    required Widget child,
+    int? minRoleRank,
+  }) {
+    return MaterialPageRoute(
+      settings: settings,
+      builder: (context) => _ProtectedRoutePage(
+        routeLabel: routeLabel,
+        minRoleRank: minRoleRank,
+        child: child,
       ),
     );
   }
@@ -351,6 +439,183 @@ class AppRouter {
         ),
       ),
     );
+  }
+}
+
+class _ProtectedRoutePage extends StatefulWidget {
+  const _ProtectedRoutePage({
+    required this.routeLabel,
+    required this.child,
+    this.minRoleRank,
+  });
+
+  final String routeLabel;
+  final Widget child;
+  final int? minRoleRank;
+
+  @override
+  State<_ProtectedRoutePage> createState() => _ProtectedRoutePageState();
+}
+
+class _ProtectedRoutePageState extends State<_ProtectedRoutePage> {
+  bool _requestedProfileRefresh = false;
+  DateTime? _profileCheckStartedAt;
+  static const Duration _profileCheckTimeout = Duration(seconds: 8);
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+
+    final unresolvedDuration = _profileCheckStartedAt == null
+        ? Duration.zero
+        : DateTime.now().difference(_profileCheckStartedAt!);
+    final guardEvaluation = evaluateProtectedRouteState(
+      isAuthenticated: authProvider.isAuthenticated,
+      profileLoading: authProvider.profileLoading,
+      hasProfile: authProvider.currentUserProfile != null,
+      currentUserRoleRank: authProvider.currentUserRoleRank,
+      minRoleRank: widget.minRoleRank,
+      unresolvedProfileDuration: unresolvedDuration,
+      unresolvedProfileTimeout: _profileCheckTimeout,
+    );
+
+    if (guardEvaluation.state == ProtectedRouteState.denyUnauthenticated) {
+      return _buildAccessDenied(
+        context,
+        message: 'Please sign in to continue.',
+        redirectToLogin: true,
+      );
+    }
+
+    if (guardEvaluation.state == ProtectedRouteState.pendingProfile &&
+        authProvider.profileLoading) {
+      _profileCheckStartedAt = null;
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (guardEvaluation.state == ProtectedRouteState.pendingProfile &&
+        authProvider.currentUserProfile == null) {
+      _profileCheckStartedAt ??= DateTime.now();
+
+      if (!_requestedProfileRefresh) {
+        _requestedProfileRefresh = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          context.read<AuthProvider>().refreshProfile();
+        });
+      }
+
+      return _buildAccessPending(
+        context,
+        message: 'Checking access permissions. Please wait...',
+      );
+    }
+
+    if (guardEvaluation.state == ProtectedRouteState.denyProfileUnavailable) {
+      return _buildAccessDenied(
+        context,
+        message: 'Unable to confirm your access right now. Please retry.',
+        onRetry: _retryAccessCheck,
+        retryLabel: 'Retry',
+      );
+    }
+
+    _profileCheckStartedAt = null;
+
+    if (guardEvaluation.state == ProtectedRouteState.denyInsufficientRole) {
+      return _buildAccessDenied(
+        context,
+        message: 'You do not have access to ${widget.routeLabel}.',
+      );
+    }
+
+    return widget.child;
+  }
+
+  Widget _buildAccessPending(BuildContext context, {required String message}) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Checking Access')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccessDenied(
+    BuildContext context, {
+    required String message,
+    bool redirectToLogin = false,
+    VoidCallback? onRetry,
+    String retryLabel = 'Retry',
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Access Restricted')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.lock_outline,
+                size: 56,
+                color: colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  final destination = redirectToLogin ? AppRouter.login : AppRouter.home;
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    destination,
+                    (route) => false,
+                  );
+                },
+                child: Text(redirectToLogin ? 'Go to Login' : 'Go to Home'),
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: onRetry,
+                  child: Text(retryLabel),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _retryAccessCheck() {
+    setState(() {
+      _requestedProfileRefresh = false;
+      _profileCheckStartedAt = null;
+    });
+    context.read<AuthProvider>().refreshProfile();
   }
 }
 
