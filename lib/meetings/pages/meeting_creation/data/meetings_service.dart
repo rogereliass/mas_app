@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/constants/offline_policy.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
@@ -11,6 +14,8 @@ class MeetingsService {
   // Static cache keeps entries alive even though instance() creates a new
   // service object at call sites.
   static final TtlCache<String, List<Meeting>> _meetingsCache = TtlCache();
+  static final Map<String, DateTime> _meetingsLastUpdated =
+      <String, DateTime>{};
 
   MeetingsService(this._supabase);
 
@@ -21,6 +26,16 @@ class MeetingsService {
   /// Clears in-memory meetings cache.
   void clearCache() {
     _meetingsCache.clear();
+    _meetingsLastUpdated.clear();
+  }
+
+  DateTime? getMeetingsLastUpdated({
+    required String seasonId,
+    required String troopId,
+  }) {
+    return _meetingsLastUpdated[
+      _meetingsCacheKey(seasonId: seasonId, troopId: troopId)
+    ];
   }
 
   // -------------------------------------------------------------------------
@@ -33,13 +48,13 @@ class MeetingsService {
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
 
-      final result = await _supabase
+      final result = await _withTimeout(_supabase
           .from('seasons')
           .select()
           .lte('start_date', today)
           .gte('end_date', today)
           .limit(1)
-          .maybeSingle();
+          .maybeSingle());
 
       return result;
     } catch (e) {
@@ -54,10 +69,10 @@ class MeetingsService {
   /// Returns a list of troops as `[{id, name}]`, ordered by name.
   Future<List<Map<String, dynamic>>> fetchTroops() async {
     try {
-      final results = await _supabase
+      final results = await _withTimeout(_supabase
           .from('troops')
           .select('id, name')
-          .order('name', ascending: true);
+          .order('name', ascending: true));
 
       return List<Map<String, dynamic>>.from(results as List);
     } catch (e) {
@@ -85,6 +100,13 @@ class MeetingsService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshMeetingsCache(seasonId: seasonId, troopId: troopId);
+        } catch (_) {
+          // Keep current cache result if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -103,6 +125,13 @@ class MeetingsService {
       }
       throw Exception('MeetingsService.fetchMeetings: $e');
     }
+  }
+
+  Future<List<Meeting>> refreshMeetings({
+    required String seasonId,
+    required String troopId,
+  }) {
+    return _refreshMeetingsCache(seasonId: seasonId, troopId: troopId);
   }
 
   /// Inserts a new meeting row and returns the created [Meeting].
@@ -139,11 +168,11 @@ class MeetingsService {
         if (price != null) 'price': price,
       };
 
-      final result = await _supabase
+        final result = await _withTimeout(_supabase
           .from('meetings')
           .insert(payload)
           .select()
-          .single();
+          .single());
 
       _meetingsCache.invalidate(
         _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
@@ -183,12 +212,12 @@ class MeetingsService {
         'price': price,
       };
 
-      final result = await _supabase
+        final result = await _withTimeout(_supabase
           .from('meetings')
           .update(payload)
           .eq('id', meetingId)
           .select()
-          .single();
+          .single());
 
       // Meeting can move between troop/season; clear all list caches safely.
       _meetingsCache.clear();
@@ -202,7 +231,7 @@ class MeetingsService {
   /// Deletes a meeting row by [meetingId].
   Future<void> deleteMeeting(String meetingId) async {
     try {
-      await _supabase.from('meetings').delete().eq('id', meetingId);
+      await _withTimeout(_supabase.from('meetings').delete().eq('id', meetingId));
       _meetingsCache.clear();
     } catch (e) {
       throw Exception('MeetingsService.deleteMeeting: $e');
@@ -219,13 +248,13 @@ class MeetingsService {
       scope: _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
     );
 
-    final results = await _supabase
+    final results = await _withTimeout(_supabase
         .from('meetings')
         .select()
         // TODO: Implement clan-based meeting support
         .eq('season_id', seasonId)
         .eq('troop_id', troopId)
-        .order('meeting_date', ascending: true);
+      .order('meeting_date', ascending: true));
 
     final meetings = (results as List)
         .map((row) => Meeting.fromJson(row as Map<String, dynamic>))
@@ -236,6 +265,9 @@ class MeetingsService {
       meetings,
       CacheTtl.meetingsList,
     );
+    _meetingsLastUpdated[
+      _meetingsCacheKey(seasonId: seasonId, troopId: troopId)
+    ] = DateTime.now();
     return meetings;
   }
 
@@ -264,5 +296,12 @@ class MeetingsService {
       default:
         return source;
     }
+  }
+
+  Future<T> _withTimeout<T>(Future<T> future) {
+    return future.timeout(
+      OfflinePolicy.networkTimeout,
+      onTimeout: () => throw Exception('Network timeout.'),
+    );
   }
 }

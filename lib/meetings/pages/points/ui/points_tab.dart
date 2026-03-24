@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:masapp/core/constants/app_colors.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/widgets/error_view.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
@@ -68,7 +69,10 @@ class _PointsTabState extends State<PointsTab> {
         }
 
         if (provider.noMeetings) {
-          return const _NoMeetingsView();
+          return _NoMeetingsView(
+            isOffline: !ConnectivityService.instance.isOnline,
+            onRetry: _reloadIfScopeReady,
+          );
         }
 
         return Column(
@@ -77,6 +81,19 @@ class _PointsTabState extends State<PointsTab> {
               key: ValueKey(provider.selectedMeetingId),
               provider: provider,
             ),
+            if (provider.pointsLastUpdated != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _formatLastUpdated(provider.pointsLastUpdated!),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
             // TODO(points/custom-categories): surface category management here when leaders can create troop categories.
             if (provider.error != null)
               _InlineErrorBanner(
@@ -573,7 +590,10 @@ class _WaitingForTroopView extends StatelessWidget {
 }
 
 class _NoMeetingsView extends StatelessWidget {
-  const _NoMeetingsView();
+  const _NoMeetingsView({required this.isOffline, required this.onRetry});
+
+  final bool isOffline;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -594,7 +614,9 @@ class _NoMeetingsView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No meetings found for this season.',
+              isOffline
+                  ? 'Offline - No data available'
+                  : 'No meetings found for this season.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: isDark
@@ -602,11 +624,31 @@ class _NoMeetingsView extends StatelessWidget {
                     : AppColors.textSecondaryLight,
               ),
             ),
+            if (isOffline) ...[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+String _formatLastUpdated(DateTime timestamp) {
+  final delta = DateTime.now().difference(timestamp);
+  final minutes = delta.inMinutes;
+  if (minutes < 1) {
+    return 'Last updated just now';
+  }
+  if (minutes == 1) {
+    return 'Last updated 1 min ago';
+  }
+  return 'Last updated $minutes min ago';
 }
 
 class _NoPointsView extends StatelessWidget {

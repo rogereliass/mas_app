@@ -468,65 +468,27 @@ class AuthProvider with ChangeNotifier {
       final saveTasks = <Future<void>>[
         prefs.setString('user_id', _currentUser!.id),
         prefs.setBool('is_authenticated', true),
+        prefs.remove('user_phone').then((_) {}),
+        prefs.remove('user_email').then((_) {}),
+        prefs.remove('user_first_name').then((_) {}),
+        prefs.remove('user_middle_name').then((_) {}),
+        prefs.remove('user_last_name').then((_) {}),
+        prefs.remove('user_name_ar').then((_) {}),
+        prefs.remove('user_address').then((_) {}),
+        prefs.remove('user_birthdate').then((_) {}),
+        prefs.remove('user_gender').then((_) {}),
+        prefs.remove('user_generation').then((_) {}),
       ];
 
-      // Save basic user data
-      if (_currentUser!.phone != null) {
-        saveTasks.add(prefs.setString('user_phone', _currentUser!.phone!));
-      }
-      if (_currentUser!.email != null) {
-        saveTasks.add(prefs.setString('user_email', _currentUser!.email!));
-      }
-
-      // Save all profile data if available
+      // Persist only minimal non-sensitive context required for app bootstrap.
       if (_currentUserProfile != null) {
         final profile = _currentUserProfile!;
-
-        if (profile.firstName != null) {
-          saveTasks.add(prefs.setString('user_first_name', profile.firstName!));
-        }
-        if (profile.middleName != null) {
-          saveTasks.add(
-            prefs.setString('user_middle_name', profile.middleName!),
-          );
-        }
-        if (profile.lastName != null) {
-          saveTasks.add(prefs.setString('user_last_name', profile.lastName!));
-        }
         if (profile.fullName != null) {
           saveTasks.add(prefs.setString('user_full_name', profile.fullName!));
-        }
-        if (profile.nameAr != null) {
-          saveTasks.add(prefs.setString('user_name_ar', profile.nameAr!));
-        }
-        if (profile.email != null) {
-          saveTasks.add(prefs.setString('user_email', profile.email!));
-        }
-        if (profile.phone != null) {
-          saveTasks.add(prefs.setString('user_phone', profile.phone!));
-        }
-        if (profile.address != null) {
-          saveTasks.add(prefs.setString('user_address', profile.address!));
-        }
-        if (profile.birthdate != null) {
-          saveTasks.add(
-            prefs.setString(
-              'user_birthdate',
-              profile.birthdate!.toIso8601String(),
-            ),
-          );
-        }
-        if (profile.gender != null) {
-          saveTasks.add(prefs.setString('user_gender', profile.gender!));
         }
         if (profile.signupTroopId != null) {
           saveTasks.add(
             prefs.setString('user_signup_troop', profile.signupTroopId!),
-          );
-        }
-        if (profile.generation != null) {
-          saveTasks.add(
-            prefs.setString('user_generation', profile.generation!),
           );
         }
 

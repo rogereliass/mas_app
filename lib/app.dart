@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/config/theme_config.dart';
 import 'core/config/theme_provider.dart';
+import 'core/widgets/offline_banner_widget.dart';
 import 'routing/app_router.dart';
 import 'routing/navigation_service.dart';
 
@@ -36,6 +37,17 @@ class MyApp extends StatelessWidget {
           routes: AppRouter.routes,
           onGenerateRoute: AppRouter.onGenerateRoute,
           onUnknownRoute: AppRouter.onUnknownRoute,
+          builder: (context, child) {
+            return Stack(
+              children: [
+                if (child != null) child,
+                const Align(
+                  alignment: Alignment.topCenter,
+                  child: OfflineBannerWidget(),
+                ),
+              ],
+            );
+          },
         );
       },
     );

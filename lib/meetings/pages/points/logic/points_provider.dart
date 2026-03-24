@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
+import 'package:masapp/offline/offline_action_queue.dart';
 import 'package:masapp/routing/navigation_service.dart';
 
 import '../data/models/patrol_option.dart';
@@ -17,6 +20,7 @@ import 'points_summary_aggregator.dart';
 class PointsProvider with ChangeNotifier {
   final PointsService _service;
   final AuthProvider _authProvider;
+  final OfflineActionQueue _offlineQueue = OfflineActionQueue.instance;
 
   List<Meeting> _meetings = [];
   String? _selectedMeetingId;
@@ -40,11 +44,13 @@ class PointsProvider with ChangeNotifier {
 
   bool _noMeetings = false;
   String? _error;
+  DateTime? _pointsLastUpdated;
 
   PointsProvider({PointsService? service, required AuthProvider authProvider})
     : _service = service ?? PointsService.instance(),
       _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
+    _registerOfflineHandlers();
   }
 
   @override
@@ -77,6 +83,7 @@ class PointsProvider with ChangeNotifier {
 
   bool get noMeetings => _noMeetings;
   String? get error => _error;
+  DateTime? get pointsLastUpdated => _pointsLastUpdated;
 
   List<Meeting> get meetings => List.unmodifiable(_meetings);
   List<PointEntry> get points => List.unmodifiable(_points);
@@ -121,6 +128,7 @@ class PointsProvider with ChangeNotifier {
     _isLoadingMeetings = true;
     _error = null;
     _noMeetings = false;
+    _pointsLastUpdated = null;
     _meetings = [];
     _points = [];
     _cachedSelectedMeetingSummary = null;
@@ -237,6 +245,24 @@ class PointsProvider with ChangeNotifier {
       throw Exception('Could not determine your profile for this action.');
     }
 
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'points',
+        payload: <String, dynamic>{
+          'operation': 'create_point',
+          'troopId': troopId,
+          'meetingId': meetingId,
+          'patrolId': formData.patrolId,
+          'categoryId': formData.categoryId,
+          'value': formData.value,
+          'reason': formData.reason,
+          'awardedByProfileId': profileId,
+        },
+      );
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      return;
+    }
+
     if (_isReviewDemoAccount) {
       final patrolName = _patrolsByTroop[troopId]
           ?.where((patrol) => patrol.id == formData.patrolId)
@@ -321,6 +347,24 @@ class PointsProvider with ChangeNotifier {
     }
     if (meetingId == null || meetingId.isEmpty) {
       throw Exception('Please select a meeting first.');
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'points',
+        payload: <String, dynamic>{
+          'operation': 'update_point',
+          'troopId': troopId,
+          'pointId': pointId,
+          'meetingId': meetingId,
+          'patrolId': formData.patrolId,
+          'categoryId': formData.categoryId,
+          'value': formData.value,
+          'reason': formData.reason,
+        },
+      );
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      return;
     }
 
     if (_isReviewDemoAccount) {
@@ -417,6 +461,22 @@ class PointsProvider with ChangeNotifier {
 
     final nextHiddenState = !_troopPointsHidden;
 
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'points',
+        payload: <String, dynamic>{
+          'operation': 'toggle_visibility',
+          'troopId': troopId,
+          'pointsHidden': nextHiddenState,
+        },
+      );
+      _troopPointsHidden = nextHiddenState;
+      _error = null;
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      notifyListeners();
+      return;
+    }
+
     if (_isReviewDemoAccount) {
       _troopPointsHidden = nextHiddenState;
       _error = null;
@@ -460,6 +520,32 @@ class PointsProvider with ChangeNotifier {
     final troopId = _activeTroopId;
     if (troopId == null || troopId.isEmpty) {
       throw Exception('Could not determine troop context for this action.');
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'points',
+        payload: <String, dynamic>{
+          'operation': 'create_category',
+          'troopId': troopId,
+          'name': name,
+          'description': description,
+        },
+      );
+
+      final queued = PointCategory(
+        id: 'queued-category-${DateTime.now().microsecondsSinceEpoch}',
+        name: name.trim(),
+        description: description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
+        troopId: troopId,
+      );
+      _upsertCategoryInCache(troopId: troopId, category: queued);
+      _error = null;
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      notifyListeners();
+      return queued;
     }
 
     if (_isReviewDemoAccount) {
@@ -516,6 +602,33 @@ class PointsProvider with ChangeNotifier {
     final troopId = _activeTroopId;
     if (troopId == null || troopId.isEmpty) {
       throw Exception('Could not determine troop context for this action.');
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'points',
+        payload: <String, dynamic>{
+          'operation': 'update_category',
+          'troopId': troopId,
+          'categoryId': categoryId,
+          'name': name,
+          'description': description,
+        },
+      );
+
+      final queued = PointCategory(
+        id: categoryId,
+        name: name.trim(),
+        description: description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
+        troopId: troopId,
+      );
+      _upsertCategoryInCache(troopId: troopId, category: queued);
+      _error = null;
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      notifyListeners();
+      return queued;
     }
 
     if (_isReviewDemoAccount) {
@@ -585,8 +698,10 @@ class PointsProvider with ChangeNotifier {
       );
       if (_selectedMeetingId == meetingId) {
         _points = fetched;
+        _pointsLastUpdated = _service.getPointsLastUpdated(meetingId);
         _cachedSelectedMeetingSummary = null;
       }
+      unawaited(_refreshPointsInBackground(meetingId));
     } catch (e, st) {
       debugPrint('PointsProvider._loadPointsForMeeting error: $e\n$st');
       _error = _formatErrorMessage(e);
@@ -607,6 +722,34 @@ class PointsProvider with ChangeNotifier {
       debugPrint('PointsProvider._loadTroopVisibility error: $e\n$st');
       _troopPointsHidden = false;
     }
+  }
+
+  Future<void> _refreshPointsInBackground(String meetingId) async {
+    try {
+      final refreshed = await _service.refreshPointsForMeeting(
+        meetingId: meetingId,
+      );
+      if (_selectedMeetingId != meetingId) return;
+
+      final changed = refreshed.length != _points.length ||
+          !_samePointIdsInOrder(refreshed, _points);
+      if (!changed) return;
+
+      _points = refreshed;
+      _pointsLastUpdated = _service.getPointsLastUpdated(meetingId);
+      _cachedSelectedMeetingSummary = null;
+      notifyListeners();
+    } catch (_) {
+      // Keep currently displayed data if refresh fails.
+    }
+  }
+
+  bool _samePointIdsInOrder(List<PointEntry> a, List<PointEntry> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
   }
 
   void _upsertCategoryInCache({
@@ -649,6 +792,7 @@ class PointsProvider with ChangeNotifier {
     _updatingCategoryIds.clear();
     _noMeetings = false;
     _error = null;
+    _pointsLastUpdated = null;
     notifyListeners();
   }
 
@@ -689,5 +833,99 @@ class PointsProvider with ChangeNotifier {
     final past = meetings.toList()
       ..sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
     return past.first.id;
+  }
+
+  void _registerOfflineHandlers() {
+    _offlineQueue.registerValidator('points', (payload) {
+      final operation = payload['operation'];
+      if (operation is! String || operation.isEmpty) {
+        return false;
+      }
+
+      switch (operation) {
+        case 'create_point':
+          return payload['troopId'] is String &&
+              payload['meetingId'] is String &&
+              payload['patrolId'] is String &&
+              payload['categoryId'] is String &&
+              payload['value'] is int &&
+              payload['awardedByProfileId'] is String;
+        case 'update_point':
+          return payload['troopId'] is String &&
+              payload['pointId'] is String &&
+              payload['meetingId'] is String &&
+              payload['patrolId'] is String &&
+              payload['categoryId'] is String &&
+              payload['value'] is int;
+        case 'toggle_visibility':
+          return payload['troopId'] is String && payload['pointsHidden'] is bool;
+        case 'create_category':
+          return payload['troopId'] is String && payload['name'] is String;
+        case 'update_category':
+          return payload['troopId'] is String &&
+              payload['categoryId'] is String &&
+              payload['name'] is String;
+        default:
+          return false;
+      }
+    });
+
+    _offlineQueue.registerHandler('points', (payload) async {
+      final operation = payload['operation'] as String?;
+      if (operation == null) return;
+
+      final actorRoleRank = _authProvider.selectedRoleRank;
+
+      switch (operation) {
+        case 'create_point':
+          await _service.createPoint(
+            actorRoleRank: actorRoleRank,
+            troopId: payload['troopId'] as String,
+            meetingId: payload['meetingId'] as String,
+            patrolId: payload['patrolId'] as String,
+            categoryId: payload['categoryId'] as String,
+            value: payload['value'] as int,
+            reason: payload['reason'] as String?,
+            awardedByProfileId: payload['awardedByProfileId'] as String,
+          );
+          break;
+        case 'update_point':
+          await _service.updatePoint(
+            actorRoleRank: actorRoleRank,
+            troopId: payload['troopId'] as String,
+            pointId: payload['pointId'] as String,
+            meetingId: payload['meetingId'] as String,
+            patrolId: payload['patrolId'] as String,
+            categoryId: payload['categoryId'] as String,
+            value: payload['value'] as int,
+            reason: payload['reason'] as String?,
+          );
+          break;
+        case 'toggle_visibility':
+          await _service.updateTroopPointsVisibility(
+            actorRoleRank: actorRoleRank,
+            troopId: payload['troopId'] as String,
+            pointsHidden: payload['pointsHidden'] as bool,
+          );
+          break;
+        case 'create_category':
+          await _service.createTroopCategory(
+            actorRoleRank: actorRoleRank,
+            troopId: payload['troopId'] as String,
+            name: payload['name'] as String,
+            description: payload['description'] as String?,
+          );
+          break;
+        case 'update_category':
+          await _service.updateTroopCategory(
+            actorRoleRank: actorRoleRank,
+            troopId: payload['troopId'] as String,
+            categoryId: payload['categoryId'] as String,
+            name: payload['name'] as String,
+            description: payload['description'] as String?,
+          );
+          break;
+      }
+    });
   }
 }

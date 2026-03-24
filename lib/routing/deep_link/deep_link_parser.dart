@@ -3,7 +3,9 @@ import 'deep_link_model.dart';
 class DeepLinkParser {
   DeepLinkParser._();
 
-  static final RegExp _safeIdPattern = RegExp(r'^[a-zA-Z0-9_-]{1,100}$');
+  static final RegExp _safeIdPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  );
 
   static DeepLinkModel parse(Map<String, dynamic> data) {
     if (data.isEmpty) {

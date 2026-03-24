@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/constants/offline_policy.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
@@ -13,6 +16,13 @@ class AttendanceService {
       TtlCache();
   static final TtlCache<String, List<AttendanceRecord>> _attendanceCache =
       TtlCache();
+    static final Map<String, DateTime> _attendanceLastUpdated =
+      <String, DateTime>{};
+
+    final Map<String, Future<List<MemberWithAttendance>>> _membersRefreshInFlight =
+      <String, Future<List<MemberWithAttendance>>>{};
+    final Map<String, Future<List<AttendanceRecord>>> _attendanceRefreshInFlight =
+      <String, Future<List<AttendanceRecord>>>{};
 
   AttendanceService(this._supabase);
 
@@ -24,6 +34,11 @@ class AttendanceService {
   void clearCache() {
     _membersCache.clear();
     _attendanceCache.clear();
+    _attendanceLastUpdated.clear();
+  }
+
+  DateTime? getAttendanceLastUpdated(String meetingId) {
+    return _attendanceLastUpdated[meetingId.trim()];
   }
 
   // -------------------------------------------------------------------------
@@ -56,6 +71,16 @@ class AttendanceService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshTroopMembersCache(
+            troopId: troopId,
+            memberProfileIdFilter: memberProfileIdFilter,
+          );
+        } catch (_) {
+          // Keep cached member list if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -93,6 +118,13 @@ class AttendanceService {
         source: 'LOCAL_CACHE_HIT',
         scope: meetingId.trim(),
       );
+      unawaited(() async {
+        try {
+          await _refreshAttendanceForMeetingCache(meetingId);
+        } catch (_) {
+          // Keep cached attendance if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -111,6 +143,12 @@ class AttendanceService {
       }
       throw Exception('AttendanceService.fetchAttendanceForMeeting: $e');
     }
+  }
+
+  Future<List<AttendanceRecord>> refreshAttendanceForMeeting(
+    String meetingId,
+  ) {
+    return _refreshAttendanceForMeetingCache(meetingId);
   }
 
   /// Inserts absent rows for all [memberProfileIds] who do not yet have an
@@ -137,9 +175,9 @@ class AttendanceService {
         };
       }).toList();
 
-      await _supabase
+        await _withTimeout(_supabase
           .from('attendance')
-          .upsert(rows, onConflict: 'meeting_id,profile_id', ignoreDuplicates: true);
+          .upsert(rows, onConflict: 'meeting_id,profile_id', ignoreDuplicates: true));
 
       _attendanceCache.invalidate(meetingId);
     } catch (e) {
@@ -155,10 +193,10 @@ class AttendanceService {
     required String? notes,
   }) async {
     try {
-      await _supabase
+        await _withTimeout(_supabase
           .from('attendance')
           .update({'notes': (notes?.trim().isEmpty ?? true) ? null : notes!.trim()})
-          .eq('id', recordId);
+          .eq('id', recordId));
 
       if (meetingId != null && meetingId.trim().isNotEmpty) {
         _attendanceCache.invalidate(meetingId.trim());
@@ -182,11 +220,11 @@ class AttendanceService {
     try {
       await Future.wait(
         changedRecords.map(
-          (r) => _supabase.from('attendance').update({
+          (r) => _withTimeout(_supabase.from('attendance').update({
             'status': r.status.dbValue,
             'marked_by_profile_id': r.markedByProfileId,
             'marked_at': DateTime.now().toIso8601String(),
-          }).eq('id', r.id),
+          }).eq('id', r.id)),
         ),
       );
 
@@ -203,6 +241,27 @@ class AttendanceService {
   }
 
   Future<List<MemberWithAttendance>> _refreshTroopMembersCache({
+    required String troopId,
+    String? memberProfileIdFilter,
+  }) {
+    final cacheKey = _membersCacheKey(
+      troopId: troopId,
+      memberProfileIdFilter: memberProfileIdFilter,
+    );
+    final inFlight = _membersRefreshInFlight[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshTroopMembersCacheInternal(
+      troopId: troopId,
+      memberProfileIdFilter: memberProfileIdFilter,
+    );
+    _membersRefreshInFlight[cacheKey] = future;
+    return future.whenComplete(() => _membersRefreshInFlight.remove(cacheKey));
+  }
+
+  Future<List<MemberWithAttendance>> _refreshTroopMembersCacheInternal({
     required String troopId,
     String? memberProfileIdFilter,
   }) async {
@@ -226,7 +285,7 @@ class AttendanceService {
         .order('last_name', ascending: true)
         .order('first_name', ascending: true);
 
-    final profileResults = await profileQuery;
+    final profileResults = await _withTimeout(profileQuery);
     var profiles = (profileResults as List).cast<Map<String, dynamic>>();
 
     // Optionally narrow to a single member (e.g. regular-member self-view).
@@ -246,10 +305,10 @@ class AttendanceService {
     }
 
     // Step 2 – fetch all patrols for this troop so we can resolve names.
-    final patrolResults = await _supabase
+    final patrolResults = await _withTimeout(_supabase
         .from('patrols')
         .select('id, name')
-        .eq('troop_id', troopId);
+      .eq('troop_id', troopId));
 
     final patrolMap = <String, String>{
       for (final row in (patrolResults as List).cast<Map<String, dynamic>>())
@@ -292,6 +351,22 @@ class AttendanceService {
 
   Future<List<AttendanceRecord>> _refreshAttendanceForMeetingCache(
     String meetingId,
+  ) {
+    final cacheKey = meetingId.trim();
+    final inFlight = _attendanceRefreshInFlight[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshAttendanceForMeetingCacheInternal(meetingId);
+    _attendanceRefreshInFlight[cacheKey] = future;
+    return future.whenComplete(
+      () => _attendanceRefreshInFlight.remove(cacheKey),
+    );
+  }
+
+  Future<List<AttendanceRecord>> _refreshAttendanceForMeetingCacheInternal(
+    String meetingId,
   ) async {
     _logDataSource(
       operation: 'fetchAttendanceForMeeting',
@@ -299,16 +374,17 @@ class AttendanceService {
       scope: meetingId.trim(),
     );
 
-    final results = await _supabase
+    final results = await _withTimeout(_supabase
         .from('attendance')
         .select()
-        .eq('meeting_id', meetingId);
+      .eq('meeting_id', meetingId));
 
     final records = (results as List)
         .map((row) => AttendanceRecord.fromJson(row as Map<String, dynamic>))
         .toList();
 
     _attendanceCache.set(meetingId, records, CacheTtl.attendanceRecords);
+    _attendanceLastUpdated[meetingId.trim()] = DateTime.now();
     return records;
   }
 
@@ -356,12 +432,12 @@ class AttendanceService {
   }) async {
     try {
       // 1) Fetch all meetings for the troop and season in descending order
-      final meetingsResponse = await _supabase
+        final meetingsResponse = await _withTimeout(_supabase
           .from('meetings')
           .select()
           .eq('troop_id', troopId)
           .eq('season_id', seasonId)
-          .order('meeting_date', ascending: false);
+          .order('meeting_date', ascending: false));
 
       final List<Meeting> meetings = (meetingsResponse as List)
           .map((row) => Meeting.fromJson(row))
@@ -372,11 +448,11 @@ class AttendanceService {
       final List<String> meetingIds = meetings.map((m) => m.id).toList();
 
       // 2) Fetch attendance records for this profile ID within these meetings
-      final attendanceResponse = await _supabase
+        final attendanceResponse = await _withTimeout(_supabase
           .from('attendance')
           .select()
           .eq('profile_id', profileId)
-          .inFilter('meeting_id', meetingIds);
+          .inFilter('meeting_id', meetingIds));
 
       final List<AttendanceRecord> records = (attendanceResponse as List)
           .map((row) => AttendanceRecord.fromJson(row))
@@ -396,5 +472,12 @@ class AttendanceService {
     } catch (e) {
       throw Exception('AttendanceService.fetchMyAttendanceForSeason: $e');
     }
+  }
+
+  Future<T> _withTimeout<T>(Future<T> future) {
+    return future.timeout(
+      OfflinePolicy.networkTimeout,
+      onTimeout: () => throw Exception('Network timeout.'),
+    );
   }
 }

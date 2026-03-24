@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/routing/navigation_service.dart';
 import '../data/models/meeting.dart';
@@ -32,6 +34,7 @@ class MeetingsProvider with ChangeNotifier {
   final Set<String> _deletingMeetingIds = {};
   String? _error;
   bool _noActiveSeason = false;
+  DateTime? _meetingsLastUpdated;
 
   // ── Constructor / lifecycle ────────────────────────────────────────────────
 
@@ -57,6 +60,7 @@ class MeetingsProvider with ChangeNotifier {
     _activeSeason = null;
     _selectedTroopId = null;
     _noActiveSeason = false;
+    _meetingsLastUpdated = null;
     _error = null;
     notifyListeners();
   }
@@ -80,6 +84,7 @@ class MeetingsProvider with ChangeNotifier {
         !_troops.any((troop) => troop['id'] == _selectedTroopId)) {
       _selectedTroopId = null;
       _meetings = [];
+      _meetingsLastUpdated = null;
     }
   }
 
@@ -100,6 +105,7 @@ class MeetingsProvider with ChangeNotifier {
   List<Map<String, dynamic>> get troops => List.unmodifiable(_troops);
   Map<String, dynamic>? get activeSeason => _activeSeason;
   String? get selectedTroopId => _selectedTroopId;
+  DateTime? get meetingsLastUpdated => _meetingsLastUpdated;
 
   bool isDeletingMeeting(String meetingId) =>
       _deletingMeetingIds.contains(meetingId);
@@ -187,6 +193,11 @@ class MeetingsProvider with ChangeNotifier {
         seasonId: activeSeasonId!,
         troopId: effectiveTroopId!,
       );
+      _meetingsLastUpdated = _service.getMeetingsLastUpdated(
+        seasonId: activeSeasonId!,
+        troopId: effectiveTroopId!,
+      );
+      unawaited(_refreshMeetingsInBackground());
     } catch (e, st) {
       debugPrint('MeetingsProvider.loadMeetings error: $e\n$st');
       _error = e.toString();
@@ -207,6 +218,7 @@ class MeetingsProvider with ChangeNotifier {
     if (_selectedTroopId == troopId) return;
     _selectedTroopId = troopId;
     _meetings = [];
+    _meetingsLastUpdated = null;
     notifyListeners();
     loadMeetings();
   }
@@ -227,6 +239,14 @@ class MeetingsProvider with ChangeNotifier {
     }
 
     if (_isCreating || effectiveTroopId == null || activeSeasonId == null) {
+      return;
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      const message = 'Internet required to create meeting';
+      _error = message;
+      NavigationService.showMessage(message);
+      notifyListeners();
       return;
     }
 
@@ -282,6 +302,15 @@ class MeetingsProvider with ChangeNotifier {
     }
 
     if (!canEdit || _isUpdating) return;
+
+    if (!ConnectivityService.instance.isOnline) {
+      const message = 'Internet required to update meeting';
+      _error = message;
+      NavigationService.showMessage(message);
+      notifyListeners();
+      return;
+    }
+
     if (!_meetings.any((m) => m.id == meetingId)) {
       _error = 'Could not update meeting: meeting not found.';
       notifyListeners();
@@ -329,6 +358,14 @@ class MeetingsProvider with ChangeNotifier {
 
     if (!canEdit || _deletingMeetingIds.contains(meetingId)) return;
 
+    if (!ConnectivityService.instance.isOnline) {
+      const message = 'Internet required to delete meeting';
+      _error = message;
+      NavigationService.showMessage(message);
+      notifyListeners();
+      return;
+    }
+
     _deletingMeetingIds.add(meetingId);
     _error = null;
     notifyListeners();
@@ -351,5 +388,38 @@ class MeetingsProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<void> _refreshMeetingsInBackground() async {
+    final troopId = effectiveTroopId;
+    final seasonId = activeSeasonId;
+    if (troopId == null || seasonId == null) return;
+
+    try {
+      final refreshed = await _service.refreshMeetings(
+        seasonId: seasonId,
+        troopId: troopId,
+      );
+      final changed = refreshed.length != _meetings.length ||
+          !_sameMeetingIdsInOrder(refreshed, _meetings);
+      if (!changed) return;
+
+      _meetings = refreshed;
+      _meetingsLastUpdated = _service.getMeetingsLastUpdated(
+        seasonId: seasonId,
+        troopId: troopId,
+      );
+      notifyListeners();
+    } catch (_) {
+      // Keep currently displayed data if refresh fails.
+    }
+  }
+
+  bool _sameMeetingIdsInOrder(List<Meeting> a, List<Meeting> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
   }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:masapp/auth/logic/auth_provider.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
+import 'package:masapp/offline/offline_action_queue.dart';
 import 'package:masapp/routing/navigation_service.dart';
 import '../data/models/attendance_record.dart';
 import '../data/attendance_service.dart';
@@ -15,6 +18,7 @@ class AttendanceProvider with ChangeNotifier {
   final AttendanceService _attendanceService;
   final MeetingsService _meetingsService;
   final AuthProvider _authProvider;
+  final OfflineActionQueue _offlineQueue = OfflineActionQueue.instance;
 
   // ── State ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +53,9 @@ class AttendanceProvider with ChangeNotifier {
   bool _isSaving = false;
   String? _error;
   bool _noMeetings = false;
+  DateTime? _attendanceLastUpdated;
+  String? _currentTroopId;
+  String? _currentSeasonId;
 
   // -- Scout Personal Logs --
   List<MyAttendanceLog> _myLogs = [];
@@ -98,6 +105,7 @@ class AttendanceProvider with ChangeNotifier {
        _meetingsService = meetingsService ?? MeetingsService.instance(),
        _authProvider = authProvider {
     _authProvider.addListener(_onAuthChanged);
+    _registerOfflineHandlers();
   }
 
   @override
@@ -113,6 +121,7 @@ class AttendanceProvider with ChangeNotifier {
     _myLogs = [];
     _selectedMeetingId = null;
     _noMeetings = false;
+    _attendanceLastUpdated = null;
     _error = null;
     _clearMemberState();
     notifyListeners();
@@ -131,6 +140,7 @@ class AttendanceProvider with ChangeNotifier {
   bool get noMeetings => _noMeetings;
   List<Meeting> get meetings => List.unmodifiable(_meetings);
   String? get selectedMeetingId => _selectedMeetingId;
+  DateTime? get attendanceLastUpdated => _attendanceLastUpdated;
 
   /// The currently selected [Meeting].
   ///
@@ -188,8 +198,11 @@ class AttendanceProvider with ChangeNotifier {
     required String troopId,
     required String seasonId,
   }) async {
+    _currentTroopId = troopId;
+    _currentSeasonId = seasonId;
     _isLoading = true;
     _noMeetings = false;
+    _attendanceLastUpdated = null;
     _error = null;
     notifyListeners();
 
@@ -295,6 +308,25 @@ class AttendanceProvider with ChangeNotifier {
       );
       return;
     }
+
+    if (!ConnectivityService.instance.isOnline) {
+      await _offlineQueue.enqueue(
+        type: 'attendance',
+        payload: <String, dynamic>{
+          'operation': 'update_notes',
+          'recordId': recordId,
+          'meetingId': _selectedMeetingId,
+          'notes': notes,
+        },
+      );
+      _localNotes[profileId] = (notes?.trim().isEmpty ?? true)
+          ? null
+          : notes!.trim();
+      NavigationService.showMessage('Action saved offline and will sync automatically');
+      notifyListeners();
+      return;
+    }
+
     await _attendanceService.updateAttendanceNotes(
       recordId: recordId,
       meetingId: _selectedMeetingId,
@@ -357,6 +389,34 @@ class AttendanceProvider with ChangeNotifier {
         );
       }
 
+      if (!ConnectivityService.instance.isOnline) {
+        await _offlineQueue.enqueue(
+          type: 'attendance',
+          payload: <String, dynamic>{
+            'operation': 'batch_update',
+            'records': changedRecords
+                .map(
+                  (record) => <String, dynamic>{
+                    'id': record.id,
+                    'meetingId': record.meetingId,
+                    'profileId': record.profileId,
+                    'status': record.status.dbValue,
+                    'markedByProfileId': record.markedByProfileId,
+                  },
+                )
+                .toList(growable: false),
+          },
+        );
+
+        for (final profileId in _modifiedProfileIds) {
+          final current = _localAttendance[profileId];
+          if (current != null) _originalAttendance[profileId] = current;
+        }
+        _modifiedProfileIds.clear();
+        NavigationService.showMessage('Action saved offline and will sync automatically');
+        return;
+      }
+
       await _attendanceService.batchUpdateAttendance(changedRecords);
 
       // Sync snapshot so hasUnsavedChanges resets.
@@ -378,6 +438,13 @@ class AttendanceProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<void> retryLoadCurrentScope() async {
+    final troopId = _currentTroopId;
+    final seasonId = _currentSeasonId;
+    if (troopId == null || seasonId == null) return;
+    await loadMeetings(troopId: troopId, seasonId: seasonId);
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
@@ -424,6 +491,10 @@ class AttendanceProvider with ChangeNotifier {
       // Fetch existing attendance records for this meeting.
       List<AttendanceRecord> records = await _attendanceService
           .fetchAttendanceForMeeting(_selectedMeetingId!);
+      _attendanceLastUpdated = _attendanceService.getAttendanceLastUpdated(
+        _selectedMeetingId!,
+      );
+      unawaited(_refreshAttendanceInBackground(_selectedMeetingId!));
 
       // Build lookup maps from existing records.
       _recordIdByProfileId = {for (final r in records) r.profileId: r.id};
@@ -447,6 +518,9 @@ class AttendanceProvider with ChangeNotifier {
 
           // Re-fetch so we have the newly created record IDs.
           records = await _attendanceService.fetchAttendanceForMeeting(
+            _selectedMeetingId!,
+          );
+          _attendanceLastUpdated = _attendanceService.getAttendanceLastUpdated(
             _selectedMeetingId!,
           );
 
@@ -473,6 +547,31 @@ class AttendanceProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _refreshAttendanceInBackground(String meetingId) async {
+    try {
+      final refreshed = await _attendanceService.refreshAttendanceForMeeting(
+        meetingId,
+      );
+      if (_selectedMeetingId != meetingId) return;
+
+      final existingIds = _recordIdByProfileId.values.toSet();
+      final refreshedIds = refreshed.map((record) => record.id).toSet();
+      if (setEquals(existingIds, refreshedIds)) {
+        _attendanceLastUpdated = _attendanceService.getAttendanceLastUpdated(
+          meetingId,
+        );
+        return;
+      }
+
+      _attendanceLastUpdated = _attendanceService.getAttendanceLastUpdated(
+        meetingId,
+      );
+      await _loadAttendance();
+    } catch (_) {
+      // Keep current in-memory state if background refresh fails.
     }
   }
 
@@ -555,5 +654,56 @@ class AttendanceProvider with ChangeNotifier {
     final past = meetings.toList()
       ..sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
     return past.first.id;
+  }
+
+  void _registerOfflineHandlers() {
+    _offlineQueue.registerValidator('attendance', (payload) {
+      final operation = payload['operation'];
+      if (operation is! String || operation.isEmpty) {
+        return false;
+      }
+
+      switch (operation) {
+        case 'update_notes':
+          return payload['recordId'] is String;
+        case 'batch_update':
+          return payload['records'] is List;
+        default:
+          return false;
+      }
+    });
+
+    _offlineQueue.registerHandler('attendance', (payload) async {
+      final operation = payload['operation'] as String?;
+      if (operation == null) return;
+
+      switch (operation) {
+        case 'update_notes':
+          await _attendanceService.updateAttendanceNotes(
+            recordId: payload['recordId'] as String,
+            meetingId: payload['meetingId'] as String?,
+            notes: payload['notes'] as String?,
+          );
+          break;
+        case 'batch_update':
+          final rows = (payload['records'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map>()
+              .map((row) => AttendanceRecord(
+                    id: row['id'] as String,
+                    meetingId: row['meetingId'] as String,
+                    profileId: row['profileId'] as String,
+                    status: AttendanceStatusX.fromString(
+                      (row['status'] as String?) ?? 'absent',
+                    ),
+                    markedByProfileId: row['markedByProfileId'] as String?,
+                    markedAt: DateTime.now(),
+                    notes: null,
+                  ))
+              .toList(growable: false);
+
+          await _attendanceService.batchUpdateAttendance(rows);
+          break;
+      }
+    });
   }
 }

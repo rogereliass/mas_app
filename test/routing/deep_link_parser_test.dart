@@ -8,26 +8,32 @@ void main() {
       final link = DeepLinkParser.parse(
         <String, dynamic>{
           'type': 'meeting',
-          'meeting_id': 'abc-123',
+          'meeting_id': '123e4567-e89b-42d3-a456-426614174000',
         },
       );
 
       expect(link.type, DeepLinkType.meeting);
       expect(link.isValid, isTrue);
-      expect(link.paramAsString('meeting_id'), 'abc-123');
+      expect(
+        link.paramAsString('meeting_id'),
+        '123e4567-e89b-42d3-a456-426614174000',
+      );
     });
 
     test('parses attendance payload with normalized keys', () {
       final link = DeepLinkParser.parse(
         <String, dynamic>{
           'TYPE': 'attendance',
-          'MEETING_ID': 'meeting_01',
+          'MEETING_ID': '123e4567-e89b-42d3-a456-426614174001',
         },
       );
 
       expect(link.type, DeepLinkType.attendance);
       expect(link.isValid, isTrue);
-      expect(link.paramAsString('meeting_id'), 'meeting_01');
+      expect(
+        link.paramAsString('meeting_id'),
+        '123e4567-e89b-42d3-a456-426614174001',
+      );
     });
 
     test('returns invalid when attendance payload misses meeting_id', () {
@@ -46,13 +52,16 @@ void main() {
       final link = DeepLinkParser.parse(
         <String, dynamic>{
           'type': 'patrol',
-          'patrol_id': 'patrol-77',
+          'patrol_id': '123e4567-e89b-42d3-a456-426614174002',
         },
       );
 
       expect(link.type, DeepLinkType.patrol);
       expect(link.isValid, isTrue);
-      expect(link.paramAsString('patrol_id'), 'patrol-77');
+      expect(
+        link.paramAsString('patrol_id'),
+        '123e4567-e89b-42d3-a456-426614174002',
+      );
     });
 
     test('profile payload is valid without profile_id', () {

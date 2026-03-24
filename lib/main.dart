@@ -22,7 +22,9 @@ import 'meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'meetings/pages/points/logic/points_provider.dart';
 import 'core/utils/fcm_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'offline/offline_storage.dart';
+import 'offline/offline_action_queue.dart';
 import 'app.dart';
 
 void main() async {
@@ -51,8 +53,14 @@ void main() async {
   // Initialize Hive
   await Hive.initFlutter();
 
+  // Initialize debounced connectivity stream for offline-first flows.
+  await ConnectivityService.instance.initialize();
+
   // Initialize offline storage service
   await OfflineStorageService.initialize();
+
+  // Initialize persistent mutation queue and reconnect sync listener.
+  await OfflineActionQueue.instance.initialize();
 
   runApp(
     // Wrap app with providers

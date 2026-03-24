@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:masapp/core/constants/app_colors.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/core/widgets/error_view.dart';
 import 'package:masapp/meetings/pages/meeting_creation/logic/meetings_provider.dart';
@@ -111,6 +112,7 @@ class _MeetingsList extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final meetings = provider.meetings;
+    final isOffline = !ConnectivityService.instance.isOnline;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -120,6 +122,18 @@ class _MeetingsList extends StatelessWidget {
           const SizedBox(height: 20),
         ],
         if (meetings.isNotEmpty) ...[
+          if (provider.meetingsLastUpdated != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _formatLastUpdated(provider.meetingsLastUpdated!),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
@@ -178,14 +192,23 @@ class _MeetingsList extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'No meetings scheduled',
+                  isOffline
+                      ? 'Offline - No data available'
+                      : 'No meetings scheduled',
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondaryLight,
                   ),
                 ),
-                if (provider.canEdit) ...[
+                if (isOffline) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: provider.init,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ] else if (provider.canEdit) ...[
                   const SizedBox(height: 6),
                   Text(
                     'Tap "Schedule Meeting" to create the first one.',
@@ -204,6 +227,19 @@ class _MeetingsList extends StatelessWidget {
       ],
     );
   }
+}
+
+String _formatLastUpdated(DateTime timestamp) {
+  final now = DateTime.now();
+  final delta = now.difference(timestamp);
+  final minutes = delta.inMinutes;
+  if (minutes < 1) {
+    return 'Last updated just now';
+  }
+  if (minutes == 1) {
+    return 'Last updated 1 min ago';
+  }
+  return 'Last updated $minutes min ago';
 }
 
 // ---------------------------------------------------------------------------

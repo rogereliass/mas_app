@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 
 /// Error View Widget
 /// 
@@ -17,6 +18,10 @@ class ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isOffline = !ConnectivityService.instance.isOnline;
+    final displayMessage = isOffline
+      ? 'You\'re offline - showing last data'
+      : message;
 
     return Center(
       child: Padding(
@@ -38,7 +43,7 @@ class ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              message,
+              displayMessage,
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),

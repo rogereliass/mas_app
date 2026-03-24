@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
+import 'package:masapp/core/constants/offline_policy.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -21,6 +24,14 @@ class PointsService {
   static final TtlCache<String, List<PointCategory>> _categoriesCache =
       TtlCache();
   static final TtlCache<String, bool> _pointsVisibilityCache = TtlCache();
+  static final Map<String, DateTime> _pointsLastUpdated = <String, DateTime>{};
+
+    final Map<String, Future<List<PatrolOption>>> _patrolRefreshInFlight =
+      <String, Future<List<PatrolOption>>>{};
+    final Map<String, Future<List<PointCategory>>> _categoryRefreshInFlight =
+      <String, Future<List<PointCategory>>>{};
+    final Map<String, Future<List<PointEntry>>> _pointsRefreshInFlight =
+      <String, Future<List<PointEntry>>>{};
 
   PointsService(this._supabase, {MeetingsService? meetingsService})
     : _meetingsService = meetingsService ?? MeetingsService(_supabase);
@@ -35,6 +46,11 @@ class PointsService {
     _patrolsCache.clear();
     _categoriesCache.clear();
     _pointsVisibilityCache.clear();
+    _pointsLastUpdated.clear();
+  }
+
+  DateTime? getPointsLastUpdated(String meetingId) {
+    return _pointsLastUpdated[meetingId.trim()];
   }
 
   Future<List<Meeting>> fetchMeetings({
@@ -53,6 +69,13 @@ class PointsService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshPatrolsCache(troopId: troopId);
+        } catch (_) {
+          // Keep cached patrols if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -81,6 +104,13 @@ class PointsService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshCategoriesCache(troopId: troopId);
+        } catch (_) {
+          // Keep cached categories if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -109,6 +139,13 @@ class PointsService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshTroopPointsHiddenCache(troopId: troopId);
+        } catch (_) {
+          // Keep cached visibility state if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -137,10 +174,10 @@ class PointsService {
       _assertCanManage(actorRoleRank);
       _assertTroopContextAvailable(troopId);
 
-      await _supabase
+        await _withTimeout(_supabase
           .from('troops')
           .update({'points_hidden': pointsHidden})
-          .eq('id', troopId);
+          .eq('id', troopId));
 
       _pointsVisibilityCache.set(
         troopId.trim(),
@@ -167,7 +204,7 @@ class PointsService {
 
       await _assertNoCategoryConflicts(troopId: troopId, name: normalizedName);
 
-      final row = await _supabase
+      final row = await _withTimeout(_supabase
           .from('point_categories')
           .insert({
             'name': normalizedName,
@@ -175,7 +212,7 @@ class PointsService {
             'troop_id': troopId,
           })
           .select('id, slug, name, description, troop_id')
-          .single();
+          .single());
 
       _categoriesCache.invalidate(troopId.trim());
 
@@ -196,11 +233,11 @@ class PointsService {
       _assertCanManageCategories(actorRoleRank);
       _assertTroopContextAvailable(troopId);
 
-      final existing = await _supabase
+        final existing = await _withTimeout(_supabase
           .from('point_categories')
           .select('id, troop_id')
           .eq('id', categoryId)
-          .maybeSingle();
+          .maybeSingle());
 
       if (existing == null) {
         throw Exception('Selected category does not exist.');
@@ -223,7 +260,7 @@ class PointsService {
         excludeCategoryId: categoryId,
       );
 
-      final row = await _supabase
+      final row = await _withTimeout(_supabase
           .from('point_categories')
           .update({
             'name': normalizedName,
@@ -232,7 +269,7 @@ class PointsService {
           .eq('id', categoryId)
           .eq('troop_id', troopId)
           .select('id, slug, name, description, troop_id')
-          .maybeSingle();
+          .maybeSingle());
 
       if (row == null) {
         throw Exception('Category could not be updated.');
@@ -259,7 +296,7 @@ class PointsService {
 
       List<Map<String, dynamic>> rawPoints;
       try {
-        final result = await _supabase
+        final result = await _withTimeout(_supabase
             .from('points')
             .select('''
               id,
@@ -289,17 +326,17 @@ class PointsService {
               )
             ''')
             .inFilter('meeting_id', meetingIds)
-            .order('created_at', ascending: false);
+            .order('created_at', ascending: false));
             
         rawPoints = (result as List).cast<Map<String, dynamic>>();
       } catch (_) {
-        final result = await _supabase
+        final result = await _withTimeout(_supabase
             .from('points')
             .select(
               'id, meeting_id, patrol_id, category_id, value, reason, awarded_by_profile_id, approved, approved_by_profile_id, approved_at, created_at',
             )
             .inFilter('meeting_id', meetingIds)
-            .order('created_at', ascending: false);
+            .order('created_at', ascending: false));
 
         final rows = (result as List).cast<Map<String, dynamic>>();
         if (rows.isEmpty) return [];
@@ -363,6 +400,13 @@ class PointsService {
         source: 'LOCAL_CACHE_HIT',
         scope: cacheKey,
       );
+      unawaited(() async {
+        try {
+          await _refreshPointsForMeetingCache(meetingId: meetingId);
+        } catch (_) {
+          // Keep cached points if background refresh fails.
+        }
+      }());
       return cached;
     }
 
@@ -384,6 +428,12 @@ class PointsService {
     }
   }
 
+  Future<List<PointEntry>> refreshPointsForMeeting({
+    required String meetingId,
+  }) {
+    return _refreshPointsForMeetingCache(meetingId: meetingId);
+  }
+
   Future<PointEntry> createPoint({
     required int actorRoleRank,
     required String troopId,
@@ -403,7 +453,7 @@ class PointsService {
         categoryId: categoryId,
       );
 
-      final row = await _supabase
+      final row = await _withTimeout(_supabase
           .from('points')
           .insert({
             'meeting_id': meetingId,
@@ -415,7 +465,7 @@ class PointsService {
             'approved': false,
           })
           .select('id')
-          .single();
+          .single());
 
       final pointId = row['id'] as String?;
       if (pointId == null || pointId.isEmpty) {
@@ -453,7 +503,7 @@ class PointsService {
         categoryId: categoryId,
       );
 
-      await _supabase
+      await _withTimeout(_supabase
           .from('points')
           .update({
             'patrol_id': patrolId,
@@ -462,7 +512,7 @@ class PointsService {
             'reason': _normalizeReason(reason),
           })
           .eq('id', pointId)
-          .eq('meeting_id', meetingId);
+          .eq('meeting_id', meetingId));
 
       _pointsByMeetingCache.invalidate(meetingId.trim());
 
@@ -474,6 +524,20 @@ class PointsService {
 
   Future<List<PatrolOption>> _refreshPatrolsCache({
     required String troopId,
+  }) {
+    final cacheKey = troopId.trim();
+    final inFlight = _patrolRefreshInFlight[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshPatrolsCacheInternal(troopId: troopId);
+    _patrolRefreshInFlight[cacheKey] = future;
+    return future.whenComplete(() => _patrolRefreshInFlight.remove(cacheKey));
+  }
+
+  Future<List<PatrolOption>> _refreshPatrolsCacheInternal({
+    required String troopId,
   }) async {
     _logDataSource(
       operation: 'fetchPatrols',
@@ -481,11 +545,11 @@ class PointsService {
       scope: troopId.trim(),
     );
 
-    final result = await _supabase
+    final result = await _withTimeout(_supabase
         .from('patrols')
         .select('id, troop_id, name')
         .eq('troop_id', troopId)
-        .order('name', ascending: true);
+      .order('name', ascending: true));
 
     final patrols = (result as List)
         .map((row) => PatrolOption.fromJson(row as Map<String, dynamic>))
@@ -497,6 +561,20 @@ class PointsService {
 
   Future<List<PointCategory>> _refreshCategoriesCache({
     required String troopId,
+  }) {
+    final cacheKey = troopId.trim();
+    final inFlight = _categoryRefreshInFlight[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshCategoriesCacheInternal(troopId: troopId);
+    _categoryRefreshInFlight[cacheKey] = future;
+    return future.whenComplete(() => _categoryRefreshInFlight.remove(cacheKey));
+  }
+
+  Future<List<PointCategory>> _refreshCategoriesCacheInternal({
+    required String troopId,
   }) async {
     _logDataSource(
       operation: 'fetchCategories',
@@ -504,11 +582,11 @@ class PointsService {
       scope: troopId.trim(),
     );
 
-    final result = await _supabase
+    final result = await _withTimeout(_supabase
         .from('point_categories')
         .select('id, slug, name, description, troop_id')
         .or('troop_id.is.null,troop_id.eq.$troopId')
-        .order('name', ascending: true);
+      .order('name', ascending: true));
 
     final categories = (result as List)
         .map((row) => PointCategory.fromJson(row as Map<String, dynamic>))
@@ -527,11 +605,11 @@ class PointsService {
 
     _assertTroopContextAvailable(troopId);
 
-    final row = await _supabase
+    final row = await _withTimeout(_supabase
         .from('troops')
         .select('id, points_hidden')
         .eq('id', troopId)
-        .maybeSingle();
+      .maybeSingle());
 
     if (row == null) {
       throw Exception('Troop not found for visibility settings.');
@@ -548,6 +626,20 @@ class PointsService {
 
   Future<List<PointEntry>> _refreshPointsForMeetingCache({
     required String meetingId,
+  }) {
+    final cacheKey = meetingId.trim();
+    final inFlight = _pointsRefreshInFlight[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _refreshPointsForMeetingCacheInternal(meetingId: meetingId);
+    _pointsRefreshInFlight[cacheKey] = future;
+    return future.whenComplete(() => _pointsRefreshInFlight.remove(cacheKey));
+  }
+
+  Future<List<PointEntry>> _refreshPointsForMeetingCacheInternal({
+    required String meetingId,
   }) async {
     final cacheKey = meetingId.trim();
     _logDataSource(
@@ -560,6 +652,7 @@ class PointsService {
       final joinedRows = await _fetchPointsWithJoins(meetingId: meetingId);
       final entries = _toPointEntries(joinedRows);
       _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      _pointsLastUpdated[cacheKey] = DateTime.now();
       return entries;
     } catch (_) {
       final fallbackRows = await _fetchPointsWithLookupFallback(
@@ -567,6 +660,7 @@ class PointsService {
       );
       final entries = _toPointEntries(fallbackRows);
       _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      _pointsLastUpdated[cacheKey] = DateTime.now();
       return entries;
     }
   }
@@ -597,7 +691,7 @@ class PointsService {
   Future<List<Map<String, dynamic>>> _fetchPointsWithJoins({
     required String meetingId,
   }) async {
-    final result = await _supabase
+    final result = await _withTimeout(_supabase
         .from('points')
         .select('''
           id,
@@ -627,7 +721,7 @@ class PointsService {
           )
         ''')
         .eq('meeting_id', meetingId)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false));
 
     return (result as List).cast<Map<String, dynamic>>();
   }
@@ -635,13 +729,13 @@ class PointsService {
   Future<List<Map<String, dynamic>>> _fetchPointsWithLookupFallback({
     required String meetingId,
   }) async {
-    final result = await _supabase
+    final result = await _withTimeout(_supabase
         .from('points')
         .select(
           'id, meeting_id, patrol_id, category_id, value, reason, awarded_by_profile_id, approved, approved_by_profile_id, approved_at, created_at',
         )
         .eq('meeting_id', meetingId)
-        .order('created_at', ascending: false);
+        .order('created_at', ascending: false));
 
     final rows = (result as List).cast<Map<String, dynamic>>();
     if (rows.isEmpty) return rows;
@@ -695,10 +789,10 @@ class PointsService {
   }) async {
     if (ids.isEmpty) return {};
 
-    final result = await _supabase
+    final result = await _withTimeout(_supabase
         .from(table)
         .select(select)
-        .inFilter('id', ids);
+      .inFilter('id', ids));
 
     final rows = (result as List).cast<Map<String, dynamic>>();
     final map = <String, Map<String, dynamic>>{};
@@ -712,7 +806,7 @@ class PointsService {
 
   Future<PointEntry> _fetchPointById(String pointId) async {
     try {
-      final result = await _supabase
+        final result = await _withTimeout(_supabase
           .from('points')
           .select('''
             id,
@@ -742,7 +836,7 @@ class PointsService {
             )
           ''')
           .eq('id', pointId)
-          .maybeSingle();
+          .maybeSingle());
 
       if (result == null) {
         throw Exception('Point not found after write.');
@@ -750,13 +844,13 @@ class PointsService {
 
       return PointEntry.fromJson(result);
     } catch (_) {
-      final baseRow = await _supabase
+      final baseRow = await _withTimeout(_supabase
           .from('points')
           .select(
             'id, meeting_id, patrol_id, category_id, value, reason, awarded_by_profile_id, approved, approved_by_profile_id, approved_at, created_at',
           )
           .eq('id', pointId)
-          .maybeSingle();
+          .maybeSingle());
 
       if (baseRow == null) {
         throw Exception('Point not found after write.');
@@ -801,11 +895,11 @@ class PointsService {
     required String meetingId,
     required String troopId,
   }) async {
-    final row = await _supabase
+    final row = await _withTimeout(_supabase
         .from('meetings')
         .select('id, troop_id')
         .eq('id', meetingId)
-        .maybeSingle();
+      .maybeSingle());
 
     if (row == null) {
       throw Exception('Meeting does not exist.');
@@ -820,11 +914,11 @@ class PointsService {
     required String patrolId,
     required String troopId,
   }) async {
-    final row = await _supabase
+    final row = await _withTimeout(_supabase
         .from('patrols')
         .select('id, troop_id')
         .eq('id', patrolId)
-        .maybeSingle();
+      .maybeSingle());
 
     if (row == null) {
       throw Exception('Selected patrol does not exist.');
@@ -839,11 +933,11 @@ class PointsService {
     required String categoryId,
     required String troopId,
   }) async {
-    final row = await _supabase
+    final row = await _withTimeout(_supabase
         .from('point_categories')
         .select('id, troop_id')
         .eq('id', categoryId)
-        .maybeSingle();
+      .maybeSingle());
 
     if (row == null) {
       throw Exception('Selected category does not exist.');
@@ -859,11 +953,11 @@ class PointsService {
     required String pointId,
     required String meetingId,
   }) async {
-    final row = await _supabase
+    final row = await _withTimeout(_supabase
         .from('points')
         .select('id, meeting_id')
         .eq('id', pointId)
-        .maybeSingle();
+      .maybeSingle());
 
     if (row == null) {
       throw Exception('Point entry not found.');
@@ -897,10 +991,10 @@ class PointsService {
     required String name,
     String? excludeCategoryId,
   }) async {
-    final rows = await _supabase
+    final rows = await _withTimeout(_supabase
         .from('point_categories')
         .select('id, name, slug')
-        .eq('troop_id', troopId);
+      .eq('troop_id', troopId));
 
     for (final rawRow in rows as List) {
       final row = rawRow as Map<String, dynamic>;
@@ -935,5 +1029,12 @@ class PointsService {
     final trimmed = reason?.trim();
     if (trimmed == null || trimmed.isEmpty) return null;
     return trimmed;
+  }
+
+  Future<T> _withTimeout<T>(Future<T> future) {
+    return future.timeout(
+      OfflinePolicy.networkTimeout,
+      onTimeout: () => throw Exception('Network timeout.'),
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:masapp/auth/logic/auth_provider.dart';
 import 'package:masapp/core/constants/app_colors.dart';
+import 'package:masapp/core/services/connectivity_service.dart';
 import 'package:masapp/core/widgets/loading_view.dart';
 import 'package:masapp/core/widgets/error_view.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
@@ -137,7 +138,15 @@ class _AttendanceTabState extends State<AttendanceTab> {
         }
 
         if (provider.noMeetings) {
-          return const _NoMeetingsView();
+          return _NoMeetingsView(
+            isOffline: !ConnectivityService.instance.isOnline,
+            onRetry: () {
+              final troopId = widget.troopId;
+              final seasonId = widget.seasonId;
+              if (troopId == null || seasonId == null) return;
+              provider.loadMeetings(troopId: troopId, seasonId: seasonId);
+            },
+          );
         }
 
         if (!provider.isEditor) {
@@ -153,6 +162,19 @@ class _AttendanceTabState extends State<AttendanceTab> {
               key: ValueKey(provider.selectedMeetingId),
               provider: provider,
             ),
+            if (provider.attendanceLastUpdated != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _formatLastUpdated(provider.attendanceLastUpdated!),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
             if (provider.isEditor) _AttendanceActions(provider: provider),
             // Member list
             Expanded(child: _buildMemberList(context, provider)),
@@ -428,7 +450,10 @@ class _SaveAttendanceButton extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _NoMeetingsView extends StatelessWidget {
-  const _NoMeetingsView();
+  const _NoMeetingsView({required this.isOffline, required this.onRetry});
+
+  final bool isOffline;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -449,7 +474,9 @@ class _NoMeetingsView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No meetings found for this season.',
+              isOffline
+                  ? 'Offline - No data available'
+                  : 'No meetings found for this season.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: isDark
@@ -457,11 +484,31 @@ class _NoMeetingsView extends StatelessWidget {
                     : AppColors.textSecondaryLight,
               ),
             ),
+            if (isOffline) ...[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+String _formatLastUpdated(DateTime timestamp) {
+  final delta = DateTime.now().difference(timestamp);
+  final minutes = delta.inMinutes;
+  if (minutes < 1) {
+    return 'Last updated just now';
+  }
+  if (minutes == 1) {
+    return 'Last updated 1 min ago';
+  }
+  return 'Last updated $minutes min ago';
 }
 
 // ---------------------------------------------------------------------------
@@ -942,7 +989,10 @@ class _ScoutAttendanceView extends StatelessWidget {
     }
 
     if (provider.myLogs.isEmpty) {
-      return const _NoMeetingsView();
+      return _NoMeetingsView(
+        isOffline: !ConnectivityService.instance.isOnline,
+        onRetry: provider.retryLoadCurrentScope,
+      );
     }
 
     return ListView(
