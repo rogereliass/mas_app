@@ -59,6 +59,8 @@ class UserProfile {
   ///
   /// Expects data from profiles table with all columns
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    String? asOptionalString(dynamic value) => value is String ? value : null;
+
     // Debug log to diagnose missing id issue
     if (json['id'] == null) {
       debugPrint(
@@ -69,31 +71,32 @@ class UserProfile {
 
     return UserProfile(
       id:
-          json['id'] as String? ??
+        asOptionalString(json['id']) ??
           '', // Provide empty string fallback to prevent crash
       userId:
-          json['user_id'] as String? ??
-          json['id'] as String? ??
+        asOptionalString(json['user_id']) ??
+        asOptionalString(json['id']) ??
           '', // Fallback to id to prevent crash on non-auth profiles
-      firstName: json['first_name'] as String?,
-      middleName: json['middle_name'] as String?,
-      lastName: json['last_name'] as String?,
-      nameAr: json['name_ar'] as String?,
-      email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      address: json['address'] as String?,
+      firstName: asOptionalString(json['first_name']),
+      middleName: asOptionalString(json['middle_name']),
+      lastName: asOptionalString(json['last_name']),
+      nameAr: asOptionalString(json['name_ar']),
+      email: asOptionalString(json['email']),
+      phone: asOptionalString(json['phone']),
+      address: asOptionalString(json['address']),
       birthdate: json['birthdate'] != null
           ? DateTime.parse(json['birthdate'] as String)
           : null,
-      gender: json['gender'] as String?,
-      signupTroopId: json['signup_troop'] as String?,
-      generation: json['generation'] as String?,
-      avatarUrl: json['avatar_url'] as String?,
+      gender: asOptionalString(json['gender']),
+      signupTroopId: asOptionalString(json['signup_troop']),
+      generation: asOptionalString(json['generation']),
+      avatarUrl: asOptionalString(json['avatar_url']),
       roleRank:
           json['role_rank'] as int? ?? 0, // Default to 0 (public) if no role
       managedTroopId:
-          json['managed_troop_id']
-              as String?, // From profile_roles.troop_context join
+        asOptionalString(
+        json['managed_troop_id'],
+        ), // From profile_roles.troop_context join
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import '../../../../core/utils/ttl_cache.dart';
 import '../../../../core/utils/review_mode.dart';
 import '../../../../auth/data/role_repository.dart';
@@ -28,7 +28,8 @@ class UserManagementProvider with ChangeNotifier {
   String _searchQuery = '';
   String? _selectedRoleFilter;
   String? _selectedTroopFilter;
-  final Map<String, String> _allTroops = {}; // Persistent cache of troop ID -> Name
+  final Map<String, String> _allTroops =
+      {}; // Persistent cache of troop ID -> Name
 
   // Pagination state
   static const int _pageSize = 20;
@@ -101,7 +102,9 @@ class UserManagementProvider with ChangeNotifier {
   bool _isLoadingUsers = false;
   bool _isLoadingRoles = false;
   bool _isProcessing = false;
+  bool _isCreatingUser = false;
   String? _error;
+  String? _createUserError;
 
   List<ManagedUserProfile> get users => _users;
   List<Role> get roles => _roles;
@@ -110,8 +113,10 @@ class UserManagementProvider with ChangeNotifier {
   bool get isLoadingMore => _isLoadingMore;
   bool get hasMoreUsers => _hasMoreUsers;
   bool get isProcessing => _isProcessing;
+  bool get isCreatingUser => _isCreatingUser;
   bool get hasError => _error != null;
   String? get error => _error;
+  String? get createUserError => _createUserError;
 
   // Search and filter getters
   String get searchQuery => _searchQuery;
@@ -147,7 +152,7 @@ class UserManagementProvider with ChangeNotifier {
       }
     }
     if (changed) {
-      // We don't necessarily need to notifyListeners here because this is called 
+      // We don't necessarily need to notifyListeners here because this is called
       // during loadUsers which notifies anyway, but it's safer for the getter.
     }
   }
@@ -293,7 +298,7 @@ class UserManagementProvider with ChangeNotifier {
     } catch (e) {
       _error =
           'Unable to load users. Please check your connection and try again.';
-      debugPrint('❌ Error loading users: $e');
+      debugPrint('[ERROR] Error loading users: $e');
     } finally {
       _isLoadingUsers = false;
       notifyListeners();
@@ -341,7 +346,7 @@ class UserManagementProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = 'Unable to load more users. Please try again.';
-      debugPrint('❌ Error loading more users: $e');
+      debugPrint('[ERROR] Error loading more users: $e');
     } finally {
       _isLoadingMore = false;
       notifyListeners();
@@ -385,7 +390,7 @@ class UserManagementProvider with ChangeNotifier {
       _rolesCache.set('all_roles', _roles, _rolesCacheTtl);
     } catch (e) {
       _error = 'Unable to load roles. Please try again.';
-      debugPrint('❌ Error loading roles: $e');
+      debugPrint('[ERROR] Error loading roles: $e');
     } finally {
       _isLoadingRoles = false;
       notifyListeners();
@@ -504,7 +509,7 @@ class UserManagementProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = 'Unable to update user. Please try again.';
-      debugPrint('❌ Error updating user: $e');
+      debugPrint('[ERROR] Error updating user: $e');
       return false;
     } finally {
       _isProcessing = false;
@@ -518,8 +523,74 @@ class UserManagementProvider with ChangeNotifier {
     try {
       return await _roleRepository.getProfileRoles(profileId);
     } catch (e) {
-      debugPrint('❌ Error loading profile roles: $e');
+      debugPrint('[ERROR] Error loading profile roles: $e');
       return [];
+    }
+  }
+
+  /// Create a new user profile with email validation and role assignment
+  ///
+  /// Returns true on success, false if an error occurred (check createUserError)
+  Future<bool> createUser({
+    required Map<String, dynamic> profileData,
+    required String assignedTroopId,
+  }) async {
+    _isCreatingUser = true;
+    _createUserError = null;
+    _error = null; // Clear page-level errors to avoid duplicate snackbars
+    notifyListeners();
+
+    try {
+      // Validate current user authentication
+      final currentUser = _effectiveUserProfile;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      final roleRank = currentUser.roleRank;
+      final canCreate = roleRank >= 90 || (roleRank >= 60 && roleRank <= 80);
+      if (!canCreate) {
+        throw Exception('Access denied: insufficient rank to create users');
+      }
+
+      if (assignedTroopId.trim().isEmpty) {
+        throw Exception('Assigned troop is required');
+      }
+
+      if (roleRank < 90) {
+        final managedTroopId = currentUser.managedTroopId;
+        if (managedTroopId == null || managedTroopId.isEmpty) {
+          throw Exception('Your account has no managed troop');
+        }
+        if (assignedTroopId != managedTroopId) {
+          throw Exception(
+            'Access denied: you can only create users in your troop',
+          );
+        }
+      }
+
+      // Call the service to create the profile
+      final profileId = await _service.createUserProfile(
+        profileData: profileData,
+        assignedTroopId: assignedTroopId,
+        approvedByProfileId: currentUser.id,
+      );
+
+      debugPrint('✅ Created new user profile: $profileId');
+
+      // Clear cache and refresh users list to include the new user
+      _usersCache.clear();
+      await loadUsers(forceRefresh: true);
+
+      return true;
+    } catch (e, st) {
+      _createUserError = e.toString();
+      debugPrint('❌ Error creating user: $e');
+      debugPrint('❌ createUser stacktrace: $st');
+      return false;
+    } finally {
+      _isCreatingUser = false;
+      notifyListeners();
     }
   }
 

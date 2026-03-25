@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../core/utils/error_translator.dart';
+
 import '../../../../../auth/logic/auth_provider.dart';
 import '../../../../../auth/models/role.dart';
 import '../../../../../core/constants/app_colors.dart';
@@ -843,8 +845,9 @@ class _UserEditDialogState extends State<UserEditDialog> {
       setState(() {
         _isSaving = false;
       });
+      final userMessage = ErrorTranslator.toUserMessage(provider.error);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'Unable to update user')),
+        SnackBar(content: Text(userMessage)),
       );
     }
   }

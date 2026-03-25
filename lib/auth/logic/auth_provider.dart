@@ -930,5 +930,16 @@ class AuthProvider with ChangeNotifier {
   void clearError() {
     _clearError();
   }
+
+  /// Check if email already exists in profiles table
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final result = await _authRepository.checkEmailExists(email);
+      return result;
+    } catch (e) {
+      _logDebug('Error checking email existence: $e');
+      rethrow;
+    }
+  }
 }
 

@@ -594,24 +594,39 @@ class AttendanceProvider with ChangeNotifier {
             .where((id) => !_recordIdByProfileId.containsKey(id))
             .toList();
 
-        if (missingProfileIds.isNotEmpty && currentUserProfileId != null) {
-          await _attendanceService.lazyAutoFillAbsent(
-            meetingId: _selectedMeetingId!,
-            memberProfileIds: missingProfileIds,
-            markedByProfileId: currentUserProfileId,
-          );
+        if (missingProfileIds.isNotEmpty) {
+          final shouldAttemptAutoFill =
+              !_isReviewDemoAccount && currentUserProfileId != null;
 
-          // Re-fetch so we have the newly created record IDs.
-          records = await _attendanceService.fetchAttendanceForMeeting(
-            _selectedMeetingId!,
-          );
-          _attendanceLastUpdated = _attendanceService.getAttendanceLastUpdated(
-            _selectedMeetingId!,
-          );
+          if (shouldAttemptAutoFill) {
+            try {
+              await _attendanceService.lazyAutoFillAbsent(
+                meetingId: _selectedMeetingId!,
+                memberProfileIds: missingProfileIds,
+                markedByProfileId: currentUserProfileId,
+              );
 
-          _recordIdByProfileId = {for (final r in records) r.profileId: r.id};
+              // Re-fetch so we have the newly created record IDs.
+              records = await _attendanceService.fetchAttendanceForMeeting(
+                _selectedMeetingId!,
+              );
+              _attendanceLastUpdated =
+                  _attendanceService.getAttendanceLastUpdated(
+                    _selectedMeetingId!,
+                  );
 
-          // Default new records to absent in local/original maps.
+              _recordIdByProfileId = {
+                for (final r in records) r.profileId: r.id,
+              };
+            } catch (e, st) {
+              // Read-only users should still be able to view attendance.
+              debugPrint(
+                'AttendanceProvider._loadAttendance lazyAutoFillAbsent skipped: $e\n$st',
+              );
+            }
+          }
+
+          // Ensure members without DB rows still render in local read state.
           for (final id in missingProfileIds) {
             _localAttendance.putIfAbsent(id, () => AttendanceStatus.absent);
             _originalAttendance.putIfAbsent(id, () => AttendanceStatus.absent);

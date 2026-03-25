@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../auth/models/user_profile.dart';
 import '../../../../auth/data/role_repository.dart';
@@ -216,7 +216,7 @@ class UserManagementService with ScopedServiceMixin {
       } catch (error) {
         final profileId = row is Map<String, dynamic> ? row['id'] : null;
         debugPrint(
-          '⚠️ Skipping invalid profile row in fetchUsers. id=$profileId error=$error',
+          '[WARN] Skipping invalid profile row in fetchUsers. id=$profileId error=$error',
         );
       }
     }
@@ -368,6 +368,150 @@ class UserManagementService with ScopedServiceMixin {
     }
   }
 
+  /// Check if an email already exists in the profiles table
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final response = await _supabase
+          .from(_profilesTable)
+          .select('id')
+          .eq('email', email.toLowerCase().trim())
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      _logError('checkEmailExists', e);
+      rethrow;
+    }
+  }
+
+  /// Create a new user profile with Scout role assignment
+  /// 
+  /// [profileData] must contain: first_name, last_name, name_ar, email, phone,
+  ///                             address, birthdate, gender, generation
+  /// [assignedTroopId] is the UUID of the troop to assign this user to
+  /// Returns the profile ID of the created profile
+  Future<String> createUserProfile({
+    required Map<String, dynamic> profileData,
+    required String assignedTroopId,
+    String? approvedByProfileId,
+  }) async {
+    var stage = 'validate-input';
+    try {
+      if (assignedTroopId.trim().isEmpty) {
+        throw ArgumentError('Assigned troop is required');
+      }
+
+      // Email is required
+      final rawEmail = profileData['email'];
+      final email = rawEmail is String ? rawEmail.trim() : null;
+      if (email == null || email.isEmpty) {
+        throw ArgumentError('Email is required for profile creation');
+      }
+
+      // Check if email already exists
+      stage = 'check-email-exists';
+      final emailExists = await checkEmailExists(email);
+      if (emailExists) {
+        throw Exception('Email already exists in the system');
+      }
+
+      // Build a sanitized payload so unexpected value types cannot leak through.
+      final payload = <String, dynamic>{};
+      for (final entry in profileData.entries) {
+        final value = entry.value;
+        if (value is String) {
+          final trimmed = value.trim();
+          payload[entry.key] = trimmed.isEmpty ? null : trimmed;
+          continue;
+        }
+        payload[entry.key] = value;
+      }
+
+      // Ensure signup_completed is false for manually created profiles.
+      payload['signup_completed'] = false;
+      payload['approved'] = true;
+      payload['signup_troop'] = assignedTroopId.trim();
+      payload['email'] = email.toLowerCase();
+
+      // Insert the profile
+      stage = 'insert-profile';
+      final profileResponse = await _supabase
+          .from(_profilesTable)
+          .insert([payload])
+          .select('id')
+          .single();
+
+      final rawProfileId = profileResponse['id'];
+      final profileId = rawProfileId is String ? rawProfileId : null;
+      if (profileId == null || profileId.isEmpty) {
+        throw Exception('Profile creation succeeded but returned invalid id');
+      }
+
+      // Query the scout role directly to avoid brittle full-model parsing.
+      stage = 'resolve-scout-role';
+      final rolesResponse = await _supabase
+          .from('roles')
+          .select('id, name, slug');
+
+      Map<String, dynamic>? scoutRoleRow;
+      for (final row in rolesResponse as List) {
+        if (row is! Map<String, dynamic>) continue;
+
+        final slug = row['slug'] is String
+            ? (row['slug'] as String).toLowerCase().trim()
+            : '';
+        final name = row['name'] is String
+            ? (row['name'] as String).toLowerCase().trim()
+            : '';
+
+        final isScoutRole =
+            slug == 'scouts' || name == 'scout' || name == 'scouts';
+        if (isScoutRole) {
+          scoutRoleRow = row;
+          break;
+        }
+      }
+
+      final scoutRoleId =
+          scoutRoleRow != null && scoutRoleRow['id'] is String
+          ? scoutRoleRow['id'] as String
+          : null;
+      if (scoutRoleId == null || scoutRoleId.isEmpty) {
+        throw Exception('Scout role not found in system');
+      }
+
+      // Assign Scout role to the new profile
+      stage = 'assign-scout-role';
+      await _supabase.from(_profileRolesTable).insert({
+        'profile_id': profileId,
+        'role_id': scoutRoleId,
+        'troop_context': assignedTroopId,
+      });
+
+      // Create/update approval history so accepted users don't reappear in pending queue.
+      stage = 'upsert-profile-approval';
+      await _supabase.from('profiles_approvals').upsert({
+        'profile_id': profileId,
+        if (approvedByProfileId != null && approvedByProfileId.trim().isNotEmpty)
+          'approved_by': approvedByProfileId.trim(),
+        'status': true,
+        'comments': 'Auto-approved during admin create-user flow',
+      }, onConflict: 'profile_id');
+
+      return profileId;
+    } on PostgrestException catch (e, st) {
+      if (e.code == '42501') {
+        throw Exception(
+          'Create user is blocked by database RLS policy. Apply migration 20260325_allow_admin_troop_profile_insert.sql (profiles insert) and ensure profiles_approvals insert policy is active, then retry.',
+        );
+      }
+      _logError('createUserProfile[$stage]', '$e\n$st');
+      rethrow;
+    } catch (e, st) {
+      _logError('createUserProfile[$stage]', '$e\n$st');
+      rethrow;
+    }
+  }
   Future<void> _validateProfileAccess(
     String profileId,
     UserProfile currentUser,
@@ -391,6 +535,6 @@ class UserManagementService with ScopedServiceMixin {
   }
 
   void _logError(String operation, Object error) {
-    debugPrint('❌ UserManagementService.$operation error: $error');
+    debugPrint('[ERROR] UserManagementService.$operation error: $error');
   }
 }

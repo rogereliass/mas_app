@@ -13,16 +13,18 @@ flutter pub get
 flutter run
 flutter build appbundle --release
 
+ C:/Users/Peter/.claude/projects/d--Scout-Digital-Team-masapp/memory/
 ---------------------------------------------------------
 
 Act as a senior production software engineer and review this implementation to ensure it matches the planned behavior and app conventions, is secure, stable, production-safe, has modern UI consistent with the existing design, contains no crashes, edge-case failures, or bad state handling, and follows best practices without over-engineering; if any issue exists, fix it immediately with the simplest bulletproof solution, re-check security, stability, and performance after the fix, and return only: 1) critical issues found (if any), 2) corrected final code, 3) confirmation the feature is production-ready.
 
 ---------------------------------------------------------
 
--⚠️ App Offline Use Test on Phone
--⚠️ Security Review | SQLInj & XSS, Sanitize User Inputs, secure paths & routes
 -⚠️ FCM notification issue TEST
+-⚠️ App Offline Use Test on Phone
 -🏗️ QR code for attendance recording - [Troop Heads]
+-🏗️ user creation button for admin/troop head,leaders
+- Test Tester account limitations
 
 - Library Review | file views & download stats
 - Clans, Rovers & Leadership
@@ -30,7 +32,6 @@ Act as a senior production software engineer and review this implementation to e
 
 ---------------------------------------------------------
 
--🏗️ user creation button for admin/troop head,leaders
 - add reporting to library views
 - Eftekad Module
 - Leadership View & Stats

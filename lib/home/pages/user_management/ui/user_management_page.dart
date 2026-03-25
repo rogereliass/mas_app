@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/models/role.dart';
+import '../../../../core/utils/error_translator.dart';
 import '../../../../core/widgets/admin_scope_banner.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_view.dart';
 import '../../../../routing/app_router.dart';
 import '../data/models/managed_user_profile.dart';
 import '../logic/user_management_provider.dart';
+import 'components/create_user_dialog.dart';
 import 'components/user_card.dart';
 import 'components/user_edit_dialog.dart';
 
@@ -98,10 +100,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
   void _errorHandler() {
     if (!mounted || _userProvider == null) return;
 
+    // Don't show page-level errors if a dialog/modal is open
+    // Check if there are any non-route-only entries in the navigator
+    if (Navigator.of(context).canPop() &&
+        ModalRoute.of(context)?.isCurrent != true) {
+      // A modal/dialog is open, let it handle errors
+      return;
+    }
+
     if (_userProvider!.hasError && _userProvider!.users.isNotEmpty) {
+      final userMessage = ErrorTranslator.toUserMessage(_userProvider!.error);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_userProvider!.error!),
+          content: Text(userMessage),
           backgroundColor: Theme.of(context).colorScheme.error,
           action: SnackBarAction(
             label: 'Retry',
@@ -176,7 +187,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
                 if (provider.hasError) {
                   return ErrorView(
-                    message: provider.error ?? 'Unknown error occurred',
+                    message: ErrorTranslator.toUserMessage(provider.error),
                     onRetry: () => provider.loadUsers(),
                   );
                 }
@@ -190,7 +201,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 }
 
                 final filteredUsers = provider.filteredUsers;
-
                 if (filteredUsers.isEmpty) {
                   return _buildEmptyState(
                     context,
@@ -236,6 +246,48 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: _buildCreateUserFab(context),
+    );
+  }
+
+  Widget? _buildCreateUserFab(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final effectiveRank = _effectiveRank ?? authProvider.currentUserRoleRank;
+    final isSystemAdmin = effectiveRank >= 90;
+    final isTroopLeader = effectiveRank >= 60 && effectiveRank <= 80;
+
+    if (!isSystemAdmin && !isTroopLeader) {
+      return null;
+    }
+
+    return FloatingActionButton.extended(
+      onPressed: () => _showCreateUserDialog(context),
+      icon: const Icon(Icons.person_add),
+      label: const Text('Add User'),
+      tooltip: 'Add User',
+    );
+  }
+
+  Future<void> _showCreateUserDialog(BuildContext context) async {
+    final authProvider = context.read<AuthProvider>();
+    final userProvider = context.read<UserManagementProvider>();
+
+    await showDialog(
+      context: context,
+      builder: (context) => CreateUserDialog(
+        currentUserProfile: authProvider.currentUserProfile,
+        currentUserRank: _effectiveRank ?? authProvider.currentUserRoleRank,
+        availableTroops: userProvider.availableTroops,
+        onSuccess: () {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('User created successfully'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
       ),
     );
   }
@@ -285,8 +337,16 @@ class _UserManagementPageState extends State<UserManagementPage> {
             ),
           );
 
-          final roleFilter = _buildRoleFilter(theme, provider, constraints.maxWidth);
-          final troopFilter = _buildTroopFilter(theme, provider, constraints.maxWidth);
+          final roleFilter = _buildRoleFilter(
+            theme,
+            provider,
+            constraints.maxWidth,
+          );
+          final troopFilter = _buildTroopFilter(
+            theme,
+            provider,
+            constraints.maxWidth,
+          );
 
           if (compact) {
             return Column(
@@ -294,10 +354,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 searchField,
                 const SizedBox(height: 12),
                 roleFilter,
-                if (isSystemAdmin) ...[
-                  const SizedBox(height: 12),
-                  troopFilter,
-                ],
+                if (isSystemAdmin) ...[const SizedBox(height: 12), troopFilter],
               ],
             );
           }
@@ -324,12 +381,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
     UserManagementProvider provider,
     double availableWidth,
   ) {
-    // Adjust UI based on available width
-    final isNarrow = availableWidth < 250;
-    final contentPadding = isNarrow
-        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
-        : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
-
     // Get effective user rank (accounts for role context)
     final authProvider = context.read<AuthProvider>();
     final effectiveRank = _effectiveRank ?? authProvider.currentUserRoleRank;
@@ -382,10 +433,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
       items: [
         DropdownMenuItem<String?>(
@@ -440,12 +488,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
       });
     }
 
-    // Adjust UI based on available width
-    final isNarrow = availableWidth < 250;
-    final contentPadding = isNarrow
-        ? const EdgeInsets.symmetric(horizontal: 12, vertical: 12)
-        : const EdgeInsets.symmetric(horizontal: 16, vertical: 14);
-
     return DropdownButtonFormField<String?>(
       key: ValueKey('troop-filter-${provider.selectedTroopFilter ?? 'all'}'),
       initialValue: dropdownSelectedTroop,
@@ -461,10 +503,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 8,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
       items: [
         DropdownMenuItem<String?>(

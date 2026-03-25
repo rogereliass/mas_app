@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/utils/error_translator.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
@@ -14,7 +15,7 @@ import 'file_viewer/txt_viewer_widget.dart';
 import 'file_viewer/audio_viewer_widget.dart';
 
 /// File Viewer Page
-/// 
+///
 /// Displays files in view-only mode with streaming support
 /// Supports: PDF, Images, Videos, Text files
 /// Files are NOT saved locally unless user taps download button
@@ -65,7 +66,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Load file data from provider
   Future<void> _loadFileData() async {
     final provider = Provider.of<LibraryProvider>(context, listen: false);
-    
+
     try {
       final file = await provider.getFile(widget.fileId);
       if (kDebugMode) {
@@ -73,27 +74,29 @@ class _FileViewerPageState extends State<FileViewerPage> {
         debugPrint('📁 Storage path: ${file?.storagePath}');
         debugPrint('🔗 Icon URL: ${file?.iconUrl}');
       }
-      
+
       if (file != null) {
         _file = file;
-        
+
         // Check if it's a video or audio file
         final isVideo = file.fileType?.toLowerCase() == 'video';
         final isAudio = file.fileType?.toLowerCase() == 'audio';
-        
+
         // Check if file is available offline (not for videos or text files)
         final shouldCheckOffline = !isVideo && !file.isTextFile;
-        final offlinePath = shouldCheckOffline 
-            ? OfflineStorageService.getFilePath(widget.fileId) 
+        final offlinePath = shouldCheckOffline
+            ? OfflineStorageService.getFilePath(widget.fileId)
             : null;
         final hasOffline = offlinePath != null;
-        
+
         if (isVideo) {
           // For video files, use storagePath directly (YouTube URL)
           if (kDebugMode) {
-            debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
+            debugPrint(
+              '🎥 Video file - using storagePath: ${file.storagePath}',
+            );
           }
-          
+
           if (mounted) {
             setState(() {
               _fileUrl = file.storagePath; // Use storagePath as YouTube URL
@@ -105,7 +108,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           if (kDebugMode) {
             debugPrint('💾 Using offline cached file: $offlinePath');
           }
-          
+
           if (mounted) {
             setState(() {
               _fileUrl = offlinePath; // Use local file path directly
@@ -122,7 +125,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           if (kDebugMode) {
             debugPrint('🔗 Generated signed URL for audio: $url');
           }
-          
+
           if (mounted) {
             setState(() {
               _fileUrl = url;
@@ -135,7 +138,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           if (kDebugMode) {
             debugPrint('🔗 Generated signed URL: $url');
           }
-          
+
           if (mounted) {
             setState(() {
               _fileUrl = url;
@@ -146,9 +149,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
           // For text files, load content from storage if text_content is empty
           final textContent = await provider.getTextFileContent(widget.fileId);
           if (kDebugMode) {
-            debugPrint('📝 Text file loaded - content length: ${textContent?.length ?? 0}');
+            debugPrint(
+              '📝 Text file loaded - content length: ${textContent?.length ?? 0}',
+            );
           }
-          
+
           if (mounted) {
             setState(() {
               // Update the file object with loaded content
@@ -196,14 +201,14 @@ class _FileViewerPageState extends State<FileViewerPage> {
         });
       }
     }
-    
+
     _checkOfflineAvailability();
   }
 
   /// Check if file is already downloaded locally
   Future<void> _checkOfflineAvailability() async {
     final isOffline = OfflineStorageService.isAvailableOffline(widget.fileId);
-    
+
     if (mounted) {
       setState(() {
         _isAvailableOffline = isOffline;
@@ -239,7 +244,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
     if (kDebugMode) {
       debugPrint('🔄 New version available, auto-updating...');
     }
-    
+
     setState(() {
       _isCheckingUpdate = true;
     });
@@ -260,18 +265,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
           SnackBar(
             content: Row(
               children: [
-                Icon(
-                  Icons.download_done,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                Icon(Icons.download_done, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
                 const Text(
                   'Newer Version has been downloaded',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -371,7 +369,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         });
 
         if (!mounted) return;
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -379,7 +377,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
             backgroundColor: AppColors.success,
           ),
         );
-        
+
         // CRITICAL FIX: Reload file data to use the cached version
         await _loadFileData();
       } else {
@@ -392,9 +390,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
       });
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
-      );
+      final userMessage = ErrorTranslator.toUserMessage(e.toString());
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(userMessage)));
     }
   }
 
@@ -402,15 +401,15 @@ class _FileViewerPageState extends State<FileViewerPage> {
   void _updateProgressPeriodically() {
     Future.doWhile(() async {
       if (!_isDownloading || !mounted) return false;
-      
+
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       if (mounted && _downloadProgress < 0.9) {
         setState(() {
           _downloadProgress += 0.05;
         });
       }
-      
+
       return _isDownloading && _downloadProgress < 0.9;
     });
   }
@@ -435,10 +434,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -455,17 +451,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
       });
 
       if (!mounted) return;
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
             children: [
-              Icon(
-                Icons.info_outline,
-                color: Colors.white,
-                size: 20,
-              ),
+              Icon(Icons.info_outline, color: Colors.white, size: 20),
               SizedBox(width: 12),
               Text('File removed from offline storage'),
             ],
@@ -474,7 +466,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       // Reload file data to use online version
       await _loadFileData();
     } catch (e) {
@@ -516,7 +508,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
   PreferredSizeWidget _buildAppBar() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return AppBar(
       backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
       leading: Padding(
@@ -531,11 +523,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
             ),
           ),
           child: IconButton(
-            icon: Icon(
-              Icons.arrow_back,
-              color: AppColors.goldAccent,
-              size: 20,
-            ),
+            icon: Icon(Icons.arrow_back, color: AppColors.goldAccent, size: 20),
             onPressed: () => Navigator.pop(context),
             padding: EdgeInsets.zero,
           ),
@@ -543,19 +531,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
       ),
       title: Text(
         _file?.title ?? widget.fileName,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       centerTitle: true,
       actions: [
         // Hide download button for videos, audio, and when downloads are not allowed
-        if (widget.fileType.toLowerCase() != 'video' && 
-            widget.fileType.toLowerCase() != 'audio' && 
-            _file?.downloadsAllowed != false) ...[        
+        if (widget.fileType.toLowerCase() != 'video' &&
+            widget.fileType.toLowerCase() != 'audio' &&
+            _file?.downloadsAllowed != false) ...[
           if (_isDownloading)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -577,9 +562,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 _isAvailableOffline ? Icons.download_done : Icons.download,
                 color: _isAvailableOffline ? AppColors.success : null,
               ),
-              onPressed: _isAvailableOffline ? _removeFromOffline : _downloadFile,
-              tooltip: _isAvailableOffline 
-                  ? 'Remove from Offline Storage' 
+              onPressed: _isAvailableOffline
+                  ? _removeFromOffline
+                  : _downloadFile,
+              tooltip: _isAvailableOffline
+                  ? 'Remove from Offline Storage'
                   : 'Download for Offline Use',
             ),
         ],
@@ -601,9 +588,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Build main file viewer content
   Widget _buildFileViewerContent() {
     if (_isLoadingFile) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_file == null) {
@@ -611,11 +596,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.error_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             const Text('File not found'),
             const SizedBox(height: 16),
@@ -645,7 +626,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
           const SizedBox(height: 24),
 
           // Description section
-          if (_file?.description != null && 
+          if (_file?.description != null &&
               _file!.description!.trim().isNotEmpty) ...[
             _buildDescription(),
             const SizedBox(height: 24),
@@ -672,7 +653,10 @@ class _FileViewerPageState extends State<FileViewerPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        height: isVideo ? null : MediaQuery.of(context).size.height * 0.7, // Dynamic height for videos
+        height: isVideo
+            ? null
+            : MediaQuery.of(context).size.height *
+                  0.7, // Dynamic height for videos
         decoration: BoxDecoration(
           color: theme.brightness == Brightness.dark
               ? AppColors.cardDark
@@ -751,11 +735,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
     if (kDebugMode) {
       debugPrint('🎬 Building viewer for type: $fileType');
     }
-    
+
     // For text files, pass the text content directly
     if (fileType == 'text' || fileType == 'txt') {
       if (kDebugMode) {
-        debugPrint('📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...');
+        debugPrint(
+          '📝 Rendering text file with content: ${_file?.textContent?.substring(0, 50) ?? "empty"}...',
+        );
       }
       return TxtViewerWidget(
         url: '',
@@ -785,10 +771,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
       case 'mp3':
       case 'wav':
       case 'audio':
-        return AudioViewerWidget(
-          url: streamUrl,
-          iconUrl: _file?.iconUrl,
-        );
+        return AudioViewerWidget(url: streamUrl, iconUrl: _file?.iconUrl);
       default:
         return _buildUnsupportedFileType();
     }
@@ -842,17 +825,11 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ],
           if (_isAvailableOffline)
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.goldAccent.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.goldAccent,
-                  width: 1.5,
-                ),
+                border: Border.all(color: AppColors.goldAccent, width: 1.5),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -956,7 +933,9 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 child: Text(
                   tag,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.goldAccent : const Color(0xFF885A0A),
+                    color: isDark
+                        ? AppColors.goldAccent
+                        : const Color(0xFF885A0A),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -968,4 +947,3 @@ class _FileViewerPageState extends State<FileViewerPage> {
     );
   }
 }
-

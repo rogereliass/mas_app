@@ -22,6 +22,8 @@ class Role {
   /// Create Role from Supabase JSON
   /// Maps role_rank from database to rank property
   factory Role.fromJson(Map<String, dynamic> json) {
+    String? asOptionalString(dynamic value) => value is String ? value : null;
+
     // Defensive null checks for required fields
     final id = json['id'];
     final name = json['name'];
@@ -40,8 +42,8 @@ class Role {
     return Role(
       id: id,
       name: name,
-      slug: json['slug'] as String?,
-      description: json['description'] as String?,
+      slug: asOptionalString(json['slug']),
+      description: asOptionalString(json['description']),
       rank: json['role_rank'] as int? ?? json['rank'] as int? ?? 0, // Support both field names
       createdAt: DateTime.parse(createdAt),
     );

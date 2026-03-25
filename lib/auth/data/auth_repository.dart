@@ -514,4 +514,21 @@ class AuthRepository {
 
     return _handleAuthException(e);
   }
+
+  /// Check if email already exists in profiles table
+  Future<bool> checkEmailExists(String email) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      final result = await _supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', normalizedEmail)
+          .limit(1);
+
+      return result.isNotEmpty;
+    } catch (e) {
+      _logDebug('Error checking email: $e');
+      return false;
+    }
+  }
 }

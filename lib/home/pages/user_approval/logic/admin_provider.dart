@@ -7,6 +7,8 @@ import '../../../../auth/models/role.dart';
 import '../../../../auth/models/user_profile.dart';
 import '../../../../auth/logic/auth_provider.dart';
 import '../../../../auth/data/role_repository.dart';
+import '../../../../core/utils/review_mode.dart';
+import '../../../../routing/navigation_service.dart';
 import '../../../../core/utils/ttl_cache.dart';
 
 /// Admin Provider
@@ -207,6 +209,7 @@ class AdminProvider with ChangeNotifier {
 
   /// Check if effective role context has system-wide access
   bool get isEffectiveSystemWideAccess => _effectiveUserProfile?.hasSystemWideAccess ?? false;
+  bool get _isReviewDemoAccount => isReviewDemoEmail(_authProvider.userEmail);
 
   // ==================== PUBLIC METHODS ====================
 
@@ -411,6 +414,20 @@ class AdminProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    if (_isReviewDemoAccount) {
+      _pendingProfiles.removeWhere((p) => p.id == profileId);
+      _pendingProfilesCache.clear();
+      if (_selectedProfile?.id == profileId) {
+        _selectedProfile = null;
+        _selectedProfileApprovals = [];
+        _selectedProfileRoles = [];
+      }
+      _isProcessing = false;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return true;
+    }
+
     try {
       final currentUser = _effectiveUserProfile;
       
@@ -474,6 +491,13 @@ class AdminProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    if (_isReviewDemoAccount) {
+      _isProcessing = false;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return true;
+    }
+
     try {
       final currentUser = _effectiveUserProfile;
       
@@ -526,6 +550,20 @@ class AdminProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    if (_isReviewDemoAccount) {
+      _pendingProfiles.removeWhere((p) => p.id == profileId);
+      _pendingProfilesCache.clear();
+      if (_selectedProfile?.id == profileId) {
+        _selectedProfile = null;
+        _selectedProfileApprovals = [];
+        _selectedProfileRoles = [];
+      }
+      _isProcessing = false;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return true;
+    }
+
     try {
       final currentUser = _effectiveUserProfile;
       
@@ -577,6 +615,23 @@ class AdminProvider with ChangeNotifier {
     _isProcessing = true;
     _error = null;
     notifyListeners();
+
+    if (_isReviewDemoAccount) {
+      if (_selectedProfile?.id == profileId) {
+        _selectedProfile = _selectedProfile!.copyWith(generation: generation);
+      }
+
+      final index = _pendingProfiles.indexWhere((p) => p.id == profileId);
+      if (index != -1) {
+        _pendingProfiles[index] =
+            _pendingProfiles[index].copyWith(generation: generation);
+      }
+
+      _isProcessing = false;
+      NavigationService.showMessage(kReviewModeSuccessMessage);
+      notifyListeners();
+      return true;
+    }
 
     try {
       await _service.updateProfileGeneration(
