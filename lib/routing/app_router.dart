@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/logic/auth_provider.dart';
+import '../core/services/connectivity_service.dart';
 import '../startup/startup_page.dart';
 import '../auth/ui/login_page.dart';
 import '../auth/ui/register_page.dart';
@@ -60,6 +63,7 @@ class ProtectedRouteEvaluation {
 
 ProtectedRouteEvaluation evaluateProtectedRouteState({
   required bool isAuthenticated,
+  required bool isOnline,
   required bool profileLoading,
   required bool hasProfile,
   required int currentUserRoleRank,
@@ -71,11 +75,15 @@ ProtectedRouteEvaluation evaluateProtectedRouteState({
     return const ProtectedRouteEvaluation(ProtectedRouteState.denyUnauthenticated);
   }
 
-  if (profileLoading) {
+  if (profileLoading && !hasProfile) {
     return const ProtectedRouteEvaluation(ProtectedRouteState.pendingProfile);
   }
 
   if (!hasProfile) {
+    if (!isOnline) {
+      return const ProtectedRouteEvaluation(ProtectedRouteState.denyProfileUnavailable);
+    }
+
     if (unresolvedProfileDuration >= unresolvedProfileTimeout) {
       return const ProtectedRouteEvaluation(ProtectedRouteState.denyProfileUnavailable);
     }
@@ -460,7 +468,23 @@ class _ProtectedRoutePage extends StatefulWidget {
 class _ProtectedRoutePageState extends State<_ProtectedRoutePage> {
   bool _requestedProfileRefresh = false;
   DateTime? _profileCheckStartedAt;
+  StreamSubscription<bool>? _connectivitySubscription;
   static const Duration _profileCheckTimeout = Duration(seconds: 8);
+
+  @override
+  void initState() {
+    super.initState();
+    _connectivitySubscription = ConnectivityService.instance.statusStream.listen((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -471,6 +495,7 @@ class _ProtectedRoutePageState extends State<_ProtectedRoutePage> {
         : DateTime.now().difference(_profileCheckStartedAt!);
     final guardEvaluation = evaluateProtectedRouteState(
       isAuthenticated: authProvider.isAuthenticated,
+      isOnline: ConnectivityService.instance.isOnline,
       profileLoading: authProvider.profileLoading,
       hasProfile: authProvider.currentUserProfile != null,
       currentUserRoleRank: authProvider.currentUserRoleRank,
@@ -514,9 +539,12 @@ class _ProtectedRoutePageState extends State<_ProtectedRoutePage> {
     }
 
     if (guardEvaluation.state == ProtectedRouteState.denyProfileUnavailable) {
+      final offline = !ConnectivityService.instance.isOnline;
       return _buildAccessDenied(
         context,
-        message: 'Unable to confirm your access right now. Please retry.',
+        message: offline
+            ? 'Offline mode: this section needs a previously cached profile. Connect once, then retry offline.'
+            : 'Unable to confirm your access right now. Please retry.',
         onRetry: _retryAccessCheck,
         retryLabel: 'Retry',
       );

@@ -438,8 +438,7 @@ class RoleRepository {
     try {
       return await getUserRoles(user.id);
     } catch (e) {
-      // Return empty list on error (graceful degradation)
-      return [];
+      throw RoleException('Failed to fetch current user roles: $e');
     }
   }
 

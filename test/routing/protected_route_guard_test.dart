@@ -6,6 +6,7 @@ void main() {
     test('denies unauthenticated access', () {
       final result = evaluateProtectedRouteState(
         isAuthenticated: false,
+        isOnline: false,
         profileLoading: false,
         hasProfile: false,
         currentUserRoleRank: 0,
@@ -20,6 +21,7 @@ void main() {
     test('stays pending while profile is loading', () {
       final result = evaluateProtectedRouteState(
         isAuthenticated: true,
+        isOnline: true,
         profileLoading: true,
         hasProfile: false,
         currentUserRoleRank: 0,
@@ -34,6 +36,7 @@ void main() {
     test('denies when profile remains unavailable after timeout', () {
       final result = evaluateProtectedRouteState(
         isAuthenticated: true,
+        isOnline: true,
         profileLoading: false,
         hasProfile: false,
         currentUserRoleRank: 0,
@@ -48,6 +51,7 @@ void main() {
     test('denies insufficient role using current user rank', () {
       final result = evaluateProtectedRouteState(
         isAuthenticated: true,
+        isOnline: true,
         profileLoading: false,
         hasProfile: true,
         currentUserRoleRank: 70,
@@ -62,6 +66,7 @@ void main() {
     test('allows access when rank requirement is met', () {
       final result = evaluateProtectedRouteState(
         isAuthenticated: true,
+        isOnline: true,
         profileLoading: false,
         hasProfile: true,
         currentUserRoleRank: 100,
@@ -72,6 +77,36 @@ void main() {
 
       expect(result.state, ProtectedRouteState.allow);
       expect(result.isAllowed, isTrue);
+    });
+
+    test('denies immediately offline when profile is unavailable', () {
+      final result = evaluateProtectedRouteState(
+        isAuthenticated: true,
+        isOnline: false,
+        profileLoading: false,
+        hasProfile: false,
+        currentUserRoleRank: 0,
+        minRoleRank: 60,
+        unresolvedProfileDuration: const Duration(seconds: 1),
+        unresolvedProfileTimeout: const Duration(seconds: 8),
+      );
+
+      expect(result.state, ProtectedRouteState.denyProfileUnavailable);
+    });
+
+    test('allows when profile exists even if profileLoading is true', () {
+      final result = evaluateProtectedRouteState(
+        isAuthenticated: true,
+        isOnline: false,
+        profileLoading: true,
+        hasProfile: true,
+        currentUserRoleRank: 70,
+        minRoleRank: 60,
+        unresolvedProfileDuration: const Duration(seconds: 9),
+        unresolvedProfileTimeout: const Duration(seconds: 8),
+      );
+
+      expect(result.state, ProtectedRouteState.allow);
     });
   });
 }

@@ -76,7 +76,7 @@ class NotificationsProvider with ChangeNotifier {
   }
 
   Future<void> loadNotifications({bool forceRefresh = false}) async {
-    if (_authProvider.profileLoading && _items.isEmpty) {
+    if (_authProvider.profileLoading && _authProvider.currentUserProfile == null) {
       _isLoading = true;
       notifyListeners();
       return;
@@ -436,7 +436,7 @@ class NotificationsProvider with ChangeNotifier {
       return;
     }
 
-    if (_authProvider.profileLoading) {
+    if (_authProvider.profileLoading && _authProvider.currentUserProfile == null) {
       return;
     }
 

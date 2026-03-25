@@ -84,8 +84,8 @@ class _HomePageState extends State<HomePage> {
       debugPrint('🏠 ======================================');
     }
 
-    // Show loading state while profile is being fetched
-    if (authProvider.profileLoading) {
+    // Show loading only if profile is being fetched and no cached profile exists yet.
+    if (authProvider.profileLoading && authProvider.currentUserProfile == null) {
       return Scaffold(
         body: Center(
           child: Column(

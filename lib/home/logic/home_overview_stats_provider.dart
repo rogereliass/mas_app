@@ -45,7 +45,7 @@ class HomeOverviewStatsProvider with ChangeNotifier {
   }
 
   Future<void> loadOverview({bool forceRefresh = false}) async {
-    if (_authProvider.profileLoading) {
+    if (_authProvider.profileLoading && _authProvider.currentUserProfile == null) {
       _setLoading(true);
       return;
     }
@@ -142,7 +142,8 @@ class HomeOverviewStatsProvider with ChangeNotifier {
 
     _error = null;
     if (_isSupportedRank(_authProvider.selectedRoleRank) &&
-        !_authProvider.profileLoading) {
+        !(_authProvider.profileLoading &&
+            _authProvider.currentUserProfile == null)) {
       loadOverview();
     } else {
       notifyListeners();

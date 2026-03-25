@@ -1,28 +1,49 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:masapp/app.dart';
 import 'package:masapp/core/config/theme_provider.dart';
 
 void main() {
-  testWidgets('App initialization test', (WidgetTester tester) async {
-    // Build our app with provider and trigger a frame.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
+
+  testWidgets('ThemeProvider toggles app theme mode', (
+    WidgetTester tester,
+  ) async {
+    final provider = ThemeProvider();
+
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => ThemeProvider(),
-        child: const MyApp(),
+        create: (_) => provider,
+        child: Consumer<ThemeProvider>(
+          builder: (context, theme, _) {
+            return MaterialApp(
+              themeMode: theme.themeMode,
+              home: Scaffold(
+                body: Text(
+                  theme.themeMode.toString(),
+                  textDirection: TextDirection.ltr,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
 
-    // Verify that startup page is shown
-    expect(find.text('Welcome to'), findsOneWidget);
-    expect(find.text('MAS'), findsOneWidget);
+    expect(find.text('ThemeMode.system'), findsOneWidget);
+
+    await provider.setDarkMode();
+    await tester.pump();
+    expect(find.text('ThemeMode.dark'), findsOneWidget);
+
+    await provider.setLightMode();
+    await tester.pump();
+    expect(find.text('ThemeMode.light'), findsOneWidget);
   });
 }

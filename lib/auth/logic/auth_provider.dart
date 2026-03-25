@@ -6,6 +6,8 @@ import '../data/auth_repository.dart';
 import '../data/role_repository.dart';
 import '../models/user_profile.dart';
 import '../models/role.dart';
+import '../../core/data/persistent_query_cache.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../core/utils/ttl_cache.dart';
 import '../../core/utils/fcm_service.dart';
 import '../../routing/app_router.dart';
@@ -19,9 +21,12 @@ class AuthProvider with ChangeNotifier {
   final AuthRepository _authRepository = AuthRepository();
   final RoleRepository _roleRepository = RoleRepository();
   StreamSubscription<AuthState>? _authSubscription;
+  StreamSubscription<bool>? _connectivitySubscription;
   static SharedPreferences? _cachedPrefs;
   static const int _profileLoadAttempts = 2;
   static const Duration _profileRetryDelay = Duration(milliseconds: 700);
+  static const Duration _offlineIdentityTtl = Duration(days: 7);
+  static const Duration _offlineIdentityStaleGrace = Duration(days: 2);
 
   // TTL caching for troops list
   static const Duration _troopsCacheTtl = Duration(minutes: 60);
@@ -115,6 +120,8 @@ class AuthProvider with ChangeNotifier {
   String? _errorMessage;
   String? _profileLoadError;
   bool _profileLoading = false;
+  bool _usingCachedIdentity = false;
+  Future<void>? _bootstrapInFlight;
 
   // Getters
   User? get currentUser => _currentUser;
@@ -126,6 +133,7 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get profileLoadError => _profileLoadError;
   bool get profileLoading => _profileLoading;
+  bool get isUsingCachedIdentity => _usingCachedIdentity;
 
   /// Get current user's role rank (0 if unauthenticated)
   int get currentUserRoleRank => _currentUserProfile?.roleRank ?? 0;
@@ -205,10 +213,22 @@ class AuthProvider with ChangeNotifier {
           _logDebug('[WARN] Migration failed (non-fatal): $e');
         });
 
+    // Listen to connectivity changes so cached identity can auto-refresh on reconnect.
+    _connectivitySubscription = ConnectivityService.instance.statusStream.listen((
+      isOnline,
+    ) {
+      if (!isOnline) {
+        return;
+      }
+      if (_currentUser == null || !_usingCachedIdentity || _profileLoading) {
+        return;
+      }
+      unawaited(refreshProfile());
+    });
+
     // Listen to auth state changes and store subscription for cleanup
-    _authSubscription = _authRepository.authStateChanges.listen((
-      AuthState data,
-    ) async {
+    _authSubscription = _authRepository.authStateChanges.listen((AuthState data) async {
+      final previousUserId = _currentUser?.id;
       _currentUser = data.session?.user;
 
       if (data.event == AuthChangeEvent.passwordRecovery && _currentUser != null) {
@@ -224,21 +244,12 @@ class AuthProvider with ChangeNotifier {
       _logDebug('[AUTH] Auth state changed');
 
       if (_currentUser != null) {
-        // Load profile and roles without intermediate notifications
-        _profileLoading = true;
-        await _loadUserProfile(notifyOnComplete: false);
-        await _loadUserRoles();
-        await _saveUserData();
-        await _syncFcmTokenWithCurrentProfile();
-        _profileLoading = false;
-        _logDebug('[NOTIFY] Notifying listeners after auth state change');
-
-        // Notify listeners since user logged in
-        notifyListeners();
+        await _ensureAuthenticatedBootstrap();
       } else {
         _currentUserProfile = null;
         _userRoles = [];
-        await _clearUserData();
+        _usingCachedIdentity = false;
+        await _clearUserData(previousUserIdForCache: previousUserId);
         await _deactivateFcmTokenForSignedOutUser();
 
         // Notify listeners since user logged out
@@ -249,25 +260,91 @@ class AuthProvider with ChangeNotifier {
     // Load user profile if already logged in (async)
     if (_currentUser != null) {
       _logDebug('[USER] User already logged in, loading profile and roles...');
-      // CRITICAL: Set loading flag BEFORE starting async operations to prevent race condition
-      _profileLoading = true;
-      _loadUserProfile(notifyOnComplete: false)
-          .then((_) async {
-            await _loadUserRoles();
-            await _saveUserData();
-            await _syncFcmTokenWithCurrentProfile();
-            _profileLoading = false;
-            _logDebug('[NOTIFY] Notifying listeners after initial load complete');
-            notifyListeners();
-          })
-          .catchError((e) {
-            _logDebug('[ERROR] Error in initial load: $e');
-            _profileLoading = false;
-            // Still notify listeners so UI can show error state
-            notifyListeners();
-          });
+      unawaited(_ensureAuthenticatedBootstrap());
     } else {
       _logDebug('[WARN] No user logged in at initialization');
+    }
+  }
+
+  Future<void> _ensureAuthenticatedBootstrap() async {
+    final inFlight = _bootstrapInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _bootstrapAuthenticatedState();
+    _bootstrapInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_bootstrapInFlight, operation)) {
+        _bootstrapInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _bootstrapAuthenticatedState() async {
+    if (_currentUser == null) {
+      return;
+    }
+
+    _profileLoading = true;
+    notifyListeners();
+
+    var hydrated = false;
+    UserProfile? hydratedProfileSnapshot;
+    var hydratedRolesSnapshot = <Role>[];
+
+    try {
+      hydrated = await _hydrateOfflineIdentitySnapshot();
+      if (hydrated) {
+        _usingCachedIdentity = true;
+        hydratedProfileSnapshot = _currentUserProfile;
+        hydratedRolesSnapshot = List<Role>.from(_userRoles);
+        notifyListeners();
+      }
+
+      final isOnline = ConnectivityService.instance.isOnline;
+      if (!isOnline && hydrated) {
+        _profileLoadError ??= 'Offline mode: using cached profile data.';
+        _profileLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      if (!isOnline && !hydrated) {
+        _profileLoadError =
+            'Offline mode: no cached profile available yet. Connect once to initialize offline access.';
+        _profileLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      await _loadUserProfile(notifyOnComplete: false);
+      await _loadUserRoles();
+
+      if (_currentUserProfile == null && hydrated && hydratedProfileSnapshot != null) {
+        _currentUserProfile = hydratedProfileSnapshot;
+      }
+
+      if (_userRoles.isEmpty && hydrated && hydratedRolesSnapshot.isNotEmpty) {
+        _userRoles = hydratedRolesSnapshot;
+      }
+
+      await _hydrateAndNormalizeSelectedRole();
+      await _saveUserData();
+      await _persistOfflineIdentitySnapshot();
+      await _syncFcmTokenWithCurrentProfile();
+      _usingCachedIdentity = false;
+    } catch (e) {
+      _logDebug('[ERROR] Error in authenticated bootstrap: $e');
+      if (!hydrated) {
+        _profileLoadError = 'Failed to initialize profile data: $e';
+      }
+    } finally {
+      _profileLoading = false;
+      notifyListeners();
     }
   }
 
@@ -378,6 +455,8 @@ class AuthProvider with ChangeNotifier {
       return;
     }
 
+    final previousRoles = List<Role>.from(_userRoles);
+
     try {
       _logDebug('[SYNC] Loading roles for user');
       _userRoles = await _roleRepository.getCurrentUserRoles();
@@ -386,9 +465,14 @@ class AuthProvider with ChangeNotifier {
     } catch (e, stackTrace) {
       _logDebug('[ERROR] Failed to load user roles: $e');
       _logDebug('   StackTrace: $stackTrace');
-      _userRoles = [];
-      _selectedRoleName = null;
-      // Don't throw - allow app to continue without roles
+      if (_usingCachedIdentity && previousRoles.isNotEmpty) {
+        _userRoles = previousRoles;
+        await _hydrateAndNormalizeSelectedRole();
+      } else {
+        _userRoles = [];
+        _selectedRoleName = null;
+      }
+      // Don't throw - allow app to continue with cached roles when available.
     }
   }
 
@@ -454,6 +538,7 @@ class AuthProvider with ChangeNotifier {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -507,7 +592,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Clear user data from SharedPreferences
-  Future<bool> _clearUserData() async {
+  Future<bool> _clearUserData({String? previousUserIdForCache}) async {
     try {
       final prefs = await _prefs;
 
@@ -531,6 +616,11 @@ class AuthProvider with ChangeNotifier {
         prefs.setBool('is_authenticated', false),
       ]);
 
+      final cacheUserId = previousUserIdForCache ?? _currentUser?.id;
+      if (cacheUserId != null && cacheUserId.trim().isNotEmpty) {
+        await PersistentQueryCache.invalidate(_offlineIdentityKey(cacheUserId));
+      }
+
       _selectedRoleName = null;
 
       return true;
@@ -538,6 +628,113 @@ class AuthProvider with ChangeNotifier {
       _logDebug('Error clearing user data: $e');
       return false;
     }
+  }
+
+  String _offlineIdentityKey(String userId) =>
+      'auth:identity:${userId.trim()}';
+
+  Future<void> _persistOfflineIdentitySnapshot() async {
+    if (_currentUser == null || _currentUserProfile == null) {
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'schema_version': 1,
+      'user_id': _currentUser!.id,
+      'profile': _currentUserProfile!.toJson(),
+      'roles': _userRoles.map((role) => role.toJson()).toList(growable: false),
+      'selected_role_name': _selectedRoleName,
+      'role_rank': _currentUserProfile!.roleRank,
+    };
+
+    await PersistentQueryCache.write(
+      key: _offlineIdentityKey(_currentUser!.id),
+      payload: payload,
+      ttl: _offlineIdentityTtl,
+    );
+  }
+
+  Future<bool> _hydrateOfflineIdentitySnapshot() async {
+    if (_currentUser == null) {
+      return false;
+    }
+
+    final entry = await PersistentQueryCache.read<Map<String, dynamic>>(
+      key: _offlineIdentityKey(_currentUser!.id),
+      parser: _parseOfflineIdentitySnapshot,
+    );
+    if (entry == null) {
+      return false;
+    }
+
+    final isOnline = ConnectivityService.instance.isOnline;
+    if (entry.isExpired) {
+      if (isOnline) {
+        await PersistentQueryCache.invalidate(_offlineIdentityKey(_currentUser!.id));
+        return false;
+      }
+
+      final savedAt = entry.savedAt;
+      if (savedAt == null ||
+          DateTime.now().difference(savedAt) >
+              (_offlineIdentityTtl + _offlineIdentityStaleGrace)) {
+        await PersistentQueryCache.invalidate(_offlineIdentityKey(_currentUser!.id));
+        return false;
+      }
+
+      _profileLoadError =
+          'Offline mode: using stale cached profile. Connect to refresh permissions.';
+    }
+
+    final payload = entry.data;
+    final profileRaw = payload['profile'];
+    if (profileRaw is! Map) {
+      await PersistentQueryCache.invalidate(_offlineIdentityKey(_currentUser!.id));
+      return false;
+    }
+
+    try {
+      final profileMap = profileRaw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      _currentUserProfile = UserProfile.fromJson(profileMap);
+
+      final rolesRaw = payload['roles'];
+      final hydratedRoles = <Role>[];
+      if (rolesRaw is List) {
+        for (final raw in rolesRaw) {
+          if (raw is! Map) continue;
+          try {
+            final roleMap = raw.map(
+              (key, value) => MapEntry(key.toString(), value),
+            );
+            hydratedRoles.add(Role.fromJson(roleMap));
+          } catch (_) {
+            // Ignore malformed role entries while keeping remaining roles.
+          }
+        }
+      }
+      _userRoles = hydratedRoles;
+
+      final selectedRole = payload['selected_role_name'];
+      _selectedRoleName = selectedRole is String && selectedRole.trim().isNotEmpty
+          ? selectedRole
+          : _selectedRoleName;
+
+      _profileLoadError = null;
+      return true;
+    } catch (_) {
+      await PersistentQueryCache.invalidate(_offlineIdentityKey(_currentUser!.id));
+      return false;
+    }
+  }
+
+  Map<String, dynamic>? _parseOfflineIdentitySnapshot(Object? payload) {
+    if (payload is! Map) {
+      return null;
+    }
+
+    return payload.map((key, value) => MapEntry(key.toString(), value));
   }
 
   /// Generic wrapper for auth operations to reduce code duplication
@@ -556,7 +753,9 @@ class AuthProvider with ChangeNotifier {
       await _loadUserProfile(notifyOnComplete: false);
       await _loadUserRoles();
       await _saveUserData();
+      await _persistOfflineIdentitySnapshot();
       await _syncFcmTokenWithCurrentProfile();
+      _usingCachedIdentity = false;
 
       // Manually notify after both profile and roles are loaded
       notifyListeners();
@@ -683,9 +882,10 @@ class AuthProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
+      final previousUserId = _currentUser?.id;
       await _authRepository.signOut();
       _currentUser = null;
-      await _clearUserData();
+      await _clearUserData(previousUserIdForCache: previousUserId);
     } catch (e) {
       _setError('Failed to log out');
     } finally {
@@ -696,9 +896,10 @@ class AuthProvider with ChangeNotifier {
   /// Delete current user (rollback auth if profile creation fails)
   Future<bool> deleteCurrentUser() async {
     try {
+      final previousUserId = _currentUser?.id;
       await _authRepository.deleteCurrentUser();
       _currentUser = null;
-      await _clearUserData();
+      await _clearUserData(previousUserIdForCache: previousUserId);
       return true;
     } catch (e) {
       _logDebug('Delete user error: $e');
@@ -875,6 +1076,10 @@ class AuthProvider with ChangeNotifier {
   /// Manually refresh the user profile and roles (e.g. on pull-to-refresh)
   Future<void> refreshProfile() async {
     if (_currentUser != null) {
+      if (_profileLoading) {
+        return;
+      }
+
       _profileLoading = true;
       notifyListeners();
 
@@ -883,7 +1088,9 @@ class AuthProvider with ChangeNotifier {
         await _loadUserProfile(notifyOnComplete: false);
         await _loadUserRoles();
         await _saveUserData();
+        await _persistOfflineIdentitySnapshot();
         await _syncFcmTokenWithCurrentProfile();
+        _usingCachedIdentity = false;
       } finally {
         _profileLoading = false;
         // Manually notify after both are loaded
