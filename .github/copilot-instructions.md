@@ -51,6 +51,7 @@ Template:
 | YYYY-MM-DD | Example: Broke dropdown layout on narrow screen | Missing `isExpanded: true` | Add dropdown checklist item before submit |
 
 Current lessons:
+- 2026-03-25 | Offline mode showed banner but failed to load cached meetings/attendance/points after app restart | Feature caches relied on in-memory TTL only and did not persist read snapshots to disk | Add Hive-backed persistent query snapshots for critical read paths (season, meetings, attendance, points, notifications) and hydrate providers/services from disk before network fallback
 - 2026-03-25 | Admin-created users still appeared in user acceptance queue after create | create flow set profile fields but did not persist matching accepted state in profiles_approvals | During create-user set profiles.approved=true and upsert profiles_approvals(status=true, approved_by) while keeping signup_completed=false
 - 2026-03-25 | Admin/troop create-user flow failed with profiles INSERT RLS (42501) despite valid client payload | profiles policy only allowed self-service insert (`user_id = auth.uid()`) and lacked privileged insert policy | Add explicit `profiles_insert_admin_or_troop` WITH CHECK policy tied to rank and troop context, keep self-service policy, and map 42501 errors to actionable migration guidance
 - 2026-03-24 | Attendance QR scanner could keep camera active across lifecycle transitions and generate unstable offline batch fingerprints | Scanner screen lacked app lifecycle camera gating and modified profile IDs were iterated from an unordered set | Add WidgetsBindingObserver-based start/stop handling for scanner state and sort modified profile IDs before building batch payloads
@@ -111,6 +112,7 @@ lib/
 8. Use only `AppColors.*` or `Theme.of(context).colorScheme.*` for UI colors.
 9. Never hardcode color literals like `Colors.*` (except transparent where needed), `.shade`, or `Color(0x...)`.
 10. Keep files manageable; extract components if file size or widget complexity grows too large.
+11. When adding a package, prefer actively maintained, widely trusted libraries and pin to the latest reliable, secure, and stable version compatible with the app; avoid deprecated or abandoned packages.
 
 ## 7) RBAC Canonical Roles
 
@@ -278,6 +280,7 @@ flutter run -d <device-id>
 
 - [ ] `flutter analyze` passes for touched files.
 - [ ] Relevant tests updated and passing where applicable.
+- [ ] Any newly introduced package is justified, maintained, and set to a reliable current stable version.
 
 ## 13) Known Gotchas
 

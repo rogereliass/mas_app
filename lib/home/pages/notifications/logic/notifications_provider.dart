@@ -110,6 +110,25 @@ class NotificationsProvider with ChangeNotifier {
         return;
       }
 
+      final persistedLookup = await _cacheManager.lookupPersisted(cacheKey);
+      if (persistedLookup.hasData && persistedLookup.data != null) {
+        _applyPanelData(persistedLookup.data!);
+        _error = null;
+        _isLoading = false;
+        notifyListeners();
+
+        if (persistedLookup.isExpired) {
+          unawaited(
+            _fetchAndCache(
+              cacheKey: cacheKey,
+              profileId: profile.id,
+              isBackground: true,
+            ),
+          );
+        }
+        return;
+      }
+
       final inFlight = _inFlightLoads[cacheKey];
       if (inFlight != null) {
         await inFlight;

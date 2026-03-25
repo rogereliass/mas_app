@@ -4,11 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
 import 'package:masapp/core/constants/offline_policy.dart';
+import 'package:masapp/core/data/persistent_query_cache.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:masapp/meetings/pages/meeting_creation/data/models/meeting.dart';
 
 /// Service responsible for all Supabase operations related to meetings.
 class MeetingsService {
+  static const String _activeSeasonCacheKey = 'meetings:active_season';
+  static const String _troopsCacheKey = 'meetings:troops';
+
   final SupabaseClient _supabase;
 
   // Static cache keeps entries alive even though instance() creates a new
@@ -45,6 +49,11 @@ class MeetingsService {
   /// Returns the currently active season (where today falls between
   /// `start_date` and `end_date`), or `null` if none is found.
   Future<Map<String, dynamic>?> fetchActiveSeason() async {
+    final persisted = await PersistentQueryCache.read<Map<String, dynamic>>(
+      key: _activeSeasonCacheKey,
+      parser: _parseJsonMap,
+    );
+
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -56,8 +65,24 @@ class MeetingsService {
           .limit(1)
           .maybeSingle());
 
+      if (result != null) {
+        await PersistentQueryCache.write(
+          key: _activeSeasonCacheKey,
+          payload: result,
+          ttl: CacheTtl.activeSeason,
+        );
+      }
+
       return result;
     } catch (e) {
+      if (persisted != null) {
+        _logDataSource(
+          operation: 'fetchActiveSeason',
+          source: 'DISK_CACHE_HIT',
+          scope: _activeSeasonCacheKey,
+        );
+        return persisted.data;
+      }
       throw Exception('MeetingsService.fetchActiveSeason: $e');
     }
   }
@@ -68,14 +93,33 @@ class MeetingsService {
 
   /// Returns a list of troops as `[{id, name}]`, ordered by name.
   Future<List<Map<String, dynamic>>> fetchTroops() async {
+    final persisted = await PersistentQueryCache.read<List<Map<String, dynamic>>>(
+      key: _troopsCacheKey,
+      parser: _parseJsonMapList,
+    );
+
     try {
       final results = await _withTimeout(_supabase
           .from('troops')
           .select('id, name')
           .order('name', ascending: true));
 
+      await PersistentQueryCache.write(
+        key: _troopsCacheKey,
+        payload: results,
+        ttl: CacheTtl.troopsList,
+      );
+
       return List<Map<String, dynamic>>.from(results as List);
     } catch (e) {
+      if (persisted != null) {
+        _logDataSource(
+          operation: 'fetchTroops',
+          source: 'DISK_CACHE_HIT',
+          scope: _troopsCacheKey,
+        );
+        return persisted.data;
+      }
       throw Exception('MeetingsService.fetchTroops: $e');
     }
   }
@@ -108,6 +152,28 @@ class MeetingsService {
         }
       }());
       return cached;
+    }
+
+    final persisted = await PersistentQueryCache.read<List<Meeting>>(
+      key: _persistedMeetingsKey(cacheKey),
+      parser: _parseMeetingList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchMeetings',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _meetingsCache.set(cacheKey, persisted.data, CacheTtl.meetingsList);
+      _meetingsLastUpdated[cacheKey] = persisted.savedAt ?? DateTime.now();
+      unawaited(() async {
+        try {
+          await _refreshMeetingsCache(seasonId: seasonId, troopId: troopId);
+        } catch (_) {
+          // Keep persisted snapshot if background refresh fails.
+        }
+      }());
+      return persisted.data;
     }
 
     final stale = _meetingsCache.get(cacheKey, ignoreExpiry: true);
@@ -265,6 +331,15 @@ class MeetingsService {
       meetings,
       CacheTtl.meetingsList,
     );
+
+    await PersistentQueryCache.write(
+      key: _persistedMeetingsKey(
+        _meetingsCacheKey(seasonId: seasonId, troopId: troopId),
+      ),
+      payload: meetings.map(_meetingToJson).toList(growable: false),
+      ttl: CacheTtl.meetingsList,
+    );
+
     _meetingsLastUpdated[
       _meetingsCacheKey(seasonId: seasonId, troopId: troopId)
     ] = DateTime.now();
@@ -293,9 +368,55 @@ class MeetingsService {
         return 'CACHE';
       case 'OFFLINE_STALE_CACHE':
         return 'STALE';
+      case 'DISK_CACHE_HIT':
+        return 'DISK';
       default:
         return source;
     }
+  }
+
+  String _persistedMeetingsKey(String cacheKey) => 'meetings:list:$cacheKey';
+
+  Map<String, dynamic>? _parseJsonMap(Object? payload) {
+    if (payload is! Map) return null;
+    return payload.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+  }
+
+  List<Map<String, dynamic>>? _parseJsonMapList(Object? payload) {
+    if (payload is! List) return null;
+    return payload
+        .whereType<Map>()
+        .map(
+          (row) => row.map((key, value) => MapEntry(key.toString(), value)),
+        )
+        .toList(growable: false);
+  }
+
+  List<Meeting>? _parseMeetingList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows.map(Meeting.fromJson).toList(growable: false);
+  }
+
+  Map<String, dynamic> _meetingToJson(Meeting meeting) {
+    return <String, dynamic>{
+      'id': meeting.id,
+      'troop_id': meeting.troopId,
+      'season_id': meeting.seasonId,
+      'title': meeting.title,
+      'description': meeting.description,
+      'location': meeting.location,
+      'starts_at': meeting.startsAt?.toIso8601String(),
+      'ends_at': meeting.endsAt?.toIso8601String(),
+      'created_by_profile_id': meeting.createdByProfileId,
+      'is_template': meeting.isTemplate,
+      'created_at': meeting.createdAt?.toIso8601String(),
+      'updated_at': meeting.updatedAt?.toIso8601String(),
+      'meeting_date': meeting.meetingDate.toIso8601String().substring(0, 10),
+      'price': meeting.price,
+    };
   }
 
   Future<T> _withTimeout<T>(Future<T> future) {

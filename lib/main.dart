@@ -23,6 +23,7 @@ import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'meetings/pages/points/logic/points_provider.dart';
 import 'core/utils/fcm_service.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/data/persistent_query_cache.dart';
 import 'offline/offline_storage.dart';
 import 'offline/offline_action_queue.dart';
 import 'app.dart';
@@ -58,6 +59,9 @@ void main() async {
 
   // Initialize offline storage service
   await OfflineStorageService.initialize();
+
+  // Initialize persistent query snapshot cache for offline-first reads.
+  await PersistentQueryCache.initialize();
 
   // Initialize persistent mutation queue and reconnect sync listener.
   await OfflineActionQueue.instance.initialize();

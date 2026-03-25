@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../routing/app_router.dart';
 import '../logic/home_overview_stats_provider.dart';
 import 'premium_dashboard_widgets.dart';
@@ -19,6 +20,20 @@ class TroopHeadStats extends StatefulWidget {
 
 class _TroopHeadStatsState extends State<TroopHeadStats> {
   bool _requestedInitialLoad = false;
+
+  void _navigateOnlineOnly(String routeName, String featureLabel) {
+    if (!ConnectivityService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$featureLabel requires internet connection.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    Navigator.pushNamed(context, routeName);
+  }
 
   @override
   void didChangeDependencies() {
@@ -60,28 +75,36 @@ class _TroopHeadStatsState extends State<TroopHeadStats> {
               subtitle: 'Review & approve pending registrations',
               icon: Icons.how_to_reg_rounded,
               color: const Color(0xFF6366F1), // Indigo
-              onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
+              onTap: () => _navigateOnlineOnly(
+                AppRouter.userAcceptance,
+                'User Acceptance',
+              ),
             ),
             PremiumActionCard(
               title: 'User Management',
               subtitle: 'Edit member profiles & roles',
               icon: Icons.manage_accounts_rounded,
               color: const Color(0xFF14B8A6), // Teal
-              onTap: () => Navigator.pushNamed(context, AppRouter.userManagement),
+              onTap: () => _navigateOnlineOnly(
+                AppRouter.userManagement,
+                'User Management',
+              ),
             ),
             PremiumActionCard(
               title: 'Patrols',
               subtitle: 'Organize troop structure',
               icon: Icons.groups_rounded,
               color: const Color(0xFFF59E0B), // Amber
-              onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
+              onTap: () =>
+                  _navigateOnlineOnly(AppRouter.patrolsManagement, 'Patrols'),
             ),
             PremiumActionCard(
               title: 'Eftekad',
               subtitle: 'Open Eftekad tools (coming soon)',
               icon: Icons.fact_check_rounded,
               color: AppColors.primaryBlue,
-              onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
+              onTap: () =>
+                  _navigateOnlineOnly(AppRouter.eftekad, 'Eftekad'),
             ),
           ],
           stats: [

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -66,127 +69,128 @@ class _FileViewerPageState extends State<FileViewerPage> {
   /// Load file data from provider
   Future<void> _loadFileData() async {
     final provider = Provider.of<LibraryProvider>(context, listen: false);
+    final fallbackFile = _buildFallbackFile();
 
     try {
-      final file = await provider.getFile(widget.fileId);
+      final fetchedFile = await provider.getFile(widget.fileId);
+      final file = fetchedFile ?? fallbackFile;
       if (kDebugMode) {
-        debugPrint('📂 Loaded file: ${file?.title}, type: ${file?.fileType}');
-        debugPrint('📁 Storage path: ${file?.storagePath}');
-        debugPrint('🔗 Icon URL: ${file?.iconUrl}');
+        debugPrint('📂 Loaded file: ${file.title}, type: ${file.fileType}');
+        debugPrint('📁 Storage path: ${file.storagePath}');
+        debugPrint('🔗 Icon URL: ${file.iconUrl}');
       }
 
-      if (file != null) {
-        _file = file;
+      _file = file;
 
-        // Check if it's a video or audio file
-        final isVideo = file.fileType?.toLowerCase() == 'video';
-        final isAudio = file.fileType?.toLowerCase() == 'audio';
+      // Check if it's a video or audio file
+      final isVideo = file.fileType?.toLowerCase() == 'video';
+      final isAudio = file.fileType?.toLowerCase() == 'audio';
 
-        // Check if file is available offline (not for videos or text files)
-        final shouldCheckOffline = !isVideo && !file.isTextFile;
-        final offlinePath = shouldCheckOffline
-            ? OfflineStorageService.getFilePath(widget.fileId)
-            : null;
-        final hasOffline = offlinePath != null;
+      // Check if file is available offline for all non-video files.
+      // Text files are stored as bytes and decoded back when offline.
+      final shouldCheckOffline = !isVideo;
+      final offlinePath = shouldCheckOffline
+          ? OfflineStorageService.getFilePath(widget.fileId)
+          : null;
+      final hasOffline = offlinePath != null;
 
-        if (isVideo) {
-          // For video files, use storagePath directly (YouTube URL)
-          if (kDebugMode) {
-            debugPrint(
-              '🎥 Video file - using storagePath: ${file.storagePath}',
-            );
-          }
-
-          if (mounted) {
-            setState(() {
-              _fileUrl = file.storagePath; // Use storagePath as YouTube URL
-              _isLoadingFile = false;
-            });
-          }
-        } else if (hasOffline) {
-          // Use offline cached file for PDFs, images, and audio
-          if (kDebugMode) {
-            debugPrint('💾 Using offline cached file: $offlinePath');
-          }
-
-          if (mounted) {
-            setState(() {
-              _fileUrl = offlinePath; // Use local file path directly
-              _isLoadingFile = false;
-              _isAvailableOffline = true; // Set offline status immediately
-            });
-          }
-        } else if (isAudio) {
-          // For audio files, get signed URL from Supabase storage
-          if (kDebugMode) {
-            debugPrint('🎵 Audio file - getting signed URL');
-          }
-          final url = await provider.getFileUrl(widget.fileId);
-          if (kDebugMode) {
-            debugPrint('🔗 Generated signed URL for audio: $url');
-          }
-
-          if (mounted) {
-            setState(() {
-              _fileUrl = url;
-              _isLoadingFile = false;
-            });
-          }
-        } else if (!file.isTextFile) {
-          // Get signed URL for non-video, non-text files
-          final url = await provider.getFileUrl(widget.fileId);
-          if (kDebugMode) {
-            debugPrint('🔗 Generated signed URL: $url');
-          }
-
-          if (mounted) {
-            setState(() {
-              _fileUrl = url;
-              _isLoadingFile = false;
-            });
-          }
-        } else {
-          // For text files, load content from storage if text_content is empty
-          final textContent = await provider.getTextFileContent(widget.fileId);
-          if (kDebugMode) {
-            debugPrint(
-              '📝 Text file loaded - content length: ${textContent?.length ?? 0}',
-            );
-          }
-
-          if (mounted) {
-            setState(() {
-              // Update the file object with loaded content
-              if (textContent != null) {
-                _file = LibraryFile(
-                  id: file.id,
-                  folderId: file.folderId,
-                  title: file.title,
-                  description: file.description,
-                  fileType: file.fileType,
-                  storagePath: file.storagePath,
-                  sizeBytes: file.sizeBytes,
-                  iconUrl: file.iconUrl,
-                  visibilityRoleId: file.visibilityRoleId,
-                  allowedRoles: file.allowedRoles,
-                  textContent: textContent, // Use loaded content
-                  serverVersion: file.serverVersion,
-                  tags: file.tags,
-                  downloadsAllowed: file.downloadsAllowed,
-                  minRoleRank: file.minRoleRank, // Preserve role rank
-                  createdAt: file.createdAt,
-                );
-              }
-              _isLoadingFile = false;
-            });
-          }
-        }
-      } else {
+      if (isVideo) {
+        // For video files, use storagePath directly (YouTube URL)
         if (kDebugMode) {
-          debugPrint('❌ File not found');
+          debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
         }
+
         if (mounted) {
           setState(() {
+            _fileUrl = file.storagePath; // Use storagePath as YouTube URL
+            _isLoadingFile = false;
+          });
+        }
+      } else if (hasOffline && file.isTextFile) {
+        // Use offline cached bytes for text files when network content is unavailable.
+        final content = await _readOfflineText(offlinePath);
+
+        if (mounted) {
+          setState(() {
+            _file = file.copyWith(textContent: content);
+            _isLoadingFile = false;
+            _isAvailableOffline = true;
+          });
+        }
+      } else if (hasOffline) {
+        // Use offline cached file for PDFs, images, and audio.
+        if (kDebugMode) {
+          debugPrint('💾 Using offline cached file: $offlinePath');
+        }
+
+        if (mounted) {
+          setState(() {
+            _fileUrl = offlinePath; // Use local file path directly
+            _isLoadingFile = false;
+            _isAvailableOffline = true; // Set offline status immediately
+          });
+        }
+      } else if (isAudio) {
+        // For audio files, get signed URL from Supabase storage
+        if (kDebugMode) {
+          debugPrint('🎵 Audio file - getting signed URL');
+        }
+        final url = await provider.getFileUrl(widget.fileId);
+        if (kDebugMode) {
+          debugPrint('🔗 Generated signed URL for audio: $url');
+        }
+
+        if (mounted) {
+          setState(() {
+            _fileUrl = url;
+            _isLoadingFile = false;
+          });
+        }
+      } else if (!file.isTextFile) {
+        // Get signed URL for non-video, non-text files
+        final url = await provider.getFileUrl(widget.fileId);
+        if (kDebugMode) {
+          debugPrint('🔗 Generated signed URL: $url');
+        }
+
+        if (mounted) {
+          setState(() {
+            _fileUrl = url;
+            _isLoadingFile = false;
+          });
+        }
+      } else {
+        // For text files, load content from storage if text_content is empty
+        final textContent = await provider.getTextFileContent(widget.fileId);
+        if (kDebugMode) {
+          debugPrint(
+            '📝 Text file loaded - content length: ${textContent?.length ?? 0}',
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            // Update the file object with loaded content
+            if (textContent != null) {
+              _file = LibraryFile(
+                id: file.id,
+                folderId: file.folderId,
+                title: file.title,
+                description: file.description,
+                fileType: file.fileType,
+                storagePath: file.storagePath,
+                sizeBytes: file.sizeBytes,
+                iconUrl: file.iconUrl,
+                visibilityRoleId: file.visibilityRoleId,
+                allowedRoles: file.allowedRoles,
+                textContent: textContent, // Use loaded content
+                serverVersion: file.serverVersion,
+                tags: file.tags,
+                downloadsAllowed: file.downloadsAllowed,
+                minRoleRank: file.minRoleRank, // Preserve role rank
+                createdAt: file.createdAt,
+              );
+            }
             _isLoadingFile = false;
           });
         }
@@ -197,12 +201,54 @@ class _FileViewerPageState extends State<FileViewerPage> {
       }
       if (mounted) {
         setState(() {
+          _file ??= fallbackFile;
           _isLoadingFile = false;
         });
       }
     }
 
     _checkOfflineAvailability();
+  }
+
+  LibraryFile _buildFallbackFile() {
+    return LibraryFile(
+      id: widget.fileId,
+      folderId: null,
+      title: widget.fileName,
+      description: widget.description,
+      fileType: widget.fileType,
+      storagePath: null,
+      sizeBytes: widget.fileSizeBytes,
+      iconUrl: null,
+      visibilityRoleId: null,
+      allowedRoles: null,
+      textContent: null,
+      serverVersion: 1,
+      tags: null,
+      downloadsAllowed: true,
+      minRoleRank: 0,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  Future<String?> _readOfflineText(String? offlinePath) async {
+    if (offlinePath == null || offlinePath.isEmpty) {
+      return null;
+    }
+
+    try {
+      final file = File(offlinePath);
+      if (!await file.exists()) {
+        return null;
+      }
+      final bytes = await file.readAsBytes();
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Failed reading offline text file: $e');
+      }
+      return null;
+    }
   }
 
   /// Check if file is already downloaded locally

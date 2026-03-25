@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
 import 'package:masapp/core/constants/offline_policy.dart';
+import 'package:masapp/core/data/persistent_query_cache.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -83,6 +84,27 @@ class PointsService {
       return cached;
     }
 
+    final persisted = await PersistentQueryCache.read<List<PatrolOption>>(
+      key: _persistedPatrolsKey(cacheKey),
+      parser: _parsePatrolOptionList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchPatrols',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _patrolsCache.set(cacheKey, persisted.data, CacheTtl.patrols);
+      unawaited(() async {
+        try {
+          await _refreshPatrolsCache(troopId: troopId);
+        } catch (_) {
+          // Keep persisted patrol list if background refresh fails.
+        }
+      }());
+      return persisted.data;
+    }
+
     final stale = _patrolsCache.get(cacheKey, ignoreExpiry: true);
     try {
       return await _refreshPatrolsCache(troopId: troopId);
@@ -116,6 +138,27 @@ class PointsService {
         }
       }());
       return cached;
+    }
+
+    final persisted = await PersistentQueryCache.read<List<PointCategory>>(
+      key: _persistedCategoriesKey(cacheKey),
+      parser: _parsePointCategoryList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchCategories',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _categoriesCache.set(cacheKey, persisted.data, CacheTtl.pointCategories);
+      unawaited(() async {
+        try {
+          await _refreshCategoriesCache(troopId: troopId);
+        } catch (_) {
+          // Keep persisted category list if background refresh fails.
+        }
+      }());
+      return persisted.data;
     }
 
     final stale = _categoriesCache.get(cacheKey, ignoreExpiry: true);
@@ -153,6 +196,31 @@ class PointsService {
       return cached;
     }
 
+    final persisted = await PersistentQueryCache.read<bool>(
+      key: _persistedVisibilityKey(cacheKey),
+      parser: (payload) => payload is bool ? payload : null,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchTroopPointsHidden',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _pointsVisibilityCache.set(
+        cacheKey,
+        persisted.data,
+        CacheTtl.troopPointsVisibility,
+      );
+      unawaited(() async {
+        try {
+          await _refreshTroopPointsHiddenCache(troopId: troopId);
+        } catch (_) {
+          // Keep persisted visibility state if background refresh fails.
+        }
+      }());
+      return persisted.data;
+    }
+
     final stale = _pointsVisibilityCache.get(cacheKey, ignoreExpiry: true);
     try {
       return await _refreshTroopPointsHiddenCache(troopId: troopId);
@@ -188,6 +256,11 @@ class PointsService {
         pointsHidden,
         CacheTtl.troopPointsVisibility,
       );
+      await PersistentQueryCache.write(
+        key: _persistedVisibilityKey(troopId.trim()),
+        payload: pointsHidden,
+        ttl: CacheTtl.troopPointsVisibility,
+      );
     } catch (e) {
       throw Exception('PointsService.updateTroopPointsVisibility: $e');
     }
@@ -219,6 +292,7 @@ class PointsService {
           .single());
 
       _categoriesCache.invalidate(troopId.trim());
+      await PersistentQueryCache.invalidate(_persistedCategoriesKey(troopId.trim()));
 
       return PointCategory.fromJson(row);
     } catch (e) {
@@ -281,6 +355,7 @@ class PointsService {
 
       _categoriesCache.invalidate(troopId.trim());
       _pointsByMeetingCache.clear();
+      await PersistentQueryCache.invalidate(_persistedCategoriesKey(troopId.trim()));
 
       return PointCategory.fromJson(row);
     } catch (e) {
@@ -292,6 +367,12 @@ class PointsService {
     String troopId,
     String seasonId,
   ) async {
+    final cacheKey = _persistedSeasonPointsKey(troopId.trim(), seasonId.trim());
+    final persisted = await PersistentQueryCache.read<List<PointEntry>>(
+      key: cacheKey,
+      parser: _parsePointEntryList,
+    );
+
     try {
       final meetings = await fetchMeetings(seasonId: seasonId, troopId: troopId);
       if (meetings.isEmpty) return [];
@@ -387,8 +468,22 @@ class PointsService {
         }).toList();
       }
 
-      return _toPointEntries(rawPoints);
+      final entries = _toPointEntries(rawPoints);
+      await PersistentQueryCache.write(
+        key: cacheKey,
+        payload: entries.map(_pointEntryToJson).toList(growable: false),
+        ttl: CacheTtl.meetingsList,
+      );
+      return entries;
     } catch (e) {
+      if (persisted != null) {
+        _logDataSource(
+          operation: 'fetchPointsForSeason',
+          source: 'DISK_CACHE_HIT',
+          scope: cacheKey,
+        );
+        return persisted.data;
+      }
       throw Exception('PointsService.fetchPointsForSeason: $e');
     }
   }
@@ -412,6 +507,28 @@ class PointsService {
         }
       }());
       return cached;
+    }
+
+    final persisted = await PersistentQueryCache.read<List<PointEntry>>(
+      key: _persistedPointsByMeetingKey(cacheKey),
+      parser: _parsePointEntryList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchPointsForMeeting',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _pointsByMeetingCache.set(cacheKey, persisted.data, CacheTtl.meetingPoints);
+      _pointsLastUpdated[cacheKey] = persisted.savedAt ?? DateTime.now();
+      unawaited(() async {
+        try {
+          await _refreshPointsForMeetingCache(meetingId: meetingId);
+        } catch (_) {
+          // Keep persisted points list if background refresh fails.
+        }
+      }());
+      return persisted.data;
     }
 
     final stale = _pointsByMeetingCache.get(cacheKey, ignoreExpiry: true);
@@ -477,6 +594,9 @@ class PointsService {
       }
 
       _pointsByMeetingCache.invalidate(meetingId.trim());
+      await PersistentQueryCache.invalidate(
+        _persistedPointsByMeetingKey(meetingId.trim()),
+      );
 
       return _fetchPointById(pointId);
     } catch (e) {
@@ -519,6 +639,9 @@ class PointsService {
           .eq('meeting_id', meetingId));
 
       _pointsByMeetingCache.invalidate(meetingId.trim());
+      await PersistentQueryCache.invalidate(
+        _persistedPointsByMeetingKey(meetingId.trim()),
+      );
 
       return _fetchPointById(pointId);
     } catch (e) {
@@ -561,6 +684,11 @@ class PointsService {
         .toList();
 
     _patrolsCache.set(normalizedTroopId, patrols, CacheTtl.patrols);
+    await PersistentQueryCache.write(
+      key: _persistedPatrolsKey(normalizedTroopId),
+      payload: patrols.map(_patrolToJson).toList(growable: false),
+      ttl: CacheTtl.patrols,
+    );
     return patrols;
   }
 
@@ -603,6 +731,11 @@ class PointsService {
       categories,
       CacheTtl.pointCategories,
     );
+    await PersistentQueryCache.write(
+      key: _persistedCategoriesKey(normalizedTroopId),
+      payload: categories.map(_categoryToJson).toList(growable: false),
+      ttl: CacheTtl.pointCategories,
+    );
     return categories;
   }
 
@@ -631,6 +764,11 @@ class PointsService {
       normalizedTroopId,
       hidden,
       CacheTtl.troopPointsVisibility,
+    );
+    await PersistentQueryCache.write(
+      key: _persistedVisibilityKey(normalizedTroopId),
+      payload: hidden,
+      ttl: CacheTtl.troopPointsVisibility,
     );
     return hidden;
   }
@@ -663,6 +801,11 @@ class PointsService {
       final joinedRows = await _fetchPointsWithJoins(meetingId: meetingId);
       final entries = _toPointEntries(joinedRows);
       _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      await PersistentQueryCache.write(
+        key: _persistedPointsByMeetingKey(cacheKey),
+        payload: entries.map(_pointEntryToJson).toList(growable: false),
+        ttl: CacheTtl.meetingPoints,
+      );
       _pointsLastUpdated[cacheKey] = DateTime.now();
       return entries;
     } catch (_) {
@@ -671,6 +814,11 @@ class PointsService {
       );
       final entries = _toPointEntries(fallbackRows);
       _pointsByMeetingCache.set(cacheKey, entries, CacheTtl.meetingPoints);
+      await PersistentQueryCache.write(
+        key: _persistedPointsByMeetingKey(cacheKey),
+        payload: entries.map(_pointEntryToJson).toList(growable: false),
+        ttl: CacheTtl.meetingPoints,
+      );
       _pointsLastUpdated[cacheKey] = DateTime.now();
       return entries;
     }
@@ -694,9 +842,88 @@ class PointsService {
         return 'CACHE';
       case 'OFFLINE_STALE_CACHE':
         return 'STALE';
+      case 'DISK_CACHE_HIT':
+        return 'DISK';
       default:
         return source;
     }
+  }
+
+  String _persistedPatrolsKey(String troopId) => 'points:patrols:$troopId';
+
+  String _persistedCategoriesKey(String troopId) =>
+      'points:categories:$troopId';
+
+  String _persistedVisibilityKey(String troopId) =>
+      'points:visibility:$troopId';
+
+  String _persistedPointsByMeetingKey(String meetingId) =>
+      'points:meeting:$meetingId';
+
+  String _persistedSeasonPointsKey(String troopId, String seasonId) =>
+      'points:season:$troopId::$seasonId';
+
+  List<Map<String, dynamic>>? _parseJsonMapList(Object? payload) {
+    if (payload is! List) return null;
+    return payload
+        .whereType<Map>()
+        .map(
+          (row) => row.map((key, value) => MapEntry(key.toString(), value)),
+        )
+        .toList(growable: false);
+  }
+
+  List<PatrolOption>? _parsePatrolOptionList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows.map(PatrolOption.fromJson).toList(growable: false);
+  }
+
+  List<PointCategory>? _parsePointCategoryList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows.map(PointCategory.fromJson).toList(growable: false);
+  }
+
+  List<PointEntry>? _parsePointEntryList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows.map(PointEntry.fromJson).toList(growable: false);
+  }
+
+  Map<String, dynamic> _patrolToJson(PatrolOption patrol) {
+    return <String, dynamic>{
+      'id': patrol.id,
+      'troop_id': patrol.troopId,
+      'name': patrol.name,
+    };
+  }
+
+  Map<String, dynamic> _categoryToJson(PointCategory category) {
+    return <String, dynamic>{
+      'id': category.id,
+      'slug': category.slug,
+      'name': category.name,
+      'description': category.description,
+      'troop_id': category.troopId,
+    };
+  }
+
+  Map<String, dynamic> _pointEntryToJson(PointEntry point) {
+    return <String, dynamic>{
+      'id': point.id,
+      'meeting_id': point.meetingId,
+      'patrol_id': point.patrolId,
+      'category_id': point.categoryId,
+      'value': point.value,
+      'reason': point.reason,
+      'awarded_by_profile_id': point.awardedByProfileId,
+      'created_at': point.createdAt?.toIso8601String(),
+      'approved': point.approved,
+      'patrol_name': point.patrolName,
+      'category_name': point.categoryName,
+      'awarded_by_name': point.awardedByName,
+    };
   }
 
   Future<List<Map<String, dynamic>>> _fetchPointsWithJoins({

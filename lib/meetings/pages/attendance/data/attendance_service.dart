@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:masapp/core/constants/cache_ttl.dart';
 import 'package:masapp/core/constants/offline_policy.dart';
+import 'package:masapp/core/data/persistent_query_cache.dart';
 import 'package:masapp/core/utils/ttl_cache.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:masapp/meetings/pages/attendance/data/models/attendance_record.dart';
@@ -16,12 +17,12 @@ class AttendanceService {
       TtlCache();
   static final TtlCache<String, List<AttendanceRecord>> _attendanceCache =
       TtlCache();
-    static final Map<String, DateTime> _attendanceLastUpdated =
+  static final Map<String, DateTime> _attendanceLastUpdated =
       <String, DateTime>{};
 
-    final Map<String, Future<List<MemberWithAttendance>>> _membersRefreshInFlight =
+  final Map<String, Future<List<MemberWithAttendance>>> _membersRefreshInFlight =
       <String, Future<List<MemberWithAttendance>>>{};
-    final Map<String, Future<List<AttendanceRecord>>> _attendanceRefreshInFlight =
+  final Map<String, Future<List<AttendanceRecord>>> _attendanceRefreshInFlight =
       <String, Future<List<AttendanceRecord>>>{};
 
   AttendanceService(this._supabase);
@@ -84,6 +85,30 @@ class AttendanceService {
       return cached;
     }
 
+    final persisted = await PersistentQueryCache.read<List<MemberWithAttendance>>(
+      key: _persistedMembersKey(cacheKey),
+      parser: _parseMemberList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchTroopMembers',
+        source: 'DISK_CACHE_HIT',
+        scope: cacheKey,
+      );
+      _membersCache.set(cacheKey, persisted.data, CacheTtl.attendanceMembers);
+      unawaited(() async {
+        try {
+          await _refreshTroopMembersCache(
+            troopId: troopId,
+            memberProfileIdFilter: memberProfileIdFilter,
+          );
+        } catch (_) {
+          // Keep persisted member list if background refresh fails.
+        }
+      }());
+      return persisted.data;
+    }
+
     final stale = _membersCache.get(cacheKey, ignoreExpiry: true);
 
     try {
@@ -126,6 +151,33 @@ class AttendanceService {
         }
       }());
       return cached;
+    }
+
+    final persisted = await PersistentQueryCache.read<List<AttendanceRecord>>(
+      key: _persistedAttendanceKey(meetingId.trim()),
+      parser: _parseAttendanceRecordList,
+    );
+    if (persisted != null) {
+      _logDataSource(
+        operation: 'fetchAttendanceForMeeting',
+        source: 'DISK_CACHE_HIT',
+        scope: meetingId.trim(),
+      );
+      _attendanceCache.set(
+        meetingId.trim(),
+        persisted.data,
+        CacheTtl.attendanceRecords,
+      );
+      _attendanceLastUpdated[meetingId.trim()] =
+          persisted.savedAt ?? DateTime.now();
+      unawaited(() async {
+        try {
+          await _refreshAttendanceForMeetingCache(meetingId);
+        } catch (_) {
+          // Keep persisted attendance snapshot if background refresh fails.
+        }
+      }());
+      return persisted.data;
     }
 
     final stale = _attendanceCache.get(meetingId, ignoreExpiry: true);
@@ -206,6 +258,9 @@ class AttendanceService {
 
       if (meetingId != null && meetingId.trim().isNotEmpty) {
         _attendanceCache.invalidate(meetingId.trim());
+        await PersistentQueryCache.invalidate(
+          _persistedAttendanceKey(meetingId.trim()),
+        );
       } else {
         // Fallback when caller cannot provide meeting scope.
         _attendanceCache.clear();
@@ -240,6 +295,7 @@ class AttendanceService {
           .toSet();
       for (final meetingId in touchedMeetingIds) {
         _attendanceCache.invalidate(meetingId);
+        await PersistentQueryCache.invalidate(_persistedAttendanceKey(meetingId));
       }
     } catch (e) {
       throw Exception('AttendanceService.batchUpdateAttendance: $e');
@@ -352,6 +408,17 @@ class AttendanceService {
       CacheTtl.attendanceMembers,
     );
 
+    await PersistentQueryCache.write(
+      key: _persistedMembersKey(
+        _membersCacheKey(
+          troopId: troopId,
+          memberProfileIdFilter: memberProfileIdFilter,
+        ),
+      ),
+      payload: members.map(_memberToJson).toList(growable: false),
+      ttl: CacheTtl.attendanceMembers,
+    );
+
     return members;
   }
 
@@ -390,6 +457,11 @@ class AttendanceService {
         .toList();
 
     _attendanceCache.set(meetingId, records, CacheTtl.attendanceRecords);
+    await PersistentQueryCache.write(
+      key: _persistedAttendanceKey(meetingId.trim()),
+      payload: records.map(_attendanceRecordToJson).toList(growable: false),
+      ttl: CacheTtl.attendanceRecords,
+    );
     _attendanceLastUpdated[meetingId.trim()] = DateTime.now();
     return records;
   }
@@ -420,6 +492,8 @@ class AttendanceService {
         return 'CACHE';
       case 'OFFLINE_STALE_CACHE':
         return 'STALE';
+      case 'DISK_CACHE_HIT':
+        return 'DISK';
       default:
         return source;
     }
@@ -436,9 +510,20 @@ class AttendanceService {
     required String troopId,
     required String seasonId,
   }) async {
+    final cacheKey = _myAttendanceCacheKey(
+      profileId: profileId,
+      troopId: troopId,
+      seasonId: seasonId,
+    );
+
+    final persisted = await PersistentQueryCache.read<List<MyAttendanceLog>>(
+      key: cacheKey,
+      parser: _parseMyAttendanceLogs,
+    );
+
     try {
       // 1) Fetch all meetings for the troop and season in descending order
-        final meetingsResponse = await _withTimeout(_supabase
+      final meetingsResponse = await _withTimeout(_supabase
           .from('meetings')
           .select()
           .eq('troop_id', troopId)
@@ -454,7 +539,7 @@ class AttendanceService {
       final List<String> meetingIds = meetings.map((m) => m.id).toList();
 
       // 2) Fetch attendance records for this profile ID within these meetings
-        final attendanceResponse = await _withTimeout(_supabase
+      final attendanceResponse = await _withTimeout(_supabase
           .from('attendance')
           .select()
           .eq('profile_id', profileId)
@@ -468,16 +553,156 @@ class AttendanceService {
       final recordMap = {for (var r in records) r.meetingId: r};
 
       // 3) Merge into logs
-      return meetings.map((meeting) {
+      final logs = meetings.map((meeting) {
         return MyAttendanceLog(
           meeting: meeting,
           record: recordMap[meeting.id],
         );
       }).toList();
+
+      await PersistentQueryCache.write(
+        key: cacheKey,
+        payload: logs.map(_myAttendanceLogToJson).toList(growable: false),
+        ttl: CacheTtl.meetingsList,
+      );
+
+      return logs;
       
     } catch (e) {
+      if (persisted != null) {
+        _logDataSource(
+          operation: 'fetchMyAttendanceForSeason',
+          source: 'DISK_CACHE_HIT',
+          scope: cacheKey,
+        );
+        return persisted.data;
+      }
       throw Exception('AttendanceService.fetchMyAttendanceForSeason: $e');
     }
+  }
+
+  String _persistedMembersKey(String cacheKey) =>
+      'attendance:members:$cacheKey';
+
+  String _persistedAttendanceKey(String meetingId) =>
+      'attendance:records:${meetingId.trim()}';
+
+  String _myAttendanceCacheKey({
+    required String profileId,
+    required String troopId,
+    required String seasonId,
+  }) {
+    return 'attendance:my:${profileId.trim()}::${troopId.trim()}::${seasonId.trim()}';
+  }
+
+  List<Map<String, dynamic>>? _parseJsonMapList(Object? payload) {
+    if (payload is! List) return null;
+    return payload
+        .whereType<Map>()
+        .map(
+          (row) => row.map((key, value) => MapEntry(key.toString(), value)),
+        )
+        .toList(growable: false);
+  }
+
+  List<MemberWithAttendance>? _parseMemberList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows
+        .map(
+          (row) => MemberWithAttendance(
+            profileId: row['profile_id'] as String,
+            displayName: (row['display_name'] as String? ?? '').trim(),
+            initialsName: (row['initials_name'] as String? ?? '').trim(),
+            patrolId: row['patrol_id'] as String?,
+            patrolName: row['patrol_name'] as String?,
+            record: _attendanceRecordFromMap(row['record']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  List<AttendanceRecord>? _parseAttendanceRecordList(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+    return rows.map(AttendanceRecord.fromJson).toList(growable: false);
+  }
+
+  List<MyAttendanceLog>? _parseMyAttendanceLogs(Object? payload) {
+    final rows = _parseJsonMapList(payload);
+    if (rows == null) return null;
+
+    final logs = <MyAttendanceLog>[];
+    for (final row in rows) {
+      final meetingRaw = row['meeting'];
+      if (meetingRaw is! Map) {
+        continue;
+      }
+      final meetingMap = meetingRaw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+
+      logs.add(
+        MyAttendanceLog(
+          meeting: Meeting.fromJson(meetingMap),
+          record: _attendanceRecordFromMap(row['record']),
+        ),
+      );
+    }
+
+    return logs;
+  }
+
+  AttendanceRecord? _attendanceRecordFromMap(Object? payload) {
+    if (payload is! Map) return null;
+    final map = payload.map((key, value) => MapEntry(key.toString(), value));
+    return AttendanceRecord.fromJson(map);
+  }
+
+  Map<String, dynamic> _memberToJson(MemberWithAttendance member) {
+    return <String, dynamic>{
+      'profile_id': member.profileId,
+      'display_name': member.displayName,
+      'initials_name': member.initialsName,
+      'patrol_id': member.patrolId,
+      'patrol_name': member.patrolName,
+      'record': member.record == null ? null : _attendanceRecordToJson(member.record!),
+    };
+  }
+
+  Map<String, dynamic> _attendanceRecordToJson(AttendanceRecord record) {
+    return <String, dynamic>{
+      'id': record.id,
+      'meeting_id': record.meetingId,
+      'profile_id': record.profileId,
+      'status': record.status.dbValue,
+      'marked_by_profile_id': record.markedByProfileId,
+      'marked_at': record.markedAt?.toIso8601String(),
+      'notes': record.notes,
+    };
+  }
+
+  Map<String, dynamic> _myAttendanceLogToJson(MyAttendanceLog log) {
+    return <String, dynamic>{
+      'meeting': <String, dynamic>{
+        'id': log.meeting.id,
+        'troop_id': log.meeting.troopId,
+        'season_id': log.meeting.seasonId,
+        'title': log.meeting.title,
+        'description': log.meeting.description,
+        'location': log.meeting.location,
+        'starts_at': log.meeting.startsAt?.toIso8601String(),
+        'ends_at': log.meeting.endsAt?.toIso8601String(),
+        'created_by_profile_id': log.meeting.createdByProfileId,
+        'is_template': log.meeting.isTemplate,
+        'created_at': log.meeting.createdAt?.toIso8601String(),
+        'updated_at': log.meeting.updatedAt?.toIso8601String(),
+        'meeting_date': log.meeting.meetingDate.toIso8601String().substring(0, 10),
+        'price': log.meeting.price,
+      },
+      'record':
+          log.record == null ? null : _attendanceRecordToJson(log.record!),
+    };
   }
 
   Future<T> _withTimeout<T>(Future<T> future) {

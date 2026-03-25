@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../data/library_models.dart';
 import '../data/library_service.dart';
 import '../../auth/logic/auth_provider.dart';
+import '../../core/data/persistent_query_cache.dart';
 import '../../core/utils/ttl_cache.dart';
 
 /// Library Provider
@@ -10,6 +11,8 @@ import '../../core/utils/ttl_cache.dart';
 /// Handles loading states, errors, and caching
 /// Implements role-based file filtering
 class LibraryProvider with ChangeNotifier {
+  static const String _rootSnapshotKey = 'library:root_contents';
+
   final LibraryService _service;
   final AuthProvider? _authProvider;
 
@@ -132,6 +135,22 @@ class LibraryProvider with ChangeNotifier {
       }
     }
 
+    final persistedRoot = !forceRefresh
+        ? await PersistentQueryCache.read<Map<String, dynamic>>(
+            key: _rootSnapshotKey,
+            parser: _parseRootSnapshot,
+          )
+        : null;
+
+    if (!forceRefresh && _rootFolders.isEmpty && persistedRoot != null) {
+      _applyRootSnapshot(persistedRoot.data);
+      _rootContentsTimestamp = persistedRoot.savedAt ?? DateTime.now();
+      _isLoadingRoot = false;
+      _error = null;
+      notifyListeners();
+      return;
+    }
+
     try {
       final result = await _service.fetchRootContents(recentFilesLimit: 10);
       
@@ -155,6 +174,12 @@ class LibraryProvider with ChangeNotifier {
       // Mark root contents as cached
       _rootContentsTimestamp = DateTime.now();
 
+      await PersistentQueryCache.write(
+        key: _rootSnapshotKey,
+        payload: _buildRootSnapshotPayload(),
+        ttl: _rootContentsTtl,
+      );
+
       _isLoadingRoot = false;
       _error = null;
 
@@ -169,7 +194,13 @@ class LibraryProvider with ChangeNotifier {
         }
       }
     } catch (e) {
-      _error = _formatError(e);
+      if (_rootFolders.isEmpty && persistedRoot != null) {
+        _applyRootSnapshot(persistedRoot.data);
+        _rootContentsTimestamp = persistedRoot.savedAt ?? DateTime.now();
+        _error = null;
+      } else {
+        _error = _formatError(e);
+      }
       _isLoadingRoot = false;
     }
 
@@ -208,6 +239,23 @@ class LibraryProvider with ChangeNotifier {
         notifyListeners();
         return;
       }
+    }
+
+    final folderSnapshotKey = _folderSnapshotKey(folderId);
+    final persistedFolder = !forceRefresh
+        ? await PersistentQueryCache.read<Map<String, dynamic>>(
+            key: folderSnapshotKey,
+            parser: _parseFolderSnapshot,
+          )
+        : null;
+
+    if (!forceRefresh && persistedFolder != null) {
+      _applyFolderSnapshot(folderId, persistedFolder.data);
+      _folderTimestamps[folderId] = persistedFolder.savedAt ?? DateTime.now();
+      _isLoadingFolder = false;
+      _error = null;
+      notifyListeners();
+      return;
     }
 
     try {
@@ -249,10 +297,22 @@ class LibraryProvider with ChangeNotifier {
       // Mark folder contents as cached
       _folderTimestamps[folderId] = DateTime.now();
 
+      await PersistentQueryCache.write(
+        key: folderSnapshotKey,
+        payload: _buildFolderSnapshotPayload(folderId),
+        ttl: _folderContentsTtl,
+      );
+
       _isLoadingFolder = false;
       _error = null;
     } catch (e) {
-      _error = _formatError(e);
+      if (persistedFolder != null) {
+        _applyFolderSnapshot(folderId, persistedFolder.data);
+        _folderTimestamps[folderId] = persistedFolder.savedAt ?? DateTime.now();
+        _error = null;
+      } else {
+        _error = _formatError(e);
+      }
       _isLoadingFolder = false;
     }
 
@@ -501,6 +561,118 @@ class LibraryProvider with ChangeNotifier {
     _fileTimestamps.clear();
     _signedUrlCache.clear();
     notifyListeners();
+  }
+
+  String _folderSnapshotKey(String folderId) => 'library:folder:$folderId';
+
+  Map<String, dynamic>? _parseRootSnapshot(Object? payload) {
+    if (payload is! Map) return null;
+    return payload.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  Map<String, dynamic>? _parseFolderSnapshot(Object? payload) {
+    if (payload is! Map) return null;
+    return payload.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  Map<String, dynamic> _buildRootSnapshotPayload() {
+    return <String, dynamic>{
+      'folders': _rootFolders.map((folder) => folder.toJson()).toList(growable: false),
+      'recent_files': _recentFiles.map((file) => file.toJson()).toList(growable: false),
+    };
+  }
+
+  Map<String, dynamic> _buildFolderSnapshotPayload(String folderId) {
+    return <String, dynamic>{
+      'folder_id': folderId,
+      'current_folder': _currentFolder?.toJson(),
+      'subfolders': _currentSubfolders
+          .map((folder) => folder.toJson())
+          .toList(growable: false),
+      'files': _currentFiles.map((file) => file.toJson()).toList(growable: false),
+      'file_offset': _fileOffset,
+      'has_more_files': _hasMoreFiles,
+    };
+  }
+
+  void _applyRootSnapshot(Map<String, dynamic> payload) {
+    final folders = _parseFolders(payload['folders']);
+    final recentFiles = _parseFiles(payload['recent_files']);
+
+    _rootFolders = folders;
+    _recentFiles = _filterFilesByRole(recentFiles);
+
+    for (final folder in folders) {
+      _folderCache[folder.id] = folder;
+    }
+
+    for (final file in recentFiles) {
+      _fileCache[file.id] = file;
+      _fileTimestamps[file.id] = DateTime.now();
+    }
+  }
+
+  void _applyFolderSnapshot(String folderId, Map<String, dynamic> payload) {
+    final currentFolder = _parseOptionalFolder(payload['current_folder']);
+    final subfolders = _parseFolders(payload['subfolders']);
+    final files = _parseFiles(payload['files']);
+
+    _currentFolder = currentFolder ?? _folderCache[folderId];
+    _currentSubfolders = subfolders;
+    _currentFiles = _filterFilesByRole(files);
+    _fileOffset = _parseInt(payload['file_offset']);
+    _hasMoreFiles = _parseBool(payload['has_more_files']);
+
+    if (_currentFolder != null) {
+      _folderCache[_currentFolder!.id] = _currentFolder!;
+    }
+
+    for (final folder in subfolders) {
+      _folderCache[folder.id] = folder;
+    }
+
+    for (final file in files) {
+      _fileCache[file.id] = file;
+      _fileTimestamps[file.id] = DateTime.now();
+    }
+  }
+
+  List<LibraryFolder> _parseFolders(Object? payload) {
+    if (payload is! List) return const <LibraryFolder>[];
+
+    return payload
+        .whereType<Map>()
+        .map((row) => row.map((key, value) => MapEntry(key.toString(), value)))
+        .map(LibraryFolder.fromJson)
+        .toList(growable: false);
+  }
+
+  List<LibraryFile> _parseFiles(Object? payload) {
+    if (payload is! List) return const <LibraryFile>[];
+
+    return payload
+        .whereType<Map>()
+        .map((row) => row.map((key, value) => MapEntry(key.toString(), value)))
+        .map(LibraryFile.fromJson)
+        .toList(growable: false);
+  }
+
+  LibraryFolder? _parseOptionalFolder(Object? payload) {
+    if (payload is! Map) return null;
+    final map = payload.map((key, value) => MapEntry(key.toString(), value));
+    return LibraryFolder.fromJson(map);
+  }
+
+  int _parseInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool _parseBool(Object? value) {
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'true';
+    return false;
   }
   
   /// Re-apply role-based filtering to current data

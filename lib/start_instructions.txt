@@ -23,7 +23,6 @@ Act as a senior production software engineer and review this implementation to e
 -⚠️ FCM notification issue TEST
 -⚠️ App Offline Use Test on Phone
 -🏗️ QR code for attendance recording - [Troop Heads]
--🏗️ user creation button for admin/troop head,leaders
 - Test Tester account limitations
 
 - Library Review | file views & download stats

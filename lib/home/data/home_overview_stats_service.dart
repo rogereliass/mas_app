@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../auth/models/user_profile.dart';
+import '../../core/constants/cache_ttl.dart';
+import '../../core/data/persistent_query_cache.dart';
 import '../../meetings/pages/meeting_creation/data/meetings_service.dart';
 import 'models/home_overview_stats.dart';
 
@@ -41,6 +43,12 @@ class HomeOverviewStatsService {
       'fetchTroopOverviewStats start: roleRank=${currentUser.roleRank}, troopId=$troopId',
     );
 
+    final cacheKey = 'home:overview:troop:${troopId.trim()}';
+    final persisted = await PersistentQueryCache.read<TroopOverviewStats>(
+      key: cacheKey,
+      parser: _parseTroopOverviewStats,
+    );
+
     try {
       final totalMembers = await _countProfiles(
         approved: true,
@@ -66,9 +74,19 @@ class HomeOverviewStatsService {
         assignedLeaders: assignedLeaders,
       );
 
+      await PersistentQueryCache.write(
+        key: cacheKey,
+        payload: _troopOverviewStatsToJson(stats),
+        ttl: CacheTtl.meetingsList,
+      );
+
       _logDebug('fetchTroopOverviewStats success: $stats');
       return stats;
     } catch (e) {
+      if (persisted != null) {
+        _logDebug('fetchTroopOverviewStats fallback: disk cache hit');
+        return persisted.data;
+      }
       final message =
           'HomeOverviewStatsService.fetchTroopOverviewStats failed: $e';
       _logError(message);
@@ -91,6 +109,12 @@ class HomeOverviewStatsService {
 
     _logDebug(
       'fetchTroopInsightStats start: roleRank=${currentUser.roleRank}, troopId=$troopId',
+    );
+
+    final cacheKey = 'home:insights:troop:${troopId.trim()}';
+    final persisted = await PersistentQueryCache.read<TroopInsightStats>(
+      key: cacheKey,
+      parser: _parseTroopInsightStats,
     );
 
     try {
@@ -125,9 +149,19 @@ class HomeOverviewStatsService {
         lastMeetingPresentCount: lastMeetingPresentCount,
       );
 
+      await PersistentQueryCache.write(
+        key: cacheKey,
+        payload: _troopInsightStatsToJson(stats),
+        ttl: CacheTtl.meetingsList,
+      );
+
       _logDebug('fetchTroopInsightStats success: $stats');
       return stats;
     } catch (e) {
+      if (persisted != null) {
+        _logDebug('fetchTroopInsightStats fallback: disk cache hit');
+        return persisted.data;
+      }
       final message = 'HomeOverviewStatsService.fetchTroopInsightStats failed: $e';
       _logError(message);
       throw Exception(message);
@@ -146,6 +180,12 @@ class HomeOverviewStatsService {
 
     _logDebug(
       'fetchAdminOverviewStats start: roleRank=${currentUser.roleRank}, profileId=${currentUser.id}',
+    );
+
+    const cacheKey = 'home:overview:admin';
+    final persisted = await PersistentQueryCache.read<AdminOverviewStats>(
+      key: cacheKey,
+      parser: _parseAdminOverviewStats,
     );
 
     try {
@@ -170,9 +210,19 @@ class HomeOverviewStatsService {
         currentSeasonCode: currentSeasonCode,
       );
 
+      await PersistentQueryCache.write(
+        key: cacheKey,
+        payload: _adminOverviewStatsToJson(stats),
+        ttl: CacheTtl.meetingsList,
+      );
+
       _logDebug('fetchAdminOverviewStats success: $stats');
       return stats;
     } catch (e) {
+      if (persisted != null) {
+        _logDebug('fetchAdminOverviewStats fallback: disk cache hit');
+        return persisted.data;
+      }
       final message =
           'HomeOverviewStatsService.fetchAdminOverviewStats failed: $e';
       _logError(message);
@@ -418,5 +468,81 @@ class HomeOverviewStatsService {
 
   void _logError(String message) {
     debugPrint('[HomeOverviewStatsService] ERROR: $message');
+  }
+
+  TroopOverviewStats? _parseTroopOverviewStats(Object? payload) {
+    if (payload is! Map) return null;
+    final map = payload.map((key, value) => MapEntry(key.toString(), value));
+    return TroopOverviewStats(
+      totalMembers: _asInt(map['total_members']),
+      pendingMembers: _asInt(map['pending_members']),
+      seasonMeetings: _asInt(map['season_meetings']),
+      assignedLeaders: _asInt(map['assigned_leaders']),
+    );
+  }
+
+  TroopInsightStats? _parseTroopInsightStats(Object? payload) {
+    if (payload is! Map) return null;
+    final map = payload.map((key, value) => MapEntry(key.toString(), value));
+    return TroopInsightStats(
+      patrolCount: _asInt(map['patrol_count']),
+      averageScoutsPresentPerMeeting: _asDouble(
+        map['average_scouts_present_per_meeting'],
+      ),
+      lastMeetingDate: DateTime.tryParse(
+        map['last_meeting_date']?.toString() ?? '',
+      ),
+      lastMeetingPresentCount: _asInt(map['last_meeting_present_count']),
+    );
+  }
+
+  AdminOverviewStats? _parseAdminOverviewStats(Object? payload) {
+    if (payload is! Map) return null;
+    final map = payload.map((key, value) => MapEntry(key.toString(), value));
+    return AdminOverviewStats(
+      totalAppUsers: _asInt(map['total_app_users']),
+      totalPendingUsers: _asInt(map['total_pending_users']),
+      seasonMeetingsAllTroops: _asInt(map['season_meetings_all_troops']),
+      currentSeasonCode: (map['current_season_code'] as String? ?? 'N/A').trim(),
+    );
+  }
+
+  Map<String, dynamic> _troopOverviewStatsToJson(TroopOverviewStats stats) {
+    return <String, dynamic>{
+      'total_members': stats.totalMembers,
+      'pending_members': stats.pendingMembers,
+      'season_meetings': stats.seasonMeetings,
+      'assigned_leaders': stats.assignedLeaders,
+    };
+  }
+
+  Map<String, dynamic> _troopInsightStatsToJson(TroopInsightStats stats) {
+    return <String, dynamic>{
+      'patrol_count': stats.patrolCount,
+      'average_scouts_present_per_meeting': stats.averageScoutsPresentPerMeeting,
+      'last_meeting_date': stats.lastMeetingDate?.toIso8601String(),
+      'last_meeting_present_count': stats.lastMeetingPresentCount,
+    };
+  }
+
+  Map<String, dynamic> _adminOverviewStatsToJson(AdminOverviewStats stats) {
+    return <String, dynamic>{
+      'total_app_users': stats.totalAppUsers,
+      'total_pending_users': stats.totalPendingUsers,
+      'season_meetings_all_troops': stats.seasonMeetingsAllTroops,
+      'current_season_code': stats.currentSeasonCode,
+    };
+  }
+
+  int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double _asDouble(Object? value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 }

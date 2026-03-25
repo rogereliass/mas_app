@@ -369,8 +369,9 @@ class _ScanQrCodesButton extends StatelessWidget {
 
     return OutlinedButton.icon(
       onPressed: () {
-        Navigator.of(context).push(
+        Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
+            fullscreenDialog: true,
             builder: (_) => QrScannerScreen(attendanceProvider: provider),
           ),
         );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 // ignore: unused_import
 import '../../core/constants/app_colors.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../routing/app_router.dart';
 import '../logic/home_overview_stats_provider.dart';
 import 'premium_dashboard_widgets.dart';
@@ -20,6 +21,20 @@ class SystemAdminStats extends StatefulWidget {
 
 class _SystemAdminStatsState extends State<SystemAdminStats> {
   bool _requestedInitialLoad = false;
+
+  void _navigateOnlineOnly(String routeName, String featureLabel) {
+    if (!ConnectivityService.instance.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$featureLabel requires internet connection.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    Navigator.pushNamed(context, routeName);
+  }
 
   @override
   void didChangeDependencies() {
@@ -69,42 +84,56 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
                   subtitle: 'Define & assign user roles',
                   icon: Icons.shield_moon_rounded,
                   color: const Color.fromARGB(255, 123, 28, 28), // Violet
-                  onTap: () => Navigator.pushNamed(context, AppRouter.manageRoles),
+                  onTap: () =>
+                      _navigateOnlineOnly(AppRouter.manageRoles, 'Manage Roles'),
                 ),
                 PremiumActionCard(
                   title: 'User Acceptance',
                   subtitle: 'Review & approve registrations',
                   icon: Icons.how_to_reg_rounded,
                   color: const Color(0xFFF43F5E), // Rose
-                  onTap: () => Navigator.pushNamed(context, AppRouter.userAcceptance),
+                  onTap: () => _navigateOnlineOnly(
+                    AppRouter.userAcceptance,
+                    'User Acceptance',
+                  ),
                 ),
                 PremiumActionCard(
                   title: 'Season Management',
                   subtitle: 'Manage activity seasons & codes',
                   icon: Icons.calendar_today_rounded,
                   color: const Color(0xFF6366F1), // Indigo
-                  onTap: () => Navigator.pushNamed(context, AppRouter.seasonManagement),
+                  onTap: () => _navigateOnlineOnly(
+                    AppRouter.seasonManagement,
+                    'Season Management',
+                  ),
                 ),
                 PremiumActionCard(
                   title: 'User Management',
                   subtitle: 'Edit profiles & role assignments',
                   icon: Icons.manage_accounts_rounded,
                   color: const Color(0xFF14B8A6), // Teal
-                  onTap: () => Navigator.pushNamed(context, AppRouter.userManagement),
+                  onTap: () => _navigateOnlineOnly(
+                    AppRouter.userManagement,
+                    'User Management',
+                  ),
                 ),
                 PremiumActionCard(
                   title: 'Patrols',
                   subtitle: 'Manage system-wide patrols',
                   icon: Icons.groups_rounded,
                   color: const Color(0xFFF59E0B), // Amber
-                  onTap: () => Navigator.pushNamed(context, AppRouter.patrolsManagement),
+                  onTap: () => _navigateOnlineOnly(
+                    AppRouter.patrolsManagement,
+                    'Patrols',
+                  ),
                 ),
                 PremiumActionCard(
                   title: 'Eftekad',
                   subtitle: 'Open Eftekad tools (coming soon)',
                   icon: Icons.fact_check_rounded,
                   color: const Color.fromARGB(255, 25, 58, 156),
-                  onTap: () => Navigator.pushNamed(context, AppRouter.eftekad),
+                  onTap: () =>
+                      _navigateOnlineOnly(AppRouter.eftekad, 'Eftekad'),
                 ),
               ],
               stats: [
