@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:masapp/core/constants/app_colors.dart';
 import 'package:masapp/core/services/connectivity_service.dart';
 
 class OfflineBannerWidget extends StatefulWidget {
@@ -34,29 +35,30 @@ class _OfflineBannerWidgetState extends State<OfflineBannerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark
+        ? AppColors.warning.withValues(alpha: 0.3)
+        : AppColors.warning;
+    final textColor = isDark ? Colors.white : Colors.black87;
 
-    return IgnorePointer(
+    if (_isOnline) {
+      return const SizedBox(height: 0);
+    }
+
+    return SizedBox(
+      height: 40,
       child: SafeArea(
         bottom: false,
-        child: AnimatedSlide(
-          duration: const Duration(milliseconds: 220),
-          offset: _isOnline ? const Offset(0, -1.2) : Offset.zero,
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 180),
-            opacity: _isOnline ? 0 : 1,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: colorScheme.errorContainer,
-              child: Text(
-                'Offline mode',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onErrorContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: bgColor,
+          child: Text(
+            'Offline mode',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

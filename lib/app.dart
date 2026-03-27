@@ -7,7 +7,7 @@ import 'routing/app_router.dart';
 import 'routing/navigation_service.dart';
 
 /// Main application widget
-/// 
+///
 /// Root widget that:
 /// - Consumes ThemeProvider for theme management
 /// - Configures Material 3 with centralized theme system
@@ -26,25 +26,22 @@ class MyApp extends StatelessWidget {
           title: 'Scout Digital Library',
           debugShowCheckedModeBanner: false,
           navigatorKey: NavigationService.navigatorKey,
-          
+
           // Theme configuration - uses centralized AppTheme
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          
+
           // Navigation configuration
           initialRoute: AppRouter.startup,
           routes: AppRouter.routes,
           onGenerateRoute: AppRouter.onGenerateRoute,
           onUnknownRoute: AppRouter.onUnknownRoute,
           builder: (context, child) {
-            return Stack(
+            return Column(
               children: [
-                if (child != null) child,
-                const Align(
-                  alignment: Alignment.topCenter,
-                  child: OfflineBannerWidget(),
-                ),
+                const OfflineBannerWidget(),
+                if (child != null) Expanded(child: child),
               ],
             );
           },
