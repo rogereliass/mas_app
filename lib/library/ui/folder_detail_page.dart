@@ -8,9 +8,10 @@ import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
+import 'components/library_report_dialog.dart';
 
 /// Folder detail page showing subfolders and files
-/// 
+///
 /// Features:
 /// - Back navigation
 /// - Breadcrumb navigation
@@ -33,7 +34,8 @@ class FolderDetailPage extends StatefulWidget {
   State<FolderDetailPage> createState() => _FolderDetailPageState();
 }
 
-class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBindingObserver {
+class _FolderDetailPageState extends State<FolderDetailPage>
+    with WidgetsBindingObserver {
   bool _isGridView = false;
   bool _hasLoadedInitially = false;
 
@@ -82,7 +84,10 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
               right: 0,
               child: AppBottomNavBar(
                 currentPage: 'library',
-                isAuthenticated: Provider.of<AuthProvider>(context, listen: false).isAuthenticated,
+                isAuthenticated: Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                ).isAuthenticated,
               ),
             ),
           ],
@@ -95,7 +100,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return AppBar(
       backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
       elevation: 0,
@@ -123,6 +128,18 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
       ),
       actions: [
         IconButton(
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: () {
+            LibraryReportDialog.show(
+              context,
+              contentId: widget.folderId,
+              contentName: widget.folderName,
+              contentType: ReportContentType.folder,
+            );
+          },
+          tooltip: 'Report an Issue',
+        ),
+        IconButton(
           icon: const Icon(Icons.settings_outlined),
           onPressed: () {
             showDialog(
@@ -141,18 +158,18 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
   Widget _buildFolderContent() {
     final provider = Provider.of<LibraryProvider>(context);
     final subfolders = provider.currentSubfolders;
-    
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 16),
-          
+
           // Breadcrumb navigation
           _buildBreadcrumbs(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Loading indicator
           if (provider.isLoadingFolder)
             const Center(
@@ -176,7 +193,8 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => provider.refreshFolderContents(forceRefresh: true),
+                      onPressed: () =>
+                          provider.refreshFolderContents(forceRefresh: true),
                       child: const Text('Retry'),
                     ),
                   ],
@@ -190,10 +208,10 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
               _buildSubfoldersSection(),
               const SizedBox(height: 24),
             ],
-            
+
             // Files section
             _buildFilesSection(),
-            
+
             const SizedBox(height: 24),
           ],
         ],
@@ -206,7 +224,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final breadcrumbs = widget.breadcrumbs ?? ['Library'];
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -227,7 +245,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                 child: Icon(
                   Icons.chevron_right,
                   size: 16,
-                  color: isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodySmall?.color,
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : theme.textTheme.bodySmall?.color,
                 ),
               ),
           ],
@@ -236,7 +256,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
             child: Icon(
               Icons.chevron_right,
               size: 16,
-              color: isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodySmall?.color,
+              color: isDark
+                  ? AppColors.sectionHeaderGray
+                  : theme.textTheme.bodySmall?.color,
             ),
           ),
           _BreadcrumbChip(
@@ -256,7 +278,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
     final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final subfolders = provider.currentSubfolders;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -268,7 +290,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
               Text(
                 'SUBFOLDERS',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -277,7 +301,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
               Text(
                 '${subfolders.length} Folders',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                   fontSize: 13,
                 ),
               ),
@@ -295,7 +321,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
             final folder = subfolders[index];
             return FolderCard(
               folderId: folder.id,
-              folderName: folder.name,              description: folder.description,              itemCount: folder.itemCount,
+              folderName: folder.name,
+              description: folder.description,
+              itemCount: folder.itemCount,
               onTap: () async {
                 // Navigate to nested folder
                 final newBreadcrumbs = [
@@ -328,7 +356,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
     final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final files = provider.currentFiles;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -340,7 +368,9 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
               Text(
                 'FILES',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -355,9 +385,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                     },
                   ),
                   IconButton(
-                    icon: Icon(
-                      _isGridView ? Icons.view_list : Icons.grid_view,
-                    ),
+                    icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
                     onPressed: () {
                       setState(() {
                         _isGridView = !_isGridView;
@@ -399,7 +427,7 @@ class _FolderDetailPageState extends State<FolderDetailPage> with WidgetsBinding
                     onTap: () async {
                       // Record view and navigate to file viewer
                       await provider.recordFileView(file.id);
-                      
+
                       if (!context.mounted) return;
                       AppRouter.goToFileViewer(
                         context,
@@ -472,14 +500,16 @@ class _BreadcrumbChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? (isDark ? AppColors.goldAccent.withValues(alpha: 0.2) : theme.colorScheme.primary.withValues(alpha: 0.1))
+              ? (isDark
+                    ? AppColors.goldAccent.withValues(alpha: 0.2)
+                    : theme.colorScheme.primary.withValues(alpha: 0.1))
               : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           border: isActive
@@ -491,7 +521,9 @@ class _BreadcrumbChip extends StatelessWidget {
           style: theme.textTheme.bodyMedium?.copyWith(
             color: isActive
                 ? AppColors.goldAccent
-                : (isDark ? AppColors.sectionHeaderGray : theme.textTheme.bodyMedium?.color),
+                : (isDark
+                      ? AppColors.sectionHeaderGray
+                      : theme.textTheme.bodyMedium?.color),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
@@ -499,4 +531,3 @@ class _BreadcrumbChip extends StatelessWidget {
     );
   }
 }
-

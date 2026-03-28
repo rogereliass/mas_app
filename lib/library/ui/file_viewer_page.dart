@@ -16,6 +16,7 @@ import 'file_viewer/image_viewer_widget.dart';
 import 'file_viewer/video_viewer_widget.dart';
 import 'file_viewer/txt_viewer_widget.dart';
 import 'file_viewer/audio_viewer_widget.dart';
+import 'components/library_report_dialog.dart';
 
 /// File Viewer Page
 ///
@@ -616,6 +617,18 @@ class _FileViewerPageState extends State<FileViewerPage> {
                   : 'Download for Offline Use',
             ),
         ],
+        IconButton(
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: () {
+            LibraryReportDialog.show(
+              context,
+              contentId: widget.fileId,
+              contentName: widget.fileName,
+              contentType: ReportContentType.file,
+            );
+          },
+          tooltip: 'Report an Issue',
+        ),
         // Settings icon
         IconButton(
           icon: const Icon(Icons.settings_outlined),

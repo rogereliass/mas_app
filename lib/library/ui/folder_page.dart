@@ -8,9 +8,10 @@ import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
+import 'components/library_report_dialog.dart';
 
 /// Library home page - main entry point for browsing content
-/// 
+///
 /// Features:
 /// - Scout Elite branded header
 /// - Search functionality
@@ -38,7 +39,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     return Scaffold(
       appBar: _buildAppBar(context),
       body: SizedBox.expand(
@@ -67,7 +68,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isDark = theme.brightness == Brightness.dark;
     final isAuthenticated = authProvider.isAuthenticated;
-    
+
     return AppBar(
       backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
       elevation: 0,
@@ -80,8 +81,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           ),
           child: IconButton(
             icon: Icon(
-              isAuthenticated ? Icons.explore : Icons.arrow_back, 
-              color: Colors.white
+              isAuthenticated ? Icons.explore : Icons.arrow_back,
+              color: Colors.white,
             ),
             iconSize: 20,
             padding: EdgeInsets.zero,
@@ -136,6 +137,16 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           tooltip: 'Search',
         ),
         IconButton(
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: () {
+            LibraryReportDialog.show(
+              context,
+              contentType: ReportContentType.general,
+            );
+          },
+          tooltip: 'Report an Issue',
+        ),
+        IconButton(
           icon: const Icon(Icons.settings_outlined),
           onPressed: () {
             showDialog(
@@ -157,15 +168,15 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
-          
+
           // Recent Assets section
           _buildRecentFilesSection(),
-          
+
           const SizedBox(height: 32),
-          
+
           // Resource Library section
           _buildFoldersSection(),
-          
+
           const SizedBox(height: 24),
         ],
       ),
@@ -178,7 +189,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final folders = provider.rootFolders;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,7 +202,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               Text(
                 'RESOURCE LIBRARY',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -201,7 +214,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                 Text(
                   '${folders.length} Folders',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                    color: isDark
+                        ? AppColors.sectionHeaderGray
+                        : Colors.grey[600],
                     fontSize: 13,
                   ),
                 ),
@@ -209,7 +224,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Content
         if (provider.isLoadingRoot)
           const Center(
@@ -247,7 +262,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               child: Text(
                 'No folders found',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                 ),
               ),
             ),
@@ -260,7 +277,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: folders.length > 5 ? 5 : folders.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final folder = folders[index];
                   return FolderCard(
@@ -280,7 +298,10 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               ),
               if (folders.length > 5)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.pushNamed(context, AppRouter.allFolders);
@@ -288,13 +309,17 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                       side: BorderSide(
-                        color: isDark ? AppColors.goldAccent : theme.colorScheme.primary,
+                        color: isDark
+                            ? AppColors.goldAccent
+                            : theme.colorScheme.primary,
                       ),
                     ),
                     child: Text(
                       'View All Folders',
                       style: TextStyle(
-                        color: isDark ? AppColors.goldAccent : theme.colorScheme.primary,
+                        color: isDark
+                            ? AppColors.goldAccent
+                            : theme.colorScheme.primary,
                       ),
                     ),
                   ),
@@ -311,7 +336,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final files = provider.recentFiles;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -324,7 +349,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               Text(
                 'RECENT ASSETS',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -332,9 +359,14 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               ),
               // "New" Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.goldAccent.withValues(alpha: 0.5)),
+                  border: Border.all(
+                    color: AppColors.goldAccent.withValues(alpha: 0.5),
+                  ),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -350,7 +382,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // Content
         if (provider.isLoadingRoot)
           const Center(
@@ -366,7 +398,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               child: Text(
                 'No recent files',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                 ),
               ),
             ),
@@ -376,9 +410,13 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
             height: 180, // Reduced height for more square aspect ratio
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), // Added vertical padding for shadows
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 10,
+              ), // Added vertical padding for shadows
               itemCount: files.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 20), // Increased spacing between cards
+              separatorBuilder: (context, index) =>
+                  const SizedBox(width: 20), // Increased spacing between cards
               itemBuilder: (context, index) {
                 final file = files[index];
                 return FileTile(
@@ -391,7 +429,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
                   onTap: () async {
                     // Record view and navigate to file viewer
                     await provider.recordFileView(file.id);
-                    
+
                     if (!context.mounted) return;
                     AppRouter.goToFileViewer(
                       context,
@@ -426,5 +464,3 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     }
   }
 }
-
-

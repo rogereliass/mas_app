@@ -6,9 +6,10 @@ import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/folder_card.dart';
+import 'components/library_report_dialog.dart';
 
 /// All folders page showing complete folder grid
-/// 
+///
 /// Features:
 /// - Search bar for filtering folders
 /// - Grid/List view toggle
@@ -42,120 +43,126 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = Provider.of<LibraryProvider>(context);
-    
+
     // Get all folders from provider and filter by search query
     final allFolders = provider.rootFolders;
     final filteredFolders = _searchQuery.isEmpty
         ? allFolders
         : allFolders.where((folder) {
-            return folder.name.toLowerCase().contains(_searchQuery.toLowerCase());
+            return folder.name.toLowerCase().contains(
+              _searchQuery.toLowerCase(),
+            );
           }).toList();
-    
+
     return Scaffold(
       appBar: _buildAppBar(context),
       body: provider.isLoadingRoot
           ? const Center(child: CircularProgressIndicator())
           : provider.hasError
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          provider.error ?? 'An error occurred',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: () => provider.refreshRootContents(),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 16),
-                    
-                    // Search bar
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: CustomSearchBar(
-                        hintText: 'Search topics...',
-                        onChanged: (query) {
-                          setState(() {
-                            _searchQuery = query;
-                          });
-                        },
+                    Text(
+                      provider.error ?? 'An error occurred',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.error,
                       ),
                     ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Folder count and view toggle
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Total ${filteredFolders.length} folders',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.brightness == Brightness.dark
-                                  ? AppColors.sectionHeaderGray
-                                  : theme.textTheme.bodySmall?.color,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  Icons.grid_view,
-                                  color: _isGridView 
-                                      ? theme.colorScheme.primary 
-                                      : theme.iconTheme.color?.withValues(alpha: 0.6),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isGridView = true;
-                                  });
-                                },
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.view_list,
-                                  color: !_isGridView 
-                                      ? theme.colorScheme.primary 
-                                      : theme.iconTheme.color?.withValues(alpha: 0.6),
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isGridView = false;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Folders grid/list
-                    Expanded(
-                      child: filteredFolders.isEmpty
-                          ? _buildEmptyState(theme)
-                          : _isGridView 
-                              ? _buildGridView(filteredFolders) 
-                              : _buildListView(filteredFolders),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => provider.refreshRootContents(),
+                      child: const Text('Retry'),
                     ),
                   ],
                 ),
+              ),
+            )
+          : Column(
+              children: [
+                const SizedBox(height: 16),
+
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: CustomSearchBar(
+                    hintText: 'Search topics...',
+                    onChanged: (query) {
+                      setState(() {
+                        _searchQuery = query;
+                      });
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Folder count and view toggle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total ${filteredFolders.length} folders',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.brightness == Brightness.dark
+                              ? AppColors.sectionHeaderGray
+                              : theme.textTheme.bodySmall?.color,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.grid_view,
+                              color: _isGridView
+                                  ? theme.colorScheme.primary
+                                  : theme.iconTheme.color?.withValues(
+                                      alpha: 0.6,
+                                    ),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isGridView = true;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.view_list,
+                              color: !_isGridView
+                                  ? theme.colorScheme.primary
+                                  : theme.iconTheme.color?.withValues(
+                                      alpha: 0.6,
+                                    ),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isGridView = false;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Folders grid/list
+                Expanded(
+                  child: filteredFolders.isEmpty
+                      ? _buildEmptyState(theme)
+                      : _isGridView
+                      ? _buildGridView(filteredFolders)
+                      : _buildListView(filteredFolders),
+                ),
+              ],
+            ),
     );
   }
 
@@ -163,7 +170,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return AppBar(
       backgroundColor: isDark ? AppColors.scoutEliteNavy : null,
       elevation: 0,
@@ -190,6 +197,16 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
         ),
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: () {
+            LibraryReportDialog.show(
+              context,
+              contentType: ReportContentType.general,
+            );
+          },
+          tooltip: 'Report an Issue',
+        ),
         IconButton(
           icon: const Icon(Icons.settings_outlined),
           onPressed: () {
@@ -298,4 +315,3 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
     );
   }
 }
-

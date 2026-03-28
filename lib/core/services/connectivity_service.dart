@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:masapp/core/constants/offline_policy.dart';
 
 class ConnectivityService {
@@ -14,7 +15,9 @@ class ConnectivityService {
       StreamController<bool>.broadcast();
 
   StreamSubscription<dynamic>? _subscription;
+  Timer? _retryTimer;
   Timer? _debounceTimer;
+  bool _initializing = false;
   bool _initialized = false;
   bool _isOnline = true;
 
@@ -22,17 +25,43 @@ class ConnectivityService {
   Stream<bool> get statusStream => _statusController.stream;
 
   Future<void> initialize() async {
-    if (_initialized) return;
-    _initialized = true;
+    if (_initialized || _initializing) return;
+    _initializing = true;
 
+    try {
+      await _bindConnectivityPlugin();
+      _initialized = true;
+      _retryTimer?.cancel();
+    } on MissingPluginException catch (_) {
+      // Hot restart can briefly race plugin registration on Android.
+      _scheduleRetry();
+    } on PlatformException catch (_) {
+      // Keep app boot resilient and retry plugin hookup shortly.
+      _scheduleRetry();
+    } finally {
+      _initializing = false;
+    }
+  }
+
+  Future<void> _bindConnectivityPlugin() async {
     final current = await _connectivity.checkConnectivity();
     _isOnline = _hasConnection(current);
-    _statusController.add(_isOnline);
+    if (!_statusController.isClosed) {
+      _statusController.add(_isOnline);
+    }
 
+    await _subscription?.cancel();
     _subscription = _connectivity.onConnectivityChanged.listen(
       _onRawConnectivityChanged,
       onError: (_) {},
     );
+  }
+
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 2), () {
+      unawaited(initialize());
+    });
   }
 
   void _onRawConnectivityChanged(dynamic rawResult) {
@@ -68,6 +97,7 @@ class ConnectivityService {
 
   Future<void> dispose() async {
     await _subscription?.cancel();
+    _retryTimer?.cancel();
     _debounceTimer?.cancel();
     await _statusController.close();
   }
