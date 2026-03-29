@@ -347,7 +347,12 @@ class NotificationsProvider with ChangeNotifier {
     required bool isBackground,
   }) async {
     try {
-      final panelData = await _repository.fetchPanelData(profileId: profileId);
+      final panelData = await _repository.fetchPanelData(
+        profileId: profileId,
+        userId: _authProvider.userId,
+        revalidateProfileId:
+            _authProvider.isUsingCachedIdentity || profileId.trim().isEmpty,
+      );
       _cacheManager.set(cacheKey, panelData);
       _applyPanelData(panelData);
       _error = null;

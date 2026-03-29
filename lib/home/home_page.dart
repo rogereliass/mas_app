@@ -441,6 +441,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showNotificationsPanel(BuildContext context) {
+    final provider = Provider.of<NotificationsProvider>(context, listen: false);
+    if (!provider.isLoading && provider.items.isEmpty) {
+      provider.loadNotifications(forceRefresh: true);
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

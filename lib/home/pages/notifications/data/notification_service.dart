@@ -75,6 +75,25 @@ class NotificationService {
     return (response as List).length;
   }
 
+  Future<String?> fetchProfileIdByUserId({required String userId}) async {
+    final trimmedUserId = userId.trim();
+    if (trimmedUserId.isEmpty) {
+      return null;
+    }
+
+    final response = await _supabase
+        .from(_profilesTable)
+        .select('id')
+        .eq('user_id', trimmedUserId)
+        .maybeSingle();
+
+    final profileId = response?['id'] as String?;
+    if (profileId == null || profileId.trim().isEmpty) {
+      return null;
+    }
+    return profileId.trim();
+  }
+
   Future<void> markRecipientRead({required String recipientId}) async {
     await _supabase
         .from(_recipientsTable)

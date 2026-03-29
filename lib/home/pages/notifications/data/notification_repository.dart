@@ -24,11 +24,34 @@ class NotificationRepository {
 
   Future<NotificationPanelData> fetchPanelData({
     required String profileId,
+    String? userId,
+    bool revalidateProfileId = false,
     int limit = 50,
   }) async {
+    var effectiveProfileId = profileId.trim();
+
+    if (revalidateProfileId) {
+      final resolvedProfileId = await _service.fetchProfileIdByUserId(
+        userId: userId ?? '',
+      );
+      if (resolvedProfileId != null && resolvedProfileId.isNotEmpty) {
+        effectiveProfileId = resolvedProfileId;
+      }
+    }
+
+    if (effectiveProfileId.isEmpty) {
+      return const NotificationPanelData(
+        notifications: <NotificationRecipientEntry>[],
+        unreadCount: 0,
+      );
+    }
+
     final result = await Future.wait<dynamic>([
-      _service.fetchNotificationsForProfile(profileId: profileId, limit: limit),
-      _service.fetchUnreadCount(profileId: profileId),
+      _service.fetchNotificationsForProfile(
+        profileId: effectiveProfileId,
+        limit: limit,
+      ),
+      _service.fetchUnreadCount(profileId: effectiveProfileId),
     ]);
 
     return NotificationPanelData(

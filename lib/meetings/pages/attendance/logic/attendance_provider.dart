@@ -97,10 +97,12 @@ class AttendanceProvider with ChangeNotifier {
 
   List<MyAttendanceLog> get pastMyLogs => List.unmodifiable(_pastLogs.toList());
 
+  AttendanceStatus _statusForScoutLog(MyAttendanceLog log) {
+    return log.record?.status ?? AttendanceStatus.absent;
+  }
+
   int _countRecordedStatus(AttendanceStatus status) {
-    return _pastLogs
-        .where((log) => log.isRecorded && log.record!.status == status)
-        .length;
+    return _pastLogs.where((log) => _statusForScoutLog(log) == status).length;
   }
 
   int get scoutTotalPastMeetings => _pastLogs.length;
