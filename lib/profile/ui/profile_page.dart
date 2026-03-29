@@ -19,6 +19,27 @@ import 'components/profile_hero_section.dart';
 import 'components/profile_info_row.dart';
 import 'components/profile_section.dart';
 
+/// Profile page role visibility guide.
+///
+/// What this page always shows for all authenticated users:
+/// - Hero: full name, email, avatar, and profile QR action.
+/// - Personal Info: primary role, patrol role (if any), troop name,
+///   phone, birth date, and address.
+/// - Roles & Permissions: all assigned role chips and highest rank badge.
+/// - Account Specs: joined date, generation, and managed troop scope name.
+///
+/// Role-specific value behavior:
+/// - Patrol roles (rank 20-30 range): Patrol field shows the patrol role name.
+/// - Troop-scoped leaders (rank 60/70): Managed Troop Scope resolves from
+///   `managedTroopId` and shows the troop name.
+/// - System-wide roles (rank 90+): Managed Troop Scope displays
+///   `System-wide access` unless an explicit troop context exists.
+/// - Public/basic roles without troop mapping: Troop and Managed Troop Scope
+///   display `Not assigned`.
+///
+/// Troop identifiers should never be rendered directly to the user. Any
+/// unresolved id is shown as `Unknown troop` while the page tries to resolve
+/// the troop name via lookup.
 /// Highly refined, premium profile screen utilizing structured cards.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -29,6 +50,8 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   List<Map<String, dynamic>> _troops = [];
+  final Map<String, String> _troopNamesById = {};
+  final Set<String> _troopNameLookupAttempted = {};
 
   @override
   void initState() {
@@ -41,21 +64,101 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadTroops() async {
     final authProvider = context.read<AuthProvider>();
     final troops = await authProvider.getTroops();
+    final troopNames = <String, String>{};
+    for (final troop in troops) {
+      final id = troop['id']?.toString();
+      final name = troop['name'] as String?;
+      if (id != null && id.isNotEmpty && name != null && name.trim().isNotEmpty) {
+        troopNames[id] = name;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _troops = troops;
+        _troopNamesById
+          ..clear()
+          ..addAll(troopNames);
       });
+    }
+
+    final profile = authProvider.currentUserProfile;
+    if (profile != null) {
+      await _resolveMissingTroopNames(
+        profile,
+        authProvider: authProvider,
+      );
     }
   }
 
-  String _getTroopName(String? troopId) {
-    if (troopId == null) return 'Not assigned';
-    try {
-      final troop = _troops.firstWhere((t) => t['id'].toString() == troopId);
-      return troop['name'] as String? ?? troopId;
-    } catch (_) {
-      return troopId;
+  String _resolveTroopName(
+    String? troopId, {
+    required String emptyLabel,
+    required String unresolvedLabel,
+  }) {
+    if (troopId == null) return emptyLabel;
+    final normalizedTroopId = troopId.trim();
+    if (normalizedTroopId.isEmpty) {
+      return emptyLabel;
     }
+
+    final cached = _troopNamesById[normalizedTroopId];
+    if (cached != null && cached.trim().isNotEmpty) {
+      return cached;
+    }
+
+    return _troops.isEmpty ? 'Loading troop...' : unresolvedLabel;
+  }
+
+  String _resolveManagedTroopScopeValue(UserProfile profile) {
+    return _resolveTroopName(
+      profile.managedTroopId,
+      emptyLabel: _isSystemWideRole(profile)
+          ? 'System-wide access'
+          : 'Not assigned',
+      unresolvedLabel: _isSystemWideRole(profile)
+          ? 'Scope troop unavailable'
+          : 'Managed troop unavailable',
+    );
+  }
+
+  bool _isSystemWideRole(UserProfile profile) => profile.roleRank >= 90;
+
+  Future<void> _resolveMissingTroopNames(
+    UserProfile profile, {
+    AuthProvider? authProvider,
+  }) async {
+    final provider = authProvider ?? context.read<AuthProvider>();
+    final idsToResolve = <String>{
+      if (profile.signupTroopId != null) profile.signupTroopId!.trim(),
+      if (profile.managedTroopId != null) profile.managedTroopId!.trim(),
+    }.where(
+      (id) =>
+          id.isNotEmpty &&
+          !_troopNamesById.containsKey(id) &&
+          !_troopNameLookupAttempted.contains(id),
+    ).toList();
+
+    if (idsToResolve.isEmpty) {
+      return;
+    }
+
+    final resolved = <String, String>{};
+    for (final troopId in idsToResolve) {
+      _troopNameLookupAttempted.add(troopId);
+      final name = await provider.getTroopNameById(troopId);
+      if (name != null && name.trim().isNotEmpty) {
+        resolved[troopId] = name;
+      }
+    }
+
+    if (!mounted || resolved.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _troopNamesById.addAll(resolved);
+    });
   }
 
   @override
@@ -67,6 +170,12 @@ class _ProfilePageState extends State<ProfilePage> {
     final UserProfile? profile = authProvider.currentUserProfile;
     final String? profileLoadError = authProvider.profileLoadError;
     final bool profileLoading = authProvider.profileLoading;
+
+    if (profile != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _resolveMissingTroopNames(profile, authProvider: authProvider);
+      });
+    }
 
     // Use a slightly different background to make the white/dark cards pop
     final bgColor = isDark
@@ -335,10 +444,28 @@ class _ProfilePageState extends State<ProfilePage> {
         ProfileInfoRow(
           icon: Icons.admin_panel_settings_outlined,
           label: 'Managed Troop Scope',
-          value: _getTroopName(profile.managedTroopId),
+          value: _resolveManagedTroopScopeValue(profile),
           isMultiline: true,
+          trailing: _isSystemWideRole(profile)
+              ? _buildManagedScopeHelpIcon(context)
+              : null,
         ),
       ],
+    );
+  }
+
+  Widget _buildManagedScopeHelpIcon(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Tooltip(
+      message:
+          'System-wide roles are not limited to a single troop, so this value is shown as System-wide access.',
+      child: Icon(
+        Icons.help_outline,
+        size: 18,
+        color: colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -355,7 +482,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   String _resolveTroopValue(UserProfile profile) {
-    return _getTroopName(profile.signupTroopId ?? profile.managedTroopId);
+    return _resolveTroopName(
+      profile.signupTroopId ?? profile.managedTroopId,
+      emptyLabel: 'Not assigned',
+      unresolvedLabel: _isSystemWideRole(profile)
+          ? 'Troop not applicable'
+          : 'Troop unavailable',
+    );
   }
 
   String _resolvePatrolValue(List<Role> roles) {

@@ -464,6 +464,37 @@ class AuthRepository {
     }
   }
 
+  /// Fetch a single troop name by id.
+  ///
+  /// Returns null when the troop cannot be found or fetched.
+  Future<String?> getTroopNameById(String troopId) async {
+    try {
+      if (troopId.trim().isEmpty) {
+        return null;
+      }
+
+      final response = await _supabase
+          .from('troops')
+          .select('name')
+          .eq('id', troopId)
+          .maybeSingle()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                throw AuthException('Request timed out while fetching troop'),
+          );
+
+      if (response == null) {
+        return null;
+      }
+
+      return response['name'] as String?;
+    } catch (e) {
+      _logDebug('Failed to fetch troop name for $troopId: $e');
+      return null;
+    }
+  }
+
   /// Handle auth exceptions and provide user-friendly messages
   AuthException _handleAuthException(AuthException e) {
     String message;

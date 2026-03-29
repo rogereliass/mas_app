@@ -1,14 +1,15 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/config/social_config.dart';
 
 /// About page with app information
 /// 
-/// Simple page displaying:
-/// - App logo
-/// - App name and description
-/// - Version information
+/// Re-designed to be professional, elegant and premium
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
 
@@ -22,126 +23,515 @@ class _AboutPageState extends State<AboutPage> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text(
-          'About',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'About App',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 1.1,
+          ),
         ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SizedBox.expand(
-        child: Stack(
-          children: [
-            const AboutContent(),
-            // Floating Navbar at Bottom
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: AppBottomNavBar(
-                currentPage: 'about',
-                isAuthenticated: authProvider.isAuthenticated,
+      body: Stack(
+        children: [
+          // Background Gradient Strategy
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.scoutEliteNavy,
+                  Color(0xFF1E293B), // Slate 800
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          
+          // Subtle circular glow effects
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.goldAccent.withValues(alpha: 0.1),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+          ),
+          
+          Positioned(
+            bottom: 100,
+            left: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryBlue.withValues(alpha: 0.05),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+          ),
+          
+          // Main Content
+          const AboutContent(),
+          
+          // Floating Navbar at Bottom
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AppBottomNavBar(
+              currentPage: 'about',
+              isAuthenticated: authProvider.isAuthenticated,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Reusable about content widget (without Scaffold)
-/// 
-/// Can be used standalone or embedded in other pages
+/// Rich about content with cards and heritage logos
 class AboutContent extends StatelessWidget {
   const AboutContent({super.key});
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // App logo
-            Container(
-              width: 120,
-              height: 120,
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 80,
+        bottom: 140,
+        left: 20,
+        right: 20,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Heritage Section (3 Logos) with entrance animation
+          _AnimatedEntrance(
+            delay: 100,
+            child: Column(
+              children: [
+                const Text(
+                  'OUR HERITAGE',
+                  style: TextStyle(
+                    color: AppColors.goldAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildLogoCircle('assets/images/church_logo.png', 60, label: 'COB'),
+                    const SizedBox(width: 15),
+                    _buildLogoCircle('assets/images/mas_logo.png', 100, isMain: true, label: 'M.A.S.'),
+                    const SizedBox(width: 15),
+                    _buildLogoCircle('assets/images/Digital_Logo.PNG', 60, label: 'DIGITAL'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // App Title & Tagline
+          _AnimatedEntrance(
+            delay: 300,
+            child: Column(
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Colors.white, AppColors.goldAccent],
+                  ).createShader(bounds),
+                  child: Text(
+                    'Scout Digital Library',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldAccent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: AppColors.goldAccent.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Text(
+                    'Digital Excellence in Scouting',
+                    style: TextStyle(
+                      color: AppColors.goldAccent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // Information Sections
+          _AnimatedEntrance(
+            delay: 500,
+            child: _buildGlassCard(
+              title: 'Our Mission',
+              icon: Icons.explore_rounded,
+              content: 'Transforming the Scouting experience through digital innovation. Mary\'s Apostolic Scouts (M.A.S.) is committed to merging traditional values with modern technology to empower the next generation of leaders.',
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          _AnimatedEntrance(
+            delay: 600,
+            child: _buildGlassCard(
+              title: 'Knowledge Hub',
+              icon: Icons.auto_stories_rounded,
+              content: 'The Digital Library serves as a central hub for all scouting resources, providing instant access to thousands of media assets, guides, and educational materials for scouts and leaders worldwide.',
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          _AnimatedEntrance(
+            delay: 700,
+            child: _buildGlassCard(
+              title: 'Scout Digital Team',
+              icon: Icons.terminal_rounded,
+              content: 'Developed with passion by the Scout Digital Team. We are dedicated to building robust, secure, and user-centric solutions that support the spiritual and technical growth of our youth.',
+            ),
+          ),
+          
+          const SizedBox(height: 40),
+
+          // Connect Section
+          _AnimatedEntrance(
+            delay: 800,
+            child: Column(
+              children: [
+                const Text(
+                  'CONNECT WITH US',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildSocialButton(Icons.language, () => _launchUrl(SocialConfig.websiteUrl), label: 'Web'),
+                    const SizedBox(width: 15),
+                    _buildSocialButton(Icons.facebook, () => _launchUrl(SocialConfig.facebookUrl), label: 'FB'),
+                    const SizedBox(width: 15),
+                    _buildSocialButton(Icons.camera_alt_outlined, () => _launchUrl(SocialConfig.instagramUrl), label: 'IG'),
+                    const SizedBox(width: 15),
+                    _buildSocialButton(Icons.music_note_outlined, () => _launchUrl(SocialConfig.anghamiUrl), label: 'Anghami'),
+                    const SizedBox(width: 15),
+                    _buildSocialButton(Icons.email_outlined, () => _launchUrl('mailto:${SocialConfig.contactEmail}'), label: 'Mail'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 48),
+          
+          // Technical Stats / Details
+          _AnimatedEntrance(
+            delay: 900,
+            child: Container(
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                color: AppColors.cardDarkElevated.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  width: 1,
+                ),
               ),
-              padding: const EdgeInsets.all(20),
-              child: Image.asset(
-                'assets/images/mas_logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.image,
-                    size: 64,
-                    color: theme.colorScheme.primary,
-                  );
-                },
-              ),
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // App name
-            Text(
-              'Scout Digital Library',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Description
-            Text(
-              'Your premier platform for knowledge and continuous learning. '
-              'Access thousands of scouting resources, guides, and educational materials.',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                height: 1.6,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Version info
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'Version 1.0.0',
-                style: theme.textTheme.bodySmall,
+              child: Column(
+                children: [
+                  _buildStatRow('Framework', 'Flutter 3.10', icon: Icons.bolt),
+                  _buildDivider(),
+                  _buildStatRow('Real-time DB', 'Supabase Cloud', icon: Icons.cloud_done),
+                  _buildDivider(),
+                  _buildStatRow('Local Sync', 'Hive Storage', icon: Icons.storage),
+                  _buildDivider(),
+                  _buildStatRow('Build Ver', '1.0.0+4', icon: Icons.info_outline),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 48),
-            
-            // Additional info
-            Text(
-              '© 2025 Scout Organization',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-              ),
+          ),
+          
+          const SizedBox(height: 60),
+          
+          // Credits & Footer
+          _AnimatedEntrance(
+            delay: 1000,
+            child: Column(
+              children: [
+                Text(
+                  '© 2026 MARY\'S APOSTOLIC SCOUTS',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Crafted with pride by the Scout Digital Team.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    fontSize: 10,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          ],
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: Divider(color: Colors.white10, height: 1),
+    );
+  }
+
+  Widget _buildLogoCircle(String path, double size, {bool isMain = false, required String label}) {
+    return Column(
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: (isMain ? AppColors.goldAccent : Colors.black).withValues(alpha: 0.3),
+                blurRadius: 15,
+                spreadRadius: isMain ? 4 : 2,
+              ),
+            ],
+            border: Border.all(
+              color: isMain ? AppColors.goldAccent : Colors.white.withValues(alpha: 0.2),
+              width: isMain ? 3 : 1,
+            ),
+          ),
+          padding: EdgeInsets.all(size * 0.15),
+          child: Image.asset(
+            path,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              Icons.broken_image_outlined,
+              size: size * 0.4,
+              color: AppColors.scoutEliteNavy,
+            ),
+          ),
         ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: TextStyle(
+            color: isMain ? AppColors.goldAccent : Colors.white.withValues(alpha: 0.4),
+            fontSize: 9,
+            fontWeight: isMain ? FontWeight.w900 : FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlassCard({required String title, required IconData icon, required String content}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.goldAccent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: AppColors.goldAccent, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            content,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              height: 1.6,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value, {required IconData icon}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.goldAccent.withValues(alpha: 0.5)),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialButton(IconData icon, VoidCallback onTap, {required String label}) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Icon(icon, color: Colors.white70, size: 20),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.3),
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Simple helper for staggered entrance animations
+class _AnimatedEntrance extends StatelessWidget {
+  final Widget child;
+  final int delay;
+
+  const _AnimatedEntrance({required this.child, required this.delay});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 800),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 30 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: EdgeInsets.only(top: delay / 100), // Minor delay simulation
+        child: child,
       ),
     );
   }
 }
+
 

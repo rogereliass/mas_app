@@ -884,6 +884,28 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Resolve troop name from troop id.
+  ///
+  /// Returns null when no readable troop is found.
+  Future<String?> getTroopNameById(String troopId) async {
+    if (troopId.trim().isEmpty) {
+      return null;
+    }
+
+    final cachedTroops = _troopsCache.get('troops');
+    if (cachedTroops != null) {
+      for (final troop in cachedTroops) {
+        final id = troop['id']?.toString();
+        final name = troop['name'] as String?;
+        if (id == troopId && name != null && name.trim().isNotEmpty) {
+          return name;
+        }
+      }
+    }
+
+    return _authRepository.getTroopNameById(troopId);
+  }
+
   /// Sign out
   Future<void> signOut() async {
     _setLoading(true);
