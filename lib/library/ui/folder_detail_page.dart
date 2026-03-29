@@ -4,7 +4,6 @@ import '../../routing/app_router.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
-import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
@@ -138,16 +137,6 @@ class _FolderDetailPageState extends State<FolderDetailPage>
             );
           },
           tooltip: 'Report an Issue',
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => const SettingsDialog(),
-            );
-          },
-          tooltip: 'Settings',
         ),
         const SizedBox(width: 4),
       ],

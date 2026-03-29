@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/settings_dialog.dart';
 import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/folder_card.dart';
@@ -206,16 +205,6 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
             );
           },
           tooltip: 'Report an Issue',
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => const SettingsDialog(),
-            );
-          },
-          tooltip: 'Settings',
         ),
         const SizedBox(width: 4),
       ],

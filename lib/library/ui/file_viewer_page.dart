@@ -8,7 +8,6 @@ import '../../../core/utils/error_translator.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/settings_dialog.dart';
 import '../../offline/offline_storage.dart';
 import '../../offline/download_service.dart';
 import 'file_viewer/pdf_viewer_widget.dart';
@@ -618,6 +617,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
             ),
         ],
         IconButton(
+          icon: Icon(
+            Icons.info_outline,
+            color: widget.fileType.toLowerCase() == 'video'
+                ? AppColors.goldAccent
+                : null,
+          ),
+          onPressed: _showMetadataSheet,
+          tooltip: 'File Info',
+        ),
+        IconButton(
           icon: const Icon(Icons.flag_outlined),
           onPressed: () {
             LibraryReportDialog.show(
@@ -628,17 +637,6 @@ class _FileViewerPageState extends State<FileViewerPage> {
             );
           },
           tooltip: 'Report an Issue',
-        ),
-        // Settings icon
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => const SettingsDialog(),
-            );
-          },
-          tooltip: 'Settings',
         ),
       ],
     );
@@ -668,37 +666,204 @@ class _FileViewerPageState extends State<FileViewerPage> {
       );
     }
 
+    final fileType = widget.fileType.toLowerCase();
+    final isPdf = fileType == 'pdf';
+    final isImage =
+        fileType == 'jpg' ||
+        fileType == 'jpeg' ||
+        fileType == 'png' ||
+        fileType == 'image';
+    final isVideo =
+        fileType == 'mp4' || fileType == 'mov' || fileType == 'video';
+    final isText = fileType == 'text' || fileType == 'txt';
+
+    if (isPdf) {
+      return _buildPdfViewerSection();
+    }
+
+    if (isImage) {
+      return _buildImageViewerSection();
+    }
+
+    if (isVideo) {
+      return _buildVideoViewerSection();
+    }
+
+    if (isText) {
+      return _buildTextViewerSection();
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 16),
-
-          // File preview with type badge and progress
           _buildFilePreview(),
-
           const SizedBox(height: 24),
-
-          // File title and metadata
           _buildFileInfo(),
-
           const SizedBox(height: 24),
-
-          // Description section
           if (_file?.description != null &&
               _file!.description!.trim().isNotEmpty) ...[
             _buildDescription(),
             const SizedBox(height: 24),
           ],
-
-          // Tags section
           if (_file!.tags != null && _file!.tags!.isNotEmpty) ...[
             _buildTags(),
             const SizedBox(height: 24),
           ],
-
           const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+
+  /// Build PDF viewer section with floating info button
+  Widget _buildPdfViewerSection() {
+    return Stack(
+      children: [
+        _buildFileViewer('pdf'),
+        Positioned(bottom: 16, right: 16, child: _buildInfoButton()),
+      ],
+    );
+  }
+
+  /// Floating info button to show metadata
+  Widget _buildInfoButton({IconData? icon}) {
+    final hasMetadata =
+        (_file?.description?.trim().isNotEmpty ?? false) ||
+        (_file?.tags?.isNotEmpty ?? false);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showMetadataSheet(),
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.scoutEliteNavy.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon ?? Icons.info_outline,
+                color: AppColors.goldAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                hasMetadata ? 'Info' : 'File Details',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build image viewer section with floating info button
+  Widget _buildImageViewerSection() {
+    return Stack(
+      children: [
+        _buildFileViewer('image'),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: _buildInfoButton(icon: Icons.image),
+        ),
+      ],
+    );
+  }
+
+  /// Build video viewer section - fullscreen video without overlay
+  Widget _buildVideoViewerSection() {
+    return _buildFileViewer('video');
+  }
+
+  /// Build text viewer section with floating info button
+  Widget _buildTextViewerSection() {
+    return Stack(
+      children: [
+        _buildFileViewer('text'),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: _buildInfoButton(icon: Icons.description_outlined),
+        ),
+      ],
+    );
+  }
+
+  /// Show metadata in modal bottom sheet
+  void _showMetadataSheet() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      isDismissible: true,
+      enableDrag: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.45,
+        minChildSize: 0.25,
+        maxChildSize: 0.85,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.cardLight,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFileInfo(),
+                      if (_file?.description != null &&
+                          _file!.description!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _buildDescription(),
+                      ],
+                      if (_file!.tags != null && _file!.tags!.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _buildTags(),
+                      ],
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

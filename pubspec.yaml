@@ -47,6 +47,7 @@ dependencies:
   path_provider: ^2.1.4
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  pdfx: ^2.9.0
 
   # File handling
   open_filex: ^4.5.0
@@ -57,7 +58,7 @@ dependencies:
   connectivity_plus: ^7.0.0
 
   # YouTube player
-  youtube_player_flutter: ^9.0.3
+  youtube_player_iframe: ^5.2.2
 
   # Audio player
   audioplayers: ^6.1.0

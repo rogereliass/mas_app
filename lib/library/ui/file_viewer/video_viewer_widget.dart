@@ -1,18 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-/// Video Viewer Widget
-/// 
-/// Displays YouTube videos embedded in the app
-/// Extracts video ID from YouTube URLs stored in storagePath
 class VideoViewerWidget extends StatefulWidget {
   final String url;
 
-  const VideoViewerWidget({
-    super.key,
-    required this.url,
-  });
+  const VideoViewerWidget({super.key, required this.url});
 
   @override
   State<VideoViewerWidget> createState() => _VideoViewerWidgetState();
@@ -23,7 +18,8 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
   bool _hasError = false;
   String? _errorMessage;
   bool _isPlayerReady = false;
-  bool _isFullScreen = false;
+  bool _isInitializing = true;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -34,161 +30,193 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
   @override
   void didUpdateWidget(VideoViewerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reinitialize if URL changes
     if (oldWidget.url != widget.url) {
-      _controller?.removeListener(_listener);
-      _controller?.dispose();
+      _disposeController();
       _initializeVideo();
     }
   }
 
+  void _disposeController() {
+    if (_controller != null) {
+      _controller!.close();
+      _controller = null;
+    }
+  }
+
   Future<void> _initializeVideo() async {
+    if (_isDisposed) return;
+
+    setState(() {
+      _isInitializing = true;
+      _hasError = false;
+      _errorMessage = null;
+    });
+
     try {
-      // Extract YouTube video ID from URL
-      final videoId = YoutubePlayer.convertUrlToId(widget.url);
-      
+      final videoId = YoutubePlayerController.convertUrlToId(widget.url);
+
       if (videoId == null) {
+        if (_isDisposed) return;
         setState(() {
           _hasError = true;
           _errorMessage = 'Invalid YouTube URL';
+          _isInitializing = false;
         });
         return;
       }
 
-      // Initialize YouTube player controller
-      _controller = YoutubePlayerController(
-        initialVideoId: videoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: true,
-          mute: false,
+      _controller = YoutubePlayerController.fromVideoId(
+        videoId: videoId,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showFullscreenButton: true,
+          showControls: true,
+          enableKeyboard: false,
+          playsInline: true,
+          strictRelatedVideos: true,
           enableCaption: true,
-          loop: false,
-          controlsVisibleAtStart: true,
-          hideControls: false,
-          forceHD: false,
         ),
-      )..addListener(_listener);
+      );
 
-      if (mounted) {
+      _controller!.listen((event) {
+        if (_isDisposed || !mounted) return;
+
+        if (event.playerState == PlayerState.playing) {
+          if (!_isPlayerReady) {
+            setState(() {
+              _isPlayerReady = true;
+              _isInitializing = false;
+            });
+          }
+        }
+
+        if (event.playerState == PlayerState.unknown && event.hasError) {
+          if (!_isDisposed) {
+            setState(() {
+              _hasError = true;
+              _errorMessage = 'Error loading video';
+              _isInitializing = false;
+            });
+          }
+        }
+      });
+
+      if (!_isDisposed && mounted) {
         setState(() {});
       }
     } catch (e) {
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         setState(() {
           _hasError = true;
           _errorMessage = 'Error loading video: $e';
+          _isInitializing = false;
         });
-      }
-    }
-  }
-
-  void _listener() {
-    if (_controller != null && mounted) {
-      if (_controller!.value.isReady && !_isPlayerReady) {
-        setState(() {
-          _isPlayerReady = true;
-        });
-      }
-      
-      // Handle fullscreen changes only when state actually changes
-      if (_controller!.value.isFullScreen != _isFullScreen) {
-        _isFullScreen = _controller!.value.isFullScreen;
-        if (_isFullScreen) {
-          SystemChrome.setPreferredOrientations([
-            DeviceOrientation.landscapeLeft,
-            DeviceOrientation.landscapeRight,
-          ]);
-        } else {
-          SystemChrome.setPreferredOrientations([
-            DeviceOrientation.portraitUp,
-          ]);
-        }
       }
     }
   }
 
   @override
   void dispose() {
-    _controller?.removeListener(_listener);
-    _controller?.dispose();
-    // Reset orientation when leaving
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    _isDisposed = true;
+    _disposeController();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isDisposed) {
+      return const SizedBox.shrink();
+    }
+
     if (_hasError) {
       return _buildError();
     }
 
-    if (_controller == null) {
+    if (_isInitializing || _controller == null) {
       return _buildLoading();
     }
 
-    return YoutubePlayerBuilder(
-      onExitFullScreen: () {
-        // Reset orientation when exiting fullscreen
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-        ]);
-      },
-      player: YoutubePlayer(
+    return Container(
+      color: Colors.black,
+      child: YoutubePlayer(
         controller: _controller!,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: Colors.red,
-        progressColors: const ProgressBarColors(
-          playedColor: Colors.red,
-          handleColor: Colors.redAccent,
-        ),
-        onReady: () {
-          setState(() {
-            _isPlayerReady = true;
-          });
-        },
         aspectRatio: 16 / 9,
+        backgroundColor: Colors.black,
+        enableFullScreenOnVerticalDrag: true,
       ),
-      builder: (context, player) {
-        return player;
-      },
     );
   }
 
   Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading video...'),
-        ],
+    return Container(
+      color: Colors.black,
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 50,
+              height: 50,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Loading video...',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red,
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: Colors.red,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _errorMessage ?? 'Failed to load video',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: _isDisposed ? null : _initializeVideo,
+                child: const Text(
+                  'Try Again',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 16),
-          Text(
-            _errorMessage ?? 'Failed to load video',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.red,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
