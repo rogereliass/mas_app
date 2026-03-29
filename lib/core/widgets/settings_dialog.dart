@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../auth/logic/auth_provider.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../core/config/theme_provider.dart';
 import '../../routing/app_router.dart';
 
@@ -107,6 +108,17 @@ class SettingsDialog extends StatelessWidget {
                             title: 'Change Password',
                             subtitle: 'Update your account password',
                             onTap: () {
+                              if (!ConnectivityService.instance.isOnline) {
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Internet connection is required to change your password.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               Navigator.pop(context); // Close settings dialog
                               Navigator.pushNamed(context, AppRouter.forgotPassword);
                             },

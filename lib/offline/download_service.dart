@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 import 'offline_storage.dart';
 
 /// Download Service
@@ -74,21 +75,28 @@ class DownloadService {
       if (iconUrl != null && iconUrl.isNotEmpty) {
         try {
           _logDebug('🖼️ Downloading icon');
-          // Note: iconUrl is expected to be a full URL, not a storage path
-          // You might need to adjust this based on your Supabase setup
-          
-          // If iconUrl is a storage path, download from Supabase
+          List<int>? iconBytes;
+
           if (!iconUrl.startsWith('http')) {
-            final iconBytes = await _supabase.storage
-                .from('library')
-                .download(iconUrl);
-            
-            if (iconBytes.isNotEmpty) {
-              await OfflineStorageService.saveIcon(
-                fileId: fileId,
-                bytes: iconBytes,
-              );
+            iconBytes = await _supabase.storage.from('library').download(iconUrl);
+          } else {
+            final client = HttpClient();
+            try {
+              final request = await client.getUrl(Uri.parse(iconUrl));
+              final response = await request.close();
+              if (response.statusCode == HttpStatus.ok) {
+                iconBytes = await consolidateHttpClientResponseBytes(response);
+              }
+            } finally {
+              client.close(force: true);
             }
+          }
+
+          if (iconBytes != null && iconBytes.isNotEmpty) {
+            await OfflineStorageService.saveIcon(
+              fileId: fileId,
+              bytes: iconBytes,
+            );
           }
         } catch (e) {
           _logDebug('⚠️ Failed to download icon: $e');

@@ -10,6 +10,7 @@ import '../../core/data/persistent_query_cache.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../core/utils/ttl_cache.dart';
 import '../../core/utils/fcm_service.dart';
+import '../../offline/offline_storage.dart';
 import '../../routing/app_router.dart';
 import '../../routing/navigation_service.dart';
 
@@ -619,6 +620,12 @@ class AuthProvider with ChangeNotifier {
       final cacheUserId = previousUserIdForCache ?? _currentUser?.id;
       if (cacheUserId != null && cacheUserId.trim().isNotEmpty) {
         await PersistentQueryCache.invalidate(_offlineIdentityKey(cacheUserId));
+      }
+
+      try {
+        await OfflineStorageService.clearAll();
+      } catch (e) {
+        _logDebug('Failed to clear offline files on sign out: $e');
       }
 
       _selectedRoleName = null;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 /// Text File Viewer Widget
 /// 
@@ -8,12 +9,14 @@ class TxtViewerWidget extends StatefulWidget {
   final String url;
   final String? textContent;
   final String? iconUrl;
+  final String? localIconPath;
 
   const TxtViewerWidget({
     super.key,
     required this.url,
     this.textContent,
     this.iconUrl,
+    this.localIconPath,
   });
 
   @override
@@ -33,6 +36,10 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
     // Detect if content contains Arabic characters
     final hasArabic = _containsArabic(widget.textContent!);
     final hasImage = widget.iconUrl != null && widget.iconUrl!.isNotEmpty;
+    final hasLocalImage =
+      widget.localIconPath != null &&
+      widget.localIconPath!.isNotEmpty &&
+      File(widget.localIconPath!).existsSync();
 
     return Container(
       width: double.infinity,
@@ -44,7 +51,7 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
           crossAxisAlignment: hasArabic ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             // Display image if iconUrl is provided
-            if (hasImage) ...[
+            if (hasImage || hasLocalImage) ...[
               Center(
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 24),
@@ -54,40 +61,39 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      widget.iconUrl!,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 200,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
+                    child: hasLocalImage
+                        ? Image.file(
+                            File(widget.localIconPath!),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildBrokenImagePlaceholder();
+                            },
+                          )
+                        : Image.network(
+                            widget.iconUrl!,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildBrokenImagePlaceholder();
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return SizedBox(
+                                height: 200,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    value:
+                                        loadingProgress.expectedTotalBytes !=
+                                            null
+                                        ? loadingProgress
+                                              .cumulativeBytesLoaded /
+                                              loadingProgress
+                                                  .expectedTotalBytes!
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              size: 64,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return SizedBox(
-                          height: 200,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ),
               ),
@@ -138,6 +144,19 @@ class _TxtViewerWidgetState extends State<TxtViewerWidget> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBrokenImagePlaceholder() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Center(
+        child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
       ),
     );
   }

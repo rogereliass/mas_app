@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import '../data/library_models.dart';
 import '../data/library_service.dart';
 import '../../auth/logic/auth_provider.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../core/data/persistent_query_cache.dart';
 import '../../core/utils/ttl_cache.dart';
+import '../../offline/offline_storage.dart';
 
 /// Library Provider
 /// 
@@ -11,8 +13,6 @@ import '../../core/utils/ttl_cache.dart';
 /// Handles loading states, errors, and caching
 /// Implements role-based file filtering
 class LibraryProvider with ChangeNotifier {
-  static const String _rootSnapshotKey = 'library:root_contents';
-
   final LibraryService _service;
   final AuthProvider? _authProvider;
 
@@ -25,6 +25,7 @@ class LibraryProvider with ChangeNotifier {
   // Root folders and recent files
   List<LibraryFolder> _rootFolders = [];
   List<LibraryFile> _recentFiles = [];
+  List<OfflineFileMetadata> _offlineFiles = [];
 
   // Current folder context
   LibraryFolder? _currentFolder;
@@ -65,6 +66,8 @@ class LibraryProvider with ChangeNotifier {
 
   List<LibraryFolder> get rootFolders => _rootFolders;
   List<LibraryFile> get recentFiles => _recentFiles;
+  List<OfflineFileMetadata> get offlineFiles => List.unmodifiable(_offlineFiles);
+  bool get hasOfflineFiles => _offlineFiles.isNotEmpty;
 
   LibraryFolder? get currentFolder => _currentFolder;
   List<LibraryFolder> get currentSubfolders => _currentSubfolders;
@@ -137,7 +140,7 @@ class LibraryProvider with ChangeNotifier {
 
     final persistedRoot = !forceRefresh
         ? await PersistentQueryCache.read<Map<String, dynamic>>(
-            key: _rootSnapshotKey,
+            key: _rootSnapshotKey(),
             parser: _parseRootSnapshot,
           )
         : null;
@@ -147,6 +150,14 @@ class LibraryProvider with ChangeNotifier {
       _rootContentsTimestamp = persistedRoot.savedAt ?? DateTime.now();
       _isLoadingRoot = false;
       _error = null;
+      notifyListeners();
+      return;
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      refreshOfflineFiles(notify: false);
+      _error = 'Internet connection is required to load library content.';
+      _isLoadingRoot = false;
       notifyListeners();
       return;
     }
@@ -175,7 +186,7 @@ class LibraryProvider with ChangeNotifier {
       _rootContentsTimestamp = DateTime.now();
 
       await PersistentQueryCache.write(
-        key: _rootSnapshotKey,
+        key: _rootSnapshotKey(),
         payload: _buildRootSnapshotPayload(),
         ttl: _rootContentsTtl,
       );
@@ -258,6 +269,14 @@ class LibraryProvider with ChangeNotifier {
       return;
     }
 
+    if (!ConnectivityService.instance.isOnline) {
+      refreshOfflineFiles(notify: false);
+      _error = 'Internet connection is required to load this folder.';
+      _isLoadingFolder = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       // Load folder details if not in cache
       if (!_folderCache.containsKey(folderId)) {
@@ -322,6 +341,13 @@ class LibraryProvider with ChangeNotifier {
   /// Load next page of files in the current folder
   Future<void> loadMoreFiles() async {
     if (_isLoadingMoreFiles || !_hasMoreFiles || _currentFolder == null) {
+      return;
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      // Keep existing cached folder content visible while offline.
+      // Pagination failure should not switch the page into a full error state.
+      notifyListeners();
       return;
     }
 
@@ -563,7 +589,18 @@ class LibraryProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  String _folderSnapshotKey(String folderId) => 'library:folder:$folderId';
+  String _cacheUserKey() {
+    final userId = _authProvider?.currentUser?.id.trim();
+    if (userId == null || userId.isEmpty) {
+      return 'guest';
+    }
+    return userId;
+  }
+
+  String _rootSnapshotKey() => 'library:${_cacheUserKey()}:root_contents';
+
+  String _folderSnapshotKey(String folderId) =>
+      'library:${_cacheUserKey()}:folder:$folderId';
 
   Map<String, dynamic>? _parseRootSnapshot(Object? payload) {
     if (payload is! Map) return null;
@@ -673,6 +710,41 @@ class LibraryProvider with ChangeNotifier {
     if (value is bool) return value;
     if (value is String) return value.toLowerCase() == 'true';
     return false;
+  }
+
+  void refreshOfflineFiles({bool notify = true}) {
+    final isAuthenticated = _authProvider?.isAuthenticated ?? false;
+    if (!isAuthenticated) {
+      _offlineFiles = const <OfflineFileMetadata>[];
+      if (notify) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    final files = OfflineStorageService.getAllOfflineFiles()
+        .where((file) {
+          if (!OfflineStorageService.isAvailableOffline(file.fileId)) {
+            return false;
+          }
+
+          final cachedFile = _fileCache[file.fileId];
+          if (cachedFile == null) {
+            // Allow authenticated users to see downloaded files even after
+            // cold restart when in-memory metadata has not been hydrated yet.
+            return true;
+          }
+
+          return _canAccessFile(cachedFile);
+        })
+        .toList(growable: false)
+      ..sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+
+    _offlineFiles = files;
+
+    if (notify) {
+      notifyListeners();
+    }
   }
   
   /// Re-apply role-based filtering to current data

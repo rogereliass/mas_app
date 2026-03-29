@@ -59,6 +59,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
   bool _isLoadingFile = true;
   final _downloadService = DownloadService();
   bool _isCheckingUpdate = false;
+  String? _localIconPath;
 
   @override
   void initState() {
@@ -93,6 +94,8 @@ class _FileViewerPageState extends State<FileViewerPage> {
           ? OfflineStorageService.getFilePath(widget.fileId)
           : null;
       final hasOffline = offlinePath != null;
+      final offlineMetadata = OfflineStorageService.getMetadata(widget.fileId);
+      final localIconPath = offlineMetadata?.localIconPath;
 
       if (isVideo) {
         // For video files, use storagePath directly (YouTube URL)
@@ -113,6 +116,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         if (mounted) {
           setState(() {
             _file = file.copyWith(textContent: content);
+            _localIconPath = localIconPath;
             _isLoadingFile = false;
             _isAvailableOffline = true;
           });
@@ -126,6 +130,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         if (mounted) {
           setState(() {
             _fileUrl = offlinePath; // Use local file path directly
+            _localIconPath = localIconPath;
             _isLoadingFile = false;
             _isAvailableOffline = true; // Set offline status immediately
           });
@@ -143,6 +148,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         if (mounted) {
           setState(() {
             _fileUrl = url;
+            _localIconPath = localIconPath;
             _isLoadingFile = false;
           });
         }
@@ -156,6 +162,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         if (mounted) {
           setState(() {
             _fileUrl = url;
+            _localIconPath = localIconPath;
             _isLoadingFile = false;
           });
         }
@@ -191,6 +198,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
                 createdAt: file.createdAt,
               );
             }
+            _localIconPath = localIconPath;
             _isLoadingFile = false;
           });
         }
@@ -408,13 +416,12 @@ class _FileViewerPageState extends State<FileViewerPage> {
       );
 
       if (filePath != null) {
+        if (!mounted) return;
         setState(() {
           _isDownloading = false;
           _downloadProgress = 1.0;
           _isAvailableOffline = true;
         });
-
-        if (!mounted) return;
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -430,12 +437,13 @@ class _FileViewerPageState extends State<FileViewerPage> {
         throw Exception('Failed to download file');
       }
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _isDownloading = false;
         _downloadProgress = 0.0;
       });
 
-      if (!mounted) return;
       final userMessage = ErrorTranslator.toUserMessage(e.toString());
       ScaffoldMessenger.of(
         context,
@@ -971,6 +979,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
         url: '',
         textContent: _file?.textContent,
         iconUrl: _file?.iconUrl,
+        localIconPath: _localIconPath,
       );
     }
 

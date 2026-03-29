@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
@@ -64,6 +65,7 @@ class _FolderDetailPageState extends State<FolderDetailPage>
 
   void _loadFolderContents() {
     final provider = Provider.of<LibraryProvider>(context, listen: false);
+    provider.refreshOfflineFiles(notify: false);
     provider.loadFolderContents(widget.folderId);
     _hasLoadedInitially = true;
   }
@@ -147,6 +149,9 @@ class _FolderDetailPageState extends State<FolderDetailPage>
   Widget _buildFolderContent() {
     final provider = Provider.of<LibraryProvider>(context);
     final subfolders = provider.currentSubfolders;
+    final files = provider.currentFiles;
+    final isOnline = ConnectivityService.instance.isOnline;
+    final hasCachedContent = subfolders.isNotEmpty || files.isNotEmpty;
 
     return SingleChildScrollView(
       child: Column(
@@ -168,7 +173,9 @@ class _FolderDetailPageState extends State<FolderDetailPage>
               ),
             )
           // Error state
-          else if (provider.hasError)
+          else if (provider.hasError && !isOnline && !hasCachedContent)
+            _buildOfflineDownloads(provider)
+          else if (provider.hasError && !hasCachedContent)
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -205,6 +212,90 @@ class _FolderDetailPageState extends State<FolderDetailPage>
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildOfflineDownloads(LibraryProvider provider) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final offlineFiles = provider.offlineFiles;
+
+    if (offlineFiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(
+                Icons.cloud_off_outlined,
+                size: 42,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No downloaded content is available offline.',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'OFFLINE DOWNLOADS',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '${offlineFiles.length} downloaded files on this device',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: offlineFiles.length,
+          itemBuilder: (context, index) {
+            final file = offlineFiles[index];
+            final fileType = _inferFileType(file.fileName);
+            return FileTile(
+              fileId: file.fileId,
+              fileName: file.fileName,
+              fileType: fileType,
+              fileSize: _formatFileSize(file.sizeBytes),
+              lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+              onTap: () {
+                AppRouter.goToFileViewer(
+                  context,
+                  fileId: file.fileId,
+                  fileName: file.fileName,
+                  fileType: fileType,
+                  fileSizeBytes: file.sizeBytes,
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -469,6 +560,38 @@ class _FolderDetailPageState extends State<FolderDetailPage>
     } else {
       return '${date.month}/${date.day}/${date.year}';
     }
+  }
+
+  String _inferFileType(String fileName) {
+    final parts = fileName.split('.');
+    if (parts.length < 2) {
+      return 'file';
+    }
+    return parts.last.toLowerCase();
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _formatDownloadedDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'today';
+    }
+    if (difference.inDays == 1) {
+      return 'yesterday';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    }
+    return '${date.month}/${date.day}/${date.year}';
   }
 }
 

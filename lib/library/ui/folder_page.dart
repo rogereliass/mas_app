@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
+import '../../core/services/connectivity_service.dart';
 import '../logic/library_provider.dart';
 import 'components/folder_card.dart';
 import 'components/file_tile.dart';
@@ -25,14 +28,35 @@ class LibraryHomePage extends StatefulWidget {
 }
 
 class _LibraryHomePageState extends State<LibraryHomePage> {
+  StreamSubscription<bool>? _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     // Load root contents on page load
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<LibraryProvider>(context, listen: false);
+      provider.refreshOfflineFiles(notify: false);
       provider.loadRootContents();
     });
+
+    _connectivitySubscription = ConnectivityService.instance.statusStream
+        .listen((isOnline) {
+          if (!mounted || !isOnline) {
+            return;
+          }
+
+          final provider = Provider.of<LibraryProvider>(context, listen: false);
+          if (!provider.isLoadingRoot && (provider.hasError || provider.rootFolders.isEmpty)) {
+            provider.loadRootContents(forceRefresh: true);
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -178,6 +202,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
     final isDark = theme.brightness == Brightness.dark;
     final provider = Provider.of<LibraryProvider>(context);
     final folders = provider.rootFolders;
+    final isOnline = ConnectivityService.instance.isOnline;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,7 +247,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               child: CircularProgressIndicator(),
             ),
           )
-        else if (provider.hasError)
+        else if (provider.hasError && !isOnline && folders.isEmpty)
+          _buildOfflineLibraryContent(theme, isDark, provider)
+        else if (provider.hasError && folders.isEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
@@ -317,6 +344,132 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           ),
       ],
     );
+  }
+
+  Widget _buildOfflineLibraryContent(
+    ThemeData theme,
+    bool isDark,
+    LibraryProvider provider,
+  ) {
+    final offlineFiles = provider.offlineFiles;
+
+    if (offlineFiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(
+                Icons.cloud_off_outlined,
+                size: 42,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'You are offline',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No downloaded library files are available on this device yet.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'OFFLINE DOWNLOADS',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '${offlineFiles.length} downloaded files available offline',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: offlineFiles.length,
+          itemBuilder: (context, index) {
+            final file = offlineFiles[index];
+            return FileTile(
+              fileId: file.fileId,
+              fileName: file.fileName,
+              fileType: _inferFileType(file.fileName),
+              fileSize: _formatFileSize(file.sizeBytes),
+              lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+              onTap: () {
+                AppRouter.goToFileViewer(
+                  context,
+                  fileId: file.fileId,
+                  fileName: file.fileName,
+                  fileType: _inferFileType(file.fileName),
+                  fileSizeBytes: file.sizeBytes,
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  String _inferFileType(String fileName) {
+    final parts = fileName.split('.');
+    if (parts.length < 2) {
+      return 'file';
+    }
+    return parts.last.toLowerCase();
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _formatDownloadedDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'today';
+    }
+    if (difference.inDays == 1) {
+      return 'yesterday';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    }
+    return '${date.month}/${date.day}/${date.year}';
   }
 
   /// Build Recent Assets section with horizontal card scroll

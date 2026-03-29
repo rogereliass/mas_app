@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routing/app_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/connectivity_service.dart';
 import '../logic/library_provider.dart';
 import 'components/custom_search_bar.dart';
 import 'components/folder_card.dart';
+import 'components/file_tile.dart';
 import 'components/library_report_dialog.dart';
 
 /// All folders page showing complete folder grid
@@ -32,6 +34,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
     // Load root contents if not already loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<LibraryProvider>(context, listen: false);
+      provider.refreshOfflineFiles(notify: false);
       if (provider.rootFolders.isEmpty && !provider.isLoadingRoot) {
         provider.loadRootContents();
       }
@@ -42,6 +45,7 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final provider = Provider.of<LibraryProvider>(context);
+    final isOnline = ConnectivityService.instance.isOnline;
 
     // Get all folders from provider and filter by search query
     final allFolders = provider.rootFolders;
@@ -55,9 +59,11 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
 
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: provider.isLoadingRoot
+        body: provider.isLoadingRoot
           ? const Center(child: CircularProgressIndicator())
-          : provider.hasError
+          : provider.hasError && !isOnline && allFolders.isEmpty
+          ? _buildOfflineDownloadsState(theme, provider)
+          : provider.hasError && allFolders.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -302,5 +308,125 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildOfflineDownloadsState(
+    ThemeData theme,
+    LibraryProvider provider,
+  ) {
+    final offlineFiles = provider.offlineFiles;
+    final isDark = theme.brightness == Brightness.dark;
+
+    if (offlineFiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.cloud_off_outlined,
+                size: 56,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No downloaded content available offline.',
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'OFFLINE DOWNLOADS',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            '${offlineFiles.length} downloaded files on this device',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            itemCount: offlineFiles.length,
+            itemBuilder: (context, index) {
+              final file = offlineFiles[index];
+              final fileType = _inferFileType(file.fileName);
+              return FileTile(
+                fileId: file.fileId,
+                fileName: file.fileName,
+                fileType: fileType,
+                fileSize: _formatFileSize(file.sizeBytes),
+                lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+                onTap: () {
+                  AppRouter.goToFileViewer(
+                    context,
+                    fileId: file.fileId,
+                    fileName: file.fileName,
+                    fileType: fileType,
+                    fileSizeBytes: file.sizeBytes,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _inferFileType(String fileName) {
+    final parts = fileName.split('.');
+    if (parts.length < 2) {
+      return 'file';
+    }
+    return parts.last.toLowerCase();
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _formatDownloadedDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'today';
+    }
+    if (difference.inDays == 1) {
+      return 'yesterday';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    }
+    return '${date.month}/${date.day}/${date.year}';
   }
 }
