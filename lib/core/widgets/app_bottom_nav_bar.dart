@@ -3,11 +3,11 @@ import '../constants/app_colors.dart';
 import '../../routing/app_router.dart';
 
 /// Unified bottom navigation bar component
-/// 
+///
 /// Adapts based on authentication status:
 /// - Authenticated users: Home, Library, Search, Profile
 /// - Public users: Library, About
-/// 
+///
 /// Handles navigation internally for consistency across the app
 class AppBottomNavBar extends StatelessWidget {
   final String currentPage;
@@ -23,33 +23,36 @@ class AppBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
-    // Return the navbar as a floating widget that doesn't take layout space
-    // This is designed to be placed at the bottom via Scaffold configuration
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(
-            color: isDark 
-                ? Colors.black.withValues(alpha: 0.4)
-                : theme.shadowColor.withValues(alpha: 0.15),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-            spreadRadius: 2,
+
+    // Return the navbar wrapped in SafeArea to prevent overlap with system navigation
+    // This ensures the navbar is always positioned above the Android/iOS navigation buttons
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDarkElevated : AppColors.cardLight,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.4)
+                  : theme.shadowColor.withValues(alpha: 0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisSize: MainAxisSize.min,
+            children: isAuthenticated
+                ? _buildAuthenticatedNavItems(context)
+                : _buildPublicNavItems(context),
           ),
-        ],
-      ),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          mainAxisSize: MainAxisSize.min,
-          children: isAuthenticated 
-              ? _buildAuthenticatedNavItems(context)
-              : _buildPublicNavItems(context),
         ),
       ),
     );
@@ -82,7 +85,7 @@ class AppBottomNavBar extends StatelessWidget {
         page: 'meetings',
         onTap: () => _navigateTo(context, AppRouter.meetings),
       ),
-      
+
       _buildNavItem(
         context: context,
         icon: Icons.person_outline,
@@ -127,12 +130,15 @@ class AppBottomNavBar extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isActive = currentPage == page;
-    
-    final Color activeColor = isDark ? AppColors.goldAccent : theme.colorScheme.primary;
-    final Color inactiveColor = isDark 
-        ? AppColors.sectionHeaderGray 
-        : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6) ?? Colors.grey;
-    
+
+    final Color activeColor = isDark
+        ? AppColors.goldAccent
+        : theme.colorScheme.primary;
+    final Color inactiveColor = isDark
+        ? AppColors.sectionHeaderGray
+        : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6) ??
+              Colors.grey;
+
     final color = isActive ? activeColor : inactiveColor;
 
     return GestureDetector(
@@ -143,11 +149,7 @@ class AppBottomNavBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: color,
-              size: 24,
-            ),
+            Icon(isActive ? activeIcon : icon, color: color, size: 24),
             const SizedBox(height: 4),
             Text(
               label.toUpperCase(),
@@ -181,7 +183,7 @@ class AppBottomNavBar extends StatelessWidget {
   void _navigateTo(BuildContext context, String route, {Object? arguments}) {
     // Don't navigate if already on the page
     if (_isCurrentRoute(route)) return;
-    
+
     Navigator.pushNamedAndRemoveUntil(
       context,
       route,
@@ -219,4 +221,3 @@ class AppBottomNavBar extends StatelessWidget {
     );
   }
 }
-

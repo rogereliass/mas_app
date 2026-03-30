@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -46,6 +47,16 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
   Future<void> _initializeVideo() async {
     if (_isDisposed) return;
 
+    if (widget.url.isEmpty) {
+      if (_isDisposed) return;
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'No video URL provided';
+        _isInitializing = false;
+      });
+      return;
+    }
+
     setState(() {
       _isInitializing = true;
       _hasError = false;
@@ -53,6 +64,7 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
     });
 
     try {
+      debugPrint('🎬 Initializing YouTube player with URL: ${widget.url}');
       final videoId = YoutubePlayerController.convertUrlToId(widget.url);
 
       if (videoId == null) {
@@ -99,6 +111,14 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
             });
           }
         }
+
+        if (event.playerState == PlayerState.ended) {
+          if (!_isDisposed) {
+            setState(() {
+              _isInitializing = false;
+            });
+          }
+        }
       });
 
       if (!_isDisposed && mounted) {
@@ -120,7 +140,10 @@ class _VideoViewerWidgetState extends State<VideoViewerWidget> {
     _isDisposed = true;
     _disposeController();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
     super.dispose();
   }
 

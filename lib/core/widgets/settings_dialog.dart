@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,10 +9,30 @@ import '../../core/config/theme_provider.dart';
 import '../../routing/app_router.dart';
 
 /// Reusable Settings Dialog Widget
-/// 
+///
 /// Shows app settings including theme, account options, logout, and support
-class SettingsDialog extends StatelessWidget {
+class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = '${info.version}+${info.buildNumber}';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,9 +42,7 @@ class SettingsDialog extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
         child: Column(
@@ -64,7 +83,7 @@ class SettingsDialog extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
-            
+
             // Scrollable Settings Content
             Flexible(
               child: SingleChildScrollView(
@@ -81,13 +100,14 @@ class SettingsDialog extends StatelessWidget {
                           icon: Icons.brightness_6_outlined,
                           title: 'Theme',
                           subtitle: _getThemeModeLabel(themeProvider.themeMode),
-                          onTap: () => _showThemeSelector(context, themeProvider),
+                          onTap: () =>
+                              _showThemeSelector(context, themeProvider),
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Account Section
                     if (authProvider.isAuthenticated) ...[
                       _SettingsSection(
@@ -109,7 +129,9 @@ class SettingsDialog extends StatelessWidget {
                             subtitle: 'Update your account password',
                             onTap: () {
                               if (!ConnectivityService.instance.isOnline) {
-                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).hideCurrentSnackBar();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -120,7 +142,10 @@ class SettingsDialog extends StatelessWidget {
                                 return;
                               }
                               Navigator.pop(context); // Close settings dialog
-                              Navigator.pushNamed(context, AppRouter.forgotPassword);
+                              Navigator.pushNamed(
+                                context,
+                                AppRouter.forgotPassword,
+                              );
                             },
                           ),
                           _SettingItem(
@@ -131,10 +156,10 @@ class SettingsDialog extends StatelessWidget {
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 24),
                     ],
-                    
+
                     // Storage Section
                     _SettingsSection(
                       title: 'Storage',
@@ -159,9 +184,9 @@ class SettingsDialog extends StatelessWidget {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Support Section
                     _SettingsSection(
                       title: 'Support',
@@ -175,9 +200,9 @@ class SettingsDialog extends StatelessWidget {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // About Section
                     _SettingsSection(
                       title: 'About',
@@ -204,7 +229,7 @@ class SettingsDialog extends StatelessWidget {
                         _SettingItem(
                           icon: Icons.update_outlined,
                           title: 'App Version',
-                          subtitle: '1.0.0',
+                          subtitle: _version ?? '...',
                           onTap: null, // Non-interactive
                         ),
                         _SettingItem(
@@ -242,7 +267,7 @@ class SettingsDialog extends StatelessWidget {
   /// Show logout confirmation dialog
   void _showLogoutConfirmation(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -257,19 +282,22 @@ class SettingsDialog extends StatelessWidget {
             onPressed: () async {
               // Get the navigator and auth provider before closing dialogs
               final navigator = Navigator.of(context);
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
+
               // Close both dialogs
               Navigator.pop(dialogContext); // Close confirmation dialog
               Navigator.pop(context); // Close settings dialog
-              
+
               // CRITICAL: Navigate BEFORE signing out to prevent flashing no-role widget
               // The auth state listener will handle clearing user data when sign out completes
               navigator.pushNamedAndRemoveUntil(
                 AppRouter.startup,
                 (route) => false,
               );
-              
+
               // Sign out after navigation
               await authProvider.signOut();
             },
@@ -285,11 +313,13 @@ class SettingsDialog extends StatelessWidget {
 
   /// Report issue via email
   Future<void> _reportIssue() async {
-    final emailAddress = dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support.masdigitalteam@gmail.com';
+    final emailAddress =
+        dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support.masdigitalteam@gmail.com';
     final uri = Uri(
       scheme: 'mailto',
       path: emailAddress,
-      query: 'subject=MAS App Issue Report&body=Please describe the issue you encountered:',
+      query:
+          'subject=MAS App Issue Report&body=Please describe the issue you encountered:',
     );
 
     if (await canLaunchUrl(uri)) {
@@ -302,7 +332,7 @@ class SettingsDialog extends StatelessWidget {
   void _showThemeSelector(BuildContext context, ThemeProvider themeProvider) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -395,11 +425,7 @@ class _SettingsSection extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Row(
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: colorScheme.primary,
-              ),
+              Icon(icon, size: 18, color: colorScheme.primary),
               const SizedBox(width: 8),
               Text(
                 title,
@@ -420,9 +446,7 @@ class _SettingsSection extends StatelessWidget {
               color: colorScheme.outline.withValues(alpha: 0.2),
             ),
           ),
-          child: Column(
-            children: children,
-          ),
+          child: Column(children: children),
         ),
       ],
     );
@@ -462,11 +486,7 @@ class _SettingItem extends StatelessWidget {
                 color: colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -532,7 +552,7 @@ class _ThemeModeOption extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected 
+                color: isSelected
                     ? colorScheme.primaryContainer
                     : colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(10),
@@ -553,8 +573,10 @@ class _ThemeModeOption extends StatelessWidget {
                   Text(
                     title,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected 
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: isSelected
                           ? colorScheme.primary
                           : colorScheme.onSurface,
                     ),
@@ -569,11 +591,7 @@ class _ThemeModeOption extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              Icon(
-                Icons.check_circle,
-                color: colorScheme.primary,
-                size: 24,
-              ),
+              Icon(Icons.check_circle, color: colorScheme.primary, size: 24),
           ],
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/connectivity_service.dart';
+import '../../../offline/offline_action_queue.dart';
 
 enum ReportContentType { folder, file, general }
 
@@ -52,6 +54,27 @@ class _LibraryReportDialogState extends State<LibraryReportDialog> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  String _formatError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('network') || message.contains('socket')) {
+      return 'Network error. Please check your connection.';
+    }
+    if (message.contains('session') ||
+        message.contains('auth') ||
+        message.contains('logged in')) {
+      return 'Session expired. Please log in again.';
+    }
+    if (message.contains('permission') ||
+        message.contains('forbidden') ||
+        message.contains('unauthorized')) {
+      return 'You do not have permission to perform this action.';
+    }
+    if (message.contains('duplicate')) {
+      return 'This report has already been submitted.';
+    }
+    return 'Something went wrong. Please try again.';
   }
 
   String _getContentTypeLabel(ReportContentType type) {
@@ -174,15 +197,36 @@ class _LibraryReportDialogState extends State<LibraryReportDialog> {
 
       final contentTypeStr = widget.contentType.name;
       final reportTypeStr = _selectedReportType.name;
-
-      await Supabase.instance.client.from('library_reports').insert({
+      final reportData = {
         'user_id': user.id,
         'content_type': contentTypeStr,
         'content_id': widget.contentId,
         'report_type': reportTypeStr,
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
-      });
+      };
+
+      if (!ConnectivityService.instance.isOnline) {
+        await OfflineActionQueue.instance.enqueue(
+          type: 'library_report',
+          payload: reportData,
+        );
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You are offline. Your report will be submitted when you reconnect.',
+              ),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+        }
+        return;
+      }
+
+      await Supabase.instance.client.from('library_reports').insert(reportData);
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -195,7 +239,7 @@ class _LibraryReportDialogState extends State<LibraryReportDialog> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = _formatError(e);
       });
     } finally {
       if (mounted) {

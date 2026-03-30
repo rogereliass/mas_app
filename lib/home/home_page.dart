@@ -53,8 +53,10 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      final notificationsProvider =
-          Provider.of<NotificationsProvider>(context, listen: false);
+      final notificationsProvider = Provider.of<NotificationsProvider>(
+        context,
+        listen: false,
+      );
       notificationsProvider.loadNotifications();
     });
   }
@@ -85,7 +87,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     // Show loading only if profile is being fetched and no cached profile exists yet.
-    if (authProvider.profileLoading && authProvider.currentUserProfile == null) {
+    if (authProvider.profileLoading &&
+        authProvider.currentUserProfile == null) {
       return Scaffold(
         body: Center(
           child: Column(
@@ -115,6 +118,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       // 1. Top App Bar (Header)
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -295,7 +299,7 @@ class _HomePageState extends State<HomePage> {
                     // Summary / Stats
                     _buildSummaryStats(context),
                     const SizedBox(height: 32),
-                    
+
                     // Troop Standings (Role specific)
                     _buildTroopStandings(context),
                     const SizedBox(height: 32),
@@ -383,7 +387,7 @@ class _HomePageState extends State<HomePage> {
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Icon(
-                    Icons.qr_code_2_rounded, 
+                    Icons.qr_code_2_rounded,
                     color: colorScheme.primary,
                     size: 24,
                   ),
@@ -572,8 +576,10 @@ class _HomePageState extends State<HomePage> {
         : authProvider.currentUserRoleRank;
 
     // Show only for Members/Scouts (10) and Troop Head (70)
-    if (effectiveRank >= 10 && effectiveRank <= 30 || effectiveRank == 60 || effectiveRank == 70) {
-      return const HomeTroopStandingsCard(); 
+    if (effectiveRank >= 10 && effectiveRank <= 30 ||
+        effectiveRank == 60 ||
+        effectiveRank == 70) {
+      return const HomeTroopStandingsCard();
     }
 
     return const SizedBox.shrink();

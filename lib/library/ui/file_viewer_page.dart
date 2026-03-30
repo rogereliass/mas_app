@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/utils/error_translator.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../logic/library_provider.dart';
 import '../data/library_models.dart';
 import '../../core/constants/app_colors.dart';
@@ -57,6 +58,7 @@ class _FileViewerPageState extends State<FileViewerPage> {
   LibraryFile? _file;
   String? _fileUrl;
   bool _isLoadingFile = true;
+  bool _isOfflineNotCached = false;
   final _downloadService = DownloadService();
   bool _isCheckingUpdate = false;
   String? _localIconPath;
@@ -71,6 +73,58 @@ class _FileViewerPageState extends State<FileViewerPage> {
   Future<void> _loadFileData() async {
     final provider = Provider.of<LibraryProvider>(context, listen: false);
     final fallbackFile = _buildFallbackFile();
+    final fileType = widget.fileType.toLowerCase();
+    final isVideo =
+        fileType == 'mp4' || fileType == 'mov' || fileType == 'video';
+
+    final offlinePath = !isVideo
+        ? OfflineStorageService.getFilePath(widget.fileId)
+        : null;
+    final hasOffline = offlinePath != null;
+
+    if (hasOffline) {
+      final offlineMetadata = OfflineStorageService.getMetadata(widget.fileId);
+      final localIconPath = offlineMetadata?.localIconPath;
+
+      if (kDebugMode) {
+        debugPrint('💾 File available offline: ${widget.fileName}');
+      }
+
+      final file = fallbackFile;
+      _file = file;
+
+      if (file.isTextFile) {
+        final content = await _readOfflineText(offlinePath);
+        if (mounted) {
+          setState(() {
+            _file = file.copyWith(textContent: content);
+            _localIconPath = localIconPath;
+            _isLoadingFile = false;
+            _isAvailableOffline = true;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _fileUrl = offlinePath;
+            _localIconPath = localIconPath;
+            _isLoadingFile = false;
+            _isAvailableOffline = true;
+          });
+        }
+      }
+      return;
+    }
+
+    if (!ConnectivityService.instance.isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOfflineNotCached = true;
+          _isLoadingFile = false;
+        });
+      }
+      return;
+    }
 
     try {
       final fetchedFile = await provider.getFile(widget.fileId);
@@ -83,63 +137,41 @@ class _FileViewerPageState extends State<FileViewerPage> {
 
       _file = file;
 
-      // Check if it's a video or audio file
-      final isVideo = file.fileType?.toLowerCase() == 'video';
       final isAudio = file.fileType?.toLowerCase() == 'audio';
-
-      // Check if file is available offline for all non-video files.
-      // Text files are stored as bytes and decoded back when offline.
-      final shouldCheckOffline = !isVideo;
-      final offlinePath = shouldCheckOffline
-          ? OfflineStorageService.getFilePath(widget.fileId)
-          : null;
-      final hasOffline = offlinePath != null;
       final offlineMetadata = OfflineStorageService.getMetadata(widget.fileId);
       final localIconPath = offlineMetadata?.localIconPath;
 
       if (isVideo) {
-        // For video files, use storagePath directly (YouTube URL)
         if (kDebugMode) {
           debugPrint('🎥 Video file - using storagePath: ${file.storagePath}');
         }
 
-        if (mounted) {
-          setState(() {
-            _fileUrl = file.storagePath; // Use storagePath as YouTube URL
-            _isLoadingFile = false;
-          });
-        }
-      } else if (hasOffline && file.isTextFile) {
-        // Use offline cached bytes for text files when network content is unavailable.
-        final content = await _readOfflineText(offlinePath);
-
-        if (mounted) {
-          setState(() {
-            _file = file.copyWith(textContent: content);
-            _localIconPath = localIconPath;
-            _isLoadingFile = false;
-            _isAvailableOffline = true;
-          });
-        }
-      } else if (hasOffline) {
-        // Use offline cached file for PDFs, images, and audio.
-        if (kDebugMode) {
-          debugPrint('💾 Using offline cached file: $offlinePath');
+        if (file.storagePath == null || file.storagePath!.isEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+              '❌ Video storagePath is null or empty, showing not cached',
+            );
+          }
+          if (mounted) {
+            setState(() {
+              _isOfflineNotCached = true;
+              _isLoadingFile = false;
+            });
+          }
+          return;
         }
 
         if (mounted) {
           setState(() {
-            _fileUrl = offlinePath; // Use local file path directly
-            _localIconPath = localIconPath;
+            _fileUrl = file.storagePath;
             _isLoadingFile = false;
-            _isAvailableOffline = true; // Set offline status immediately
           });
         }
       } else if (isAudio) {
-        // For audio files, get signed URL from Supabase storage
         if (kDebugMode) {
           debugPrint('🎵 Audio file - getting signed URL');
         }
+
         final url = await provider.getFileUrl(widget.fileId);
         if (kDebugMode) {
           debugPrint('🔗 Generated signed URL for audio: $url');
@@ -154,6 +186,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
         }
       } else if (!file.isTextFile) {
         // Get signed URL for non-video, non-text files
+        if (!ConnectivityService.instance.isOnline) {
+          if (mounted) {
+            setState(() {
+              _isOfflineNotCached = true;
+              _isLoadingFile = false;
+            });
+          }
+          return;
+        }
+
         final url = await provider.getFileUrl(widget.fileId);
         if (kDebugMode) {
           debugPrint('🔗 Generated signed URL: $url');
@@ -168,6 +210,16 @@ class _FileViewerPageState extends State<FileViewerPage> {
         }
       } else {
         // For text files, load content from storage if text_content is empty
+        if (!ConnectivityService.instance.isOnline) {
+          if (mounted) {
+            setState(() {
+              _isOfflineNotCached = true;
+              _isLoadingFile = false;
+            });
+          }
+          return;
+        }
+
         final textContent = await provider.getTextFileContent(widget.fileId);
         if (kDebugMode) {
           debugPrint(
@@ -644,6 +696,52 @@ class _FileViewerPageState extends State<FileViewerPage> {
   Widget _buildFileViewerContent() {
     if (_isLoadingFile) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_isOfflineNotCached) {
+      final theme = Theme.of(context);
+      final isDark = theme.brightness == Brightness.dark;
+      final secondaryColor = isDark
+          ? AppColors.textSecondaryDark
+          : AppColors.textSecondaryLight;
+
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.cloud_off,
+                size: 80,
+                color: secondaryColor.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Device is offline',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'This file is not downloaded.\nPlease go online to access it.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: secondaryColor),
+              ),
+              const SizedBox(height: 32),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Go Back'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     if (_file == null) {

@@ -248,7 +248,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               child: CircularProgressIndicator(),
             ),
           )
-        else if (provider.hasError && !isOnline && folders.isEmpty)
+        else if (!isOnline)
           _buildOfflineLibraryContent(theme, isDark, provider)
         else if (provider.hasError && folders.isEmpty)
           Center(

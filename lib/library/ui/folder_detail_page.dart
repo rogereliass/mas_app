@@ -171,8 +171,8 @@ class _FolderDetailPageState extends State<FolderDetailPage>
                 child: CircularProgressIndicator(),
               ),
             )
-          // Error state
-          else if (provider.hasError && !isOnline && !hasCachedContent)
+          // Offline state - show downloaded files directly
+          else if (!isOnline)
             _buildOfflineDownloads(provider)
           else if (provider.hasError && !hasCachedContent)
             Center(

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../../core/constants/app_colors.dart';
@@ -102,10 +103,30 @@ class _AboutPageState extends State<AboutPage> {
   }
 }
 
-class AboutContent extends StatelessWidget {
+class AboutContent extends StatefulWidget {
   final bool isDark;
 
   const AboutContent({super.key, required this.isDark});
+
+  @override
+  State<AboutContent> createState() => _AboutContentState();
+}
+
+class _AboutContentState extends State<AboutContent> {
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = '${info.version}+${info.buildNumber}';
+    });
+  }
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -117,6 +138,7 @@ class AboutContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = widget.isDark;
 
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
@@ -350,7 +372,7 @@ class AboutContent extends StatelessWidget {
                 children: [
                   _buildStatRow(
                     'Build Ver',
-                    '1.0.0+4',
+                    _version ?? '...',
                     icon: Icons.info_outline,
                     isDark: isDark,
                   ),

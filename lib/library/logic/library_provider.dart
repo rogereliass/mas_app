@@ -6,9 +6,11 @@ import '../../core/services/connectivity_service.dart';
 import '../../core/data/persistent_query_cache.dart';
 import '../../core/utils/ttl_cache.dart';
 import '../../offline/offline_storage.dart';
+import '../../offline/offline_action_queue.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Library Provider
-/// 
+///
 /// Manages state for the Library module
 /// Handles loading states, errors, and caching
 /// Implements role-based file filtering
@@ -17,8 +19,31 @@ class LibraryProvider with ChangeNotifier {
   final AuthProvider? _authProvider;
 
   LibraryProvider({LibraryService? service, AuthProvider? authProvider})
-      : _service = service ?? LibraryService.instance(),
-        _authProvider = authProvider;
+    : _service = service ?? LibraryService.instance(),
+      _authProvider = authProvider {
+    _registerOfflineQueueHandler();
+  }
+
+  static void _registerOfflineQueueHandler() {
+    OfflineActionQueue.instance.registerValidator('library_report', (payload) {
+      return payload['user_id'] is String &&
+          payload['title'] is String &&
+          payload['description'] is String &&
+          payload['content_type'] is String &&
+          payload['report_type'] is String;
+    });
+
+    OfflineActionQueue.instance.registerHandler('library_report', (
+      payload,
+    ) async {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User session expired. Please log in again.');
+      }
+
+      await Supabase.instance.client.from('library_reports').insert(payload);
+    });
+  }
 
   // ==================== STATE ====================
 
@@ -42,13 +67,13 @@ class LibraryProvider with ChangeNotifier {
   // Cache for folders and files
   final Map<String, LibraryFolder> _folderCache = {};
   final Map<String, LibraryFile> _fileCache = {};
-  
+
   // TTL caching - track timestamps for existing caches
   static const Duration _rootContentsTtl = Duration(minutes: 3);
   static const Duration _folderContentsTtl = Duration(minutes: 2);
   static const Duration _fileMetadataTtl = Duration(minutes: 10);
   static const Duration _signedUrlTtl = Duration(minutes: 50);
-  
+
   DateTime? _rootContentsTimestamp;
   final Map<String, DateTime> _folderTimestamps = {};
   final Map<String, DateTime> _fileTimestamps = {};
@@ -66,7 +91,8 @@ class LibraryProvider with ChangeNotifier {
 
   List<LibraryFolder> get rootFolders => _rootFolders;
   List<LibraryFile> get recentFiles => _recentFiles;
-  List<OfflineFileMetadata> get offlineFiles => List.unmodifiable(_offlineFiles);
+  List<OfflineFileMetadata> get offlineFiles =>
+      List.unmodifiable(_offlineFiles);
   bool get hasOfflineFiles => _offlineFiles.isNotEmpty;
 
   LibraryFolder? get currentFolder => _currentFolder;
@@ -81,30 +107,32 @@ class LibraryProvider with ChangeNotifier {
   String? get error => _error;
 
   // ==================== ROLE-BASED FILTERING ====================
-  
+
   /// Filter files based on current user's role rank
   /// Only returns files where user's roleRank >= file's minRoleRank
   /// Public files (minRoleRank = 0) are always visible
   List<LibraryFile> _filterFilesByRole(List<LibraryFile> files) {
     final userRoleRank = _authProvider?.currentUserRoleRank ?? 0;
-    
+
     final filtered = files.where((file) {
       // Public files (minRoleRank = 0) are always visible
       if (file.minRoleRank == 0) return true;
-      
+
       // Check if user has sufficient rank
       return userRoleRank >= file.minRoleRank;
     }).toList();
-    
+
     if (filtered.length < files.length) {
       if (kDebugMode) {
-        debugPrint('🔒 Filtered ${files.length - filtered.length} files based on role (user rank: $userRoleRank)');
+        debugPrint(
+          '🔒 Filtered ${files.length - filtered.length} files based on role (user rank: $userRoleRank)',
+        );
       }
     }
-    
+
     return filtered;
   }
-  
+
   /// Check if current user can access a specific file
   /// Returns true if file is public or user has sufficient rank
   bool _canAccessFile(LibraryFile file) {
@@ -119,11 +147,11 @@ class LibraryProvider with ChangeNotifier {
   /// Called on Library home page
   Future<void> loadRootContents({bool forceRefresh = false}) async {
     if (_isLoadingRoot) return;
-    
+
     _isLoadingRoot = true;
     _error = null;
     notifyListeners();
-    
+
     // Check cache if not forcing refresh
     if (!forceRefresh && _rootContentsTimestamp != null) {
       final now = DateTime.now();
@@ -131,7 +159,9 @@ class LibraryProvider with ChangeNotifier {
       if (elapsed < _rootContentsTtl && _rootFolders.isNotEmpty) {
         _isLoadingRoot = false;
         if (kDebugMode) {
-          debugPrint('📦 Using cached root contents (age: ${elapsed.inSeconds}s)');
+          debugPrint(
+            '📦 Using cached root contents (age: ${elapsed.inSeconds}s)',
+          );
         }
         notifyListeners();
         return;
@@ -164,9 +194,9 @@ class LibraryProvider with ChangeNotifier {
 
     try {
       final result = await _service.fetchRootContents(recentFilesLimit: 10);
-      
+
       _rootFolders = result.folders;
-      
+
       // Filter files based on user role BEFORE setting state
       final allRecentFiles = result.recentFiles;
       _recentFiles = _filterFilesByRole(allRecentFiles);
@@ -181,7 +211,7 @@ class LibraryProvider with ChangeNotifier {
         _fileCache[file.id] = file;
         _fileTimestamps[file.id] = DateTime.now();
       }
-      
+
       // Mark root contents as cached
       _rootContentsTimestamp = DateTime.now();
 
@@ -199,7 +229,9 @@ class LibraryProvider with ChangeNotifier {
         final roleRank = _authProvider?.currentUserRoleRank ?? 0;
         final hasLeak = await _service.hasRlsLeakForRole(roleRank);
         if (hasLeak) {
-          debugPrint('⚠️ RLS may be disabled: higher-rank files were visible to current user');
+          debugPrint(
+            '⚠️ RLS may be disabled: higher-rank files were visible to current user',
+          );
         } else {
           debugPrint('✅ RLS check passed or no higher-rank files found');
         }
@@ -227,25 +259,30 @@ class LibraryProvider with ChangeNotifier {
 
   /// Load folder contents (subfolders and files)
   /// Called when navigating into a folder
-  Future<void> loadFolderContents(String folderId, {bool forceRefresh = false}) async {
+  Future<void> loadFolderContents(
+    String folderId, {
+    bool forceRefresh = false,
+  }) async {
     if (_isLoadingFolder) return;
-    
+
     _isLoadingFolder = true;
     _error = null;
     _fileOffset = 0;
     _hasMoreFiles = true;
     notifyListeners();
-    
+
     // Check cache if not forcing refresh and not currently viewing different folder
-    if (!forceRefresh && 
-        _currentFolder?.id == folderId && 
+    if (!forceRefresh &&
+        _currentFolder?.id == folderId &&
         _folderTimestamps.containsKey(folderId)) {
       final now = DateTime.now();
       final elapsed = now.difference(_folderTimestamps[folderId]!);
       if (elapsed < _folderContentsTtl && _currentFiles.isNotEmpty) {
         _isLoadingFolder = false;
         if (kDebugMode) {
-          debugPrint('📦 Using cached folder contents for $folderId (age: ${elapsed.inSeconds}s)');
+          debugPrint(
+            '📦 Using cached folder contents for $folderId (age: ${elapsed.inSeconds}s)',
+          );
         }
         notifyListeners();
         return;
@@ -294,9 +331,9 @@ class LibraryProvider with ChangeNotifier {
         fileLimit: _defaultFilePageSize,
         fileOffset: _fileOffset,
       );
-      
+
       _currentSubfolders = result.subfolders;
-      
+
       // Filter files based on user role BEFORE setting state
       final allFiles = result.files;
       _currentFiles = _filterFilesByRole(allFiles);
@@ -312,7 +349,7 @@ class LibraryProvider with ChangeNotifier {
         _fileCache[file.id] = file;
         _fileTimestamps[file.id] = DateTime.now();
       }
-      
+
       // Mark folder contents as cached
       _folderTimestamps[folderId] = DateTime.now();
 
@@ -403,25 +440,34 @@ class LibraryProvider with ChangeNotifier {
 
   /// Get file by ID from cache or fetch from server
   /// Returns null if file not found OR user doesn't have access
-  Future<LibraryFile?> getFile(String fileId, {bool forceRefresh = false}) async {
+  Future<LibraryFile?> getFile(
+    String fileId, {
+    bool forceRefresh = false,
+  }) async {
     // Check cache first (with TTL)
-    if (!forceRefresh && _fileCache.containsKey(fileId) && _fileTimestamps.containsKey(fileId)) {
+    if (!forceRefresh &&
+        _fileCache.containsKey(fileId) &&
+        _fileTimestamps.containsKey(fileId)) {
       final now = DateTime.now();
       final elapsed = now.difference(_fileTimestamps[fileId]!);
-      
+
       if (elapsed < _fileMetadataTtl) {
         final file = _fileCache[fileId]!;
-        
+
         // Verify access even for cached files
         if (!_canAccessFile(file)) {
           if (kDebugMode) {
-            debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+            debugPrint(
+              '🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})',
+            );
           }
           return null;
         }
-        
+
         if (kDebugMode) {
-          debugPrint('📦 Using cached file metadata for $fileId (age: ${elapsed.inMinutes}min)');
+          debugPrint(
+            '📦 Using cached file metadata for $fileId (age: ${elapsed.inMinutes}min)',
+          );
         }
         return file;
       }
@@ -433,15 +479,17 @@ class LibraryProvider with ChangeNotifier {
       if (file != null) {
         _fileCache[fileId] = file;
         _fileTimestamps[fileId] = DateTime.now();
-        
+
         // Verify access to fetched file
         if (!_canAccessFile(file)) {
           if (kDebugMode) {
-            debugPrint('🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})');
+            debugPrint(
+              '🔒 Access denied to file $fileId (requires rank ${file.minRoleRank})',
+            );
           }
           return null;
         }
-        
+
         return file;
       }
       return null;
@@ -468,7 +516,7 @@ class LibraryProvider with ChangeNotifier {
       if (file.isTextFile) {
         return null;
       }
-      
+
       // Check signed URL cache
       if (!forceRefresh) {
         final cachedUrl = _signedUrlCache.get(fileId);
@@ -481,17 +529,17 @@ class LibraryProvider with ChangeNotifier {
       }
 
       final url = await _service.getFileSignedUrl(file);
-      
+
       if (url == null || url.isEmpty) {
         if (kDebugMode) {
           debugPrint('⚠️ No URL generated for file: ${file.title}');
         }
         return null;
       }
-      
+
       // Cache signed URL (50min TTL)
       _signedUrlCache.set(fileId, url, _signedUrlTtl);
-      
+
       return url;
     } catch (e) {
       _logError('getFileUrl', e);
@@ -509,7 +557,9 @@ class LibraryProvider with ChangeNotifier {
       // If text_content is populated in database, use it
       if (file.textContent != null && file.textContent!.isNotEmpty) {
         if (kDebugMode) {
-          debugPrint('✅ Using text_content from database (${file.textContent!.length} chars)');
+          debugPrint(
+            '✅ Using text_content from database (${file.textContent!.length} chars)',
+          );
         }
         return file.textContent;
       }
@@ -614,8 +664,12 @@ class LibraryProvider with ChangeNotifier {
 
   Map<String, dynamic> _buildRootSnapshotPayload() {
     return <String, dynamic>{
-      'folders': _rootFolders.map((folder) => folder.toJson()).toList(growable: false),
-      'recent_files': _recentFiles.map((file) => file.toJson()).toList(growable: false),
+      'folders': _rootFolders
+          .map((folder) => folder.toJson())
+          .toList(growable: false),
+      'recent_files': _recentFiles
+          .map((file) => file.toJson())
+          .toList(growable: false),
     };
   }
 
@@ -626,7 +680,9 @@ class LibraryProvider with ChangeNotifier {
       'subfolders': _currentSubfolders
           .map((folder) => folder.toJson())
           .toList(growable: false),
-      'files': _currentFiles.map((file) => file.toJson()).toList(growable: false),
+      'files': _currentFiles
+          .map((file) => file.toJson())
+          .toList(growable: false),
       'file_offset': _fileOffset,
       'has_more_files': _hasMoreFiles,
     };
@@ -722,23 +778,24 @@ class LibraryProvider with ChangeNotifier {
       return;
     }
 
-    final files = OfflineStorageService.getAllOfflineFiles()
-        .where((file) {
-          if (!OfflineStorageService.isAvailableOffline(file.fileId)) {
-            return false;
-          }
+    final files =
+        OfflineStorageService.getAllOfflineFiles()
+            .where((file) {
+              if (!OfflineStorageService.isAvailableOffline(file.fileId)) {
+                return false;
+              }
 
-          final cachedFile = _fileCache[file.fileId];
-          if (cachedFile == null) {
-            // Allow authenticated users to see downloaded files even after
-            // cold restart when in-memory metadata has not been hydrated yet.
-            return true;
-          }
+              final cachedFile = _fileCache[file.fileId];
+              if (cachedFile == null) {
+                // Allow authenticated users to see downloaded files even after
+                // cold restart when in-memory metadata has not been hydrated yet.
+                return true;
+              }
 
-          return _canAccessFile(cachedFile);
-        })
-        .toList(growable: false)
-      ..sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+              return _canAccessFile(cachedFile);
+            })
+            .toList(growable: false)
+          ..sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
 
     _offlineFiles = files;
 
@@ -746,7 +803,7 @@ class LibraryProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Re-apply role-based filtering to current data
   /// Call this when user authentication state changes (login/logout)
   void refreshFiltering() {
@@ -757,7 +814,7 @@ class LibraryProvider with ChangeNotifier {
           .toList();
       _recentFiles = _filterFilesByRole(allRecentFiles);
     }
-    
+
     // Re-filter current folder files
     if (_currentFiles.isNotEmpty) {
       final allCurrentFiles = _fileCache.values
@@ -765,11 +822,12 @@ class LibraryProvider with ChangeNotifier {
           .toList();
       _currentFiles = _filterFilesByRole(allCurrentFiles);
     }
-    
+
     if (kDebugMode) {
-      debugPrint('🔄 Reapplied role-based filtering (user rank: ${_authProvider?.currentUserRoleRank ?? 0})');
+      debugPrint(
+        '🔄 Reapplied role-based filtering (user rank: ${_authProvider?.currentUserRoleRank ?? 0})',
+      );
     }
     notifyListeners();
   }
 }
-

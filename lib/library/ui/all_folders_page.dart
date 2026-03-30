@@ -59,9 +59,9 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
 
     return Scaffold(
       appBar: _buildAppBar(context),
-        body: provider.isLoadingRoot
+      body: provider.isLoadingRoot
           ? const Center(child: CircularProgressIndicator())
-          : provider.hasError && !isOnline && allFolders.isEmpty
+          : !isOnline
           ? _buildOfflineDownloadsState(theme, provider)
           : provider.hasError && allFolders.isEmpty
           ? Center(
@@ -380,7 +380,8 @@ class _AllFoldersPageState extends State<AllFoldersPage> {
                 fileName: file.fileName,
                 fileType: fileType,
                 fileSize: _formatFileSize(file.sizeBytes),
-                lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+                lastModified:
+                    'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
                 onTap: () {
                   AppRouter.goToFileViewer(
                     context,
