@@ -86,26 +86,27 @@ class AttendanceProvider with ChangeNotifier {
     return DateTime(now.year, now.month, now.day);
   }
 
-  bool _isBeforeToday(DateTime meetingDate) {
+
+  bool _isOnOrBeforeToday(DateTime meetingDate) {
     final localDate = meetingDate.toLocal();
     final meetingDay = DateTime(localDate.year, localDate.month, localDate.day);
-    return meetingDay.isBefore(_todayLocalStart);
+    return !meetingDay.isAfter(_todayLocalStart);
   }
 
-  Iterable<MyAttendanceLog> get _pastLogs =>
-      _myLogs.where((log) => _isBeforeToday(log.meeting.meetingDate));
+  Iterable<MyAttendanceLog> get _includedLogs =>
+      _myLogs.where((log) => _isOnOrBeforeToday(log.meeting.meetingDate));
 
-  List<MyAttendanceLog> get pastMyLogs => List.unmodifiable(_pastLogs.toList());
+  List<MyAttendanceLog> get includedLogs => List.unmodifiable(_includedLogs.toList());
 
   AttendanceStatus _statusForScoutLog(MyAttendanceLog log) {
     return log.record?.status ?? AttendanceStatus.absent;
   }
 
   int _countRecordedStatus(AttendanceStatus status) {
-    return _pastLogs.where((log) => _statusForScoutLog(log) == status).length;
+    return _includedLogs.where((log) => _statusForScoutLog(log) == status).length;
   }
 
-  int get scoutTotalPastMeetings => _pastLogs.length;
+  int get scoutTotalPastMeetings => _includedLogs.length;
   int get scoutPresentCount => _countRecordedStatus(AttendanceStatus.present);
   int get scoutAbsentCount => _countRecordedStatus(AttendanceStatus.absent);
   int get scoutLateCount => _countRecordedStatus(AttendanceStatus.late);

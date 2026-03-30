@@ -47,7 +47,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           }
 
           final provider = Provider.of<LibraryProvider>(context, listen: false);
-          if (!provider.isLoadingRoot && (provider.hasError || provider.rootFolders.isEmpty)) {
+          if (!provider.isLoadingRoot &&
+              (provider.hasError || provider.rootFolders.isEmpty)) {
             provider.loadRootContents(forceRefresh: true);
           }
         });
@@ -190,7 +191,7 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
           // Resource Library section
           _buildFoldersSection(),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 170),
         ],
       ),
     );
@@ -286,61 +287,28 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
             ),
           )
         else
-          Column(
-            children: [
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: folders.length > 5 ? 5 : folders.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final folder = folders[index];
-                  return FolderCard(
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: folders.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final folder = folders[index];
+              return FolderCard(
+                folderId: folder.id,
+                folderName: folder.name,
+                description: folder.description,
+                itemCount: folder.itemCount,
+                onTap: () {
+                  AppRouter.goToFolder(
+                    context,
                     folderId: folder.id,
                     folderName: folder.name,
-                    description: folder.description,
-                    itemCount: folder.itemCount,
-                    onTap: () {
-                      AppRouter.goToFolder(
-                        context,
-                        folderId: folder.id,
-                        folderName: folder.name,
-                      );
-                    },
                   );
                 },
-              ),
-              if (folders.length > 5)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, AppRouter.allFolders);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                      side: BorderSide(
-                        color: isDark
-                            ? AppColors.goldAccent
-                            : theme.colorScheme.primary,
-                      ),
-                    ),
-                    child: Text(
-                      'View All Folders',
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.goldAccent
-                            : theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+              );
+            },
           ),
       ],
     );
@@ -375,7 +343,9 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               Text(
                 'No downloaded library files are available on this device yet.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.sectionHeaderGray : Colors.grey[600],
+                  color: isDark
+                      ? AppColors.sectionHeaderGray
+                      : Colors.grey[600],
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -423,7 +393,8 @@ class _LibraryHomePageState extends State<LibraryHomePage> {
               fileName: file.fileName,
               fileType: _inferFileType(file.fileName),
               fileSize: _formatFileSize(file.sizeBytes),
-              lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+              lastModified:
+                  'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
               onTap: () {
                 AppRouter.goToFileViewer(
                   context,

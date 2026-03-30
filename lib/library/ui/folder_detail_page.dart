@@ -36,7 +36,6 @@ class FolderDetailPage extends StatefulWidget {
 
 class _FolderDetailPageState extends State<FolderDetailPage>
     with WidgetsBindingObserver {
-  bool _isGridView = false;
   bool _hasLoadedInitially = false;
 
   @override
@@ -282,7 +281,8 @@ class _FolderDetailPageState extends State<FolderDetailPage>
               fileName: file.fileName,
               fileType: fileType,
               fileSize: _formatFileSize(file.sizeBytes),
-              lastModified: 'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
+              lastModified:
+                  'Downloaded ${_formatDownloadedDate(file.downloadedAt)}',
               onTap: () {
                 AppRouter.goToFileViewer(
                   context,
@@ -462,14 +462,6 @@ class _FolderDetailPageState extends State<FolderDetailPage>
                     icon: const Icon(Icons.filter_list),
                     onPressed: () {
                       // TODO: Show filter options
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-                    onPressed: () {
-                      setState(() {
-                        _isGridView = !_isGridView;
-                      });
                     },
                   ),
                 ],

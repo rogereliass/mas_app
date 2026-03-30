@@ -110,7 +110,7 @@ class _UserScoreCardState extends State<UserScoreCard>
     final int percentage = (attendanceRate * 100).round();
 
     // Keep history aligned with the same "before today" cutoff used by stats.
-    final history = attendanceProvider.pastMyLogs.take(6).toList();
+    final history = attendanceProvider.includedLogs.take(6).toList();
 
     return SmartStackCardBase(
       icon: Icons.auto_graph_rounded,

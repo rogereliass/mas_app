@@ -625,16 +625,6 @@ class _FileViewerPageState extends State<FileViewerPage> {
             ),
         ],
         IconButton(
-          icon: Icon(
-            Icons.info_outline,
-            color: widget.fileType.toLowerCase() == 'video'
-                ? AppColors.goldAccent
-                : null,
-          ),
-          onPressed: _showMetadataSheet,
-          tooltip: 'File Info',
-        ),
-        IconButton(
           icon: const Icon(Icons.flag_outlined),
           onPressed: () {
             LibraryReportDialog.show(
@@ -701,27 +691,36 @@ class _FileViewerPageState extends State<FileViewerPage> {
       return _buildTextViewerSection();
     }
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          _buildFilePreview(),
-          const SizedBox(height: 24),
-          _buildFileInfo(),
-          const SizedBox(height: 24),
-          if (_file?.description != null &&
-              _file!.description!.trim().isNotEmpty) ...[
-            _buildDescription(),
-            const SizedBox(height: 24),
-          ],
-          if (_file!.tags != null && _file!.tags!.isNotEmpty) ...[
-            _buildTags(),
-            const SizedBox(height: 24),
-          ],
-          const SizedBox(height: 32),
-        ],
-      ),
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              _buildFilePreview(),
+              const SizedBox(height: 24),
+              _buildFileInfo(),
+              const SizedBox(height: 24),
+              if (_file?.description != null &&
+                  _file!.description!.trim().isNotEmpty) ...[
+                _buildDescription(),
+                const SizedBox(height: 24),
+              ],
+              if (_file!.tags != null && _file!.tags!.isNotEmpty) ...[
+                _buildTags(),
+                const SizedBox(height: 24),
+              ],
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: _buildInfoButton(icon: Icons.audiotrack),
+        ),
+      ],
     );
   }
 
@@ -797,9 +796,18 @@ class _FileViewerPageState extends State<FileViewerPage> {
     );
   }
 
-  /// Build video viewer section - fullscreen video without overlay
+  /// Build video viewer section - fullscreen video with info FAB
   Widget _buildVideoViewerSection() {
-    return _buildFileViewer('video');
+    return Stack(
+      children: [
+        _buildFileViewer('video'),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: _buildInfoButton(icon: Icons.play_circle_outline),
+        ),
+      ],
+    );
   }
 
   /// Build text viewer section with floating info button
