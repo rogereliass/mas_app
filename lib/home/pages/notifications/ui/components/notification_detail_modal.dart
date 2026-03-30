@@ -52,12 +52,28 @@ class NotificationDetailModal extends StatelessWidget {
                           children: [
                             _TypeBadge(type: entry.notification.type),
                             const SizedBox(height: 6),
-                            Text(
-                              DateFormat('MMM d, yyyy • h:mm a').format(
-                                entry.notification.createdAt,
+                            if (entry.notification.type ==
+                                    NotificationType.announcement &&
+                                entry.notification.senderName != null) ...[
+                              Text(
+                                'From: ${entry.notification.senderName}',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 4),
+                            ],
+                            Text(
+                              DateFormat(
+                                'MMM d, yyyy • h:mm a',
+                              ).format(entry.notification.createdAt),
                               style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.6,
+                                ),
                                 fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
@@ -71,7 +87,8 @@ class NotificationDetailModal extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     style: IconButton.styleFrom(
-                      backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      backgroundColor: colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -86,7 +103,9 @@ class NotificationDetailModal extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.4,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: colorScheme.outline.withValues(alpha: 0.1),
@@ -152,8 +171,9 @@ class NotificationDetailModal extends StatelessWidget {
                     ),
                   ),
                   child: SelectableText(
-                    const JsonEncoder.withIndent('  ')
-                        .convert(entry.notification.data),
+                    const JsonEncoder.withIndent(
+                      '  ',
+                    ).convert(entry.notification.data),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontFamily: 'monospace',
@@ -227,9 +247,7 @@ class _TypeBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Text(
         _typeLabel(type).toUpperCase(),

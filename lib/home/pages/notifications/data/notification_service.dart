@@ -51,17 +51,28 @@ class NotificationService {
             created_at,
             season_id,
             target_type,
-            target_id
+            target_id,
+            sender:profiles!notifications_created_by_profile_id_fkey(
+              first_name,
+              middle_name,
+              last_name
+            )
           )
         ''')
         .eq('profile_id', profileId)
-        .order('created_at', referencedTable: _notificationsTable, ascending: false)
+        .order(
+          'created_at',
+          referencedTable: _notificationsTable,
+          ascending: false,
+        )
         .limit(limit);
 
     return (response as List)
-        .map((item) => NotificationRecipientEntry.fromJoinedJson(
-              Map<String, dynamic>.from(item as Map),
-            ))
+        .map(
+          (item) => NotificationRecipientEntry.fromJoinedJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
         .toList();
   }
 
@@ -97,20 +108,14 @@ class NotificationService {
   Future<void> markRecipientRead({required String recipientId}) async {
     await _supabase
         .from(_recipientsTable)
-        .update({
-          'read': true,
-          'read_at': DateTime.now().toIso8601String(),
-        })
+        .update({'read': true, 'read_at': DateTime.now().toIso8601String()})
         .eq('id', recipientId);
   }
 
   Future<void> markAllRead({required String profileId}) async {
     await _supabase
         .from(_recipientsTable)
-        .update({
-          'read': true,
-          'read_at': DateTime.now().toIso8601String(),
-        })
+        .update({'read': true, 'read_at': DateTime.now().toIso8601String()})
         .eq('profile_id', profileId)
         .eq('read', false);
   }
@@ -207,11 +212,13 @@ class NotificationService {
         )
         .toList();
 
-    await _supabase.from(_recipientsTable).upsert(
-      rows,
-      onConflict: 'notification_id,profile_id',
-      ignoreDuplicates: true,
-    );
+    await _supabase
+        .from(_recipientsTable)
+        .upsert(
+          rows,
+          onConflict: 'notification_id,profile_id',
+          ignoreDuplicates: true,
+        );
   }
 
   Future<List<NotificationTargetOption>> fetchTroopTargetOptions() async {
@@ -220,15 +227,13 @@ class NotificationService {
         .select('id, name')
         .order('name', ascending: true);
 
-    return (response as List)
-        .map((row) {
-          final map = Map<String, dynamic>.from(row as Map);
-          return NotificationTargetOption(
-            id: map['id'] as String,
-            label: (map['name'] as String? ?? '').trim(),
-          );
-        })
-        .toList();
+    return (response as List).map((row) {
+      final map = Map<String, dynamic>.from(row as Map);
+      return NotificationTargetOption(
+        id: map['id'] as String,
+        label: (map['name'] as String? ?? '').trim(),
+      );
+    }).toList();
   }
 
   Future<NotificationTargetOption?> fetchTroopTargetOptionById({
@@ -259,15 +264,13 @@ class NotificationService {
         .eq('troop_id', troopId)
         .order('name', ascending: true);
 
-    return (response as List)
-        .map((row) {
-          final map = Map<String, dynamic>.from(row as Map);
-          return NotificationTargetOption(
-            id: map['id'] as String,
-            label: (map['name'] as String? ?? '').trim(),
-          );
-        })
-        .toList();
+    return (response as List).map((row) {
+      final map = Map<String, dynamic>.from(row as Map);
+      return NotificationTargetOption(
+        id: map['id'] as String,
+        label: (map['name'] as String? ?? '').trim(),
+      );
+    }).toList();
   }
 
   Future<List<NotificationTargetOption>> fetchIndividualTargetOptions({
@@ -280,22 +283,20 @@ class NotificationService {
         .eq('signup_troop', troopId)
         .order('first_name', ascending: true);
 
-    return (response as List)
-        .map((row) {
-          final map = Map<String, dynamic>.from(row as Map);
-          final first = (map['first_name'] as String? ?? '').trim();
-          final middle = (map['middle_name'] as String? ?? '').trim();
-          final last = (map['last_name'] as String? ?? '').trim();
-          final parts = [first, middle, last].where((part) => part.isNotEmpty);
-          final displayName = parts.isNotEmpty ? parts.join(' ') : 'Unknown Member';
-          final phone = (map['phone'] as String? ?? '').trim();
-          return NotificationTargetOption(
-            id: map['id'] as String,
-            label: displayName,
-            subtitle: phone.isEmpty ? null : phone,
-          );
-        })
-        .toList();
+    return (response as List).map((row) {
+      final map = Map<String, dynamic>.from(row as Map);
+      final first = (map['first_name'] as String? ?? '').trim();
+      final middle = (map['middle_name'] as String? ?? '').trim();
+      final last = (map['last_name'] as String? ?? '').trim();
+      final parts = [first, middle, last].where((part) => part.isNotEmpty);
+      final displayName = parts.isNotEmpty ? parts.join(' ') : 'Unknown Member';
+      final phone = (map['phone'] as String? ?? '').trim();
+      return NotificationTargetOption(
+        id: map['id'] as String,
+        label: displayName,
+        subtitle: phone.isEmpty ? null : phone,
+      );
+    }).toList();
   }
 
   /// Fetch all available roles that can be targeted for notifications.
@@ -397,6 +398,7 @@ class NotificationService {
         .whereType<String>()
         .toList();
   }
+
   /// Fetch all approved profile IDs associated with a specific role slug.
   /// Role slug is matched against roles.slug.
   /// This joins profiles → profile_roles → roles and returns approved users only.
@@ -458,6 +460,7 @@ class NotificationService {
       return [];
     }
   }
+
   void _validateSenderTargetScope({
     required NotificationTargetType targetType,
     required String? targetId,
@@ -481,10 +484,13 @@ class NotificationService {
     }
 
     if (isTroopSender && targetType == NotificationTargetType.role) {
-      throw Exception('Troop roles cannot send notifications by role. Only system-wide admins can use role-based targeting.');
+      throw Exception(
+        'Troop roles cannot send notifications by role. Only system-wide admins can use role-based targeting.',
+      );
     }
 
-    if (isTroopSender && (senderTroopId == null || senderTroopId.trim().isEmpty)) {
+    if (isTroopSender &&
+        (senderTroopId == null || senderTroopId.trim().isEmpty)) {
       throw Exception('No troop scope is available for this account.');
     }
   }

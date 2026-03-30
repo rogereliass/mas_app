@@ -1,12 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-enum NotificationType {
-  system,
-  announcement,
-  meeting,
-  attendance,
-  points,
-}
+enum NotificationType { system, announcement, meeting, attendance, points }
 
 extension NotificationTypeX on NotificationType {
   String get value {
@@ -41,13 +35,7 @@ extension NotificationTypeX on NotificationType {
   }
 }
 
-enum NotificationTargetType {
-  all,
-  troop,
-  patrol,
-  individual,
-  role,
-}
+enum NotificationTargetType { all, troop, patrol, individual, role }
 
 extension NotificationTargetTypeX on NotificationTargetType {
   String get value {
@@ -93,6 +81,7 @@ class AppNotification {
   final String? seasonId;
   final NotificationTargetType targetType;
   final String? targetId;
+  final String? senderName;
 
   const AppNotification({
     required this.id,
@@ -105,6 +94,7 @@ class AppNotification {
     required this.seasonId,
     required this.targetType,
     required this.targetId,
+    this.senderName,
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
@@ -117,8 +107,8 @@ class AppNotification {
       data: data is Map<String, dynamic>
           ? data
           : data is Map
-              ? Map<String, dynamic>.from(data)
-              : <String, dynamic>{},
+          ? Map<String, dynamic>.from(data)
+          : <String, dynamic>{},
       createdByProfileId: json['created_by_profile_id'] as String?,
       createdAt:
           DateTime.tryParse(json['created_at'] as String? ?? '') ??
@@ -128,7 +118,21 @@ class AppNotification {
         json['target_type'] as String?,
       ),
       targetId: json['target_id'] as String?,
+      senderName: _parseSenderName(json['sender']),
     );
+  }
+
+  static String? _parseSenderName(dynamic sender) {
+    if (sender is! Map<String, dynamic>) return null;
+    final firstName = (sender['first_name'] as String?)?.trim() ?? '';
+    final middleName = (sender['middle_name'] as String?)?.trim() ?? '';
+    final lastName = (sender['last_name'] as String?)?.trim() ?? '';
+    final parts = [
+      firstName,
+      middleName,
+      lastName,
+    ].where((p) => p.isNotEmpty).toList();
+    return parts.isEmpty ? null : parts.join(' ');
   }
 }
 
@@ -155,10 +159,7 @@ class NotificationRecipientEntry {
     required this.notification,
   });
 
-  NotificationRecipientEntry copyWith({
-    bool? isRead,
-    DateTime? readAt,
-  }) {
+  NotificationRecipientEntry copyWith({bool? isRead, DateTime? readAt}) {
     return NotificationRecipientEntry(
       id: id,
       profileId: profileId,

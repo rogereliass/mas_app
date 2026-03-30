@@ -70,7 +70,9 @@ class FcmService {
     _currentProfileId = normalizedProfileId;
 
     if (!_isSupabaseReady()) {
-      debugPrint('FCM token sync skipped because Supabase is not initialized yet.');
+      debugPrint(
+        'FCM token sync skipped because Supabase is not initialized yet.',
+      );
       return;
     }
 
@@ -94,9 +96,7 @@ class FcmService {
       sound: true,
     );
 
-    debugPrint(
-      'FCM permission status: ${settings.authorizationStatus.name}',
-    );
+    debugPrint('FCM permission status: ${settings.authorizationStatus.name}');
 
     return settings;
   }
@@ -163,9 +163,9 @@ class FcmService {
 
   Future<void> _configureForegroundPresentation() async {
     await _messaging.setForegroundNotificationPresentationOptions(
-      alert: false,
-      badge: false,
-      sound: false,
+      alert: true,
+      badge: true,
+      sound: true,
     );
   }
 
@@ -245,7 +245,9 @@ class FcmService {
     }
 
     if (!_isSupabaseReady()) {
-      debugPrint('FCM token registration skipped: Supabase is not initialized yet.');
+      debugPrint(
+        'FCM token registration skipped: Supabase is not initialized yet.',
+      );
       return;
     }
 

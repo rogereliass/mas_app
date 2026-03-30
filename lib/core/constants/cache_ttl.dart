@@ -24,7 +24,7 @@ class CacheTtl {
   static const Duration meetingPoints = Duration(minutes: 2);
 
   /// Notifications list and unread badge data.
-  static const Duration notificationsList = Duration(minutes: 2);
+  static const Duration notificationsList = Duration(seconds: 30);
 
   /// Reference lookup data for Points tab.
   static const Duration patrols = Duration(minutes: 30);

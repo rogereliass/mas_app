@@ -92,6 +92,7 @@ class _HomeTroopStandingsCardState extends State<HomeTroopStandingsCard>
             // Premium Header
             _buildHeader(provider.activeSeasonName ?? "Season", theme, isDark),
 
+
             // Visual Podium section
             if (top3.isNotEmpty)
               _PodiumSection(
@@ -99,6 +100,10 @@ class _HomeTroopStandingsCardState extends State<HomeTroopStandingsCard>
                 allPatrols: allPatrols,
                 isDark: isDark,
               ),
+
+            // Add extra spacing between podium and remaining rows
+            if (top3.isNotEmpty && remaining.isNotEmpty)
+              const SizedBox(height: 24),
 
             // Remaining list with creative indicators
             if (remaining.isNotEmpty)

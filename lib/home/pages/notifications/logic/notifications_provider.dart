@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:masapp/core/utils/review_mode.dart';
 import 'package:masapp/routing/navigation_service.dart';
 
@@ -9,24 +9,30 @@ import '../data/models/notification_models.dart';
 import '../data/notification_repository.dart';
 import 'notification_cache_manager.dart';
 
-class NotificationsProvider with ChangeNotifier {
+class NotificationsProvider extends ChangeNotifier with WidgetsBindingObserver {
   NotificationsProvider({
     required AuthProvider authProvider,
     NotificationRepository? repository,
     NotificationCacheManager? cacheManager,
-  })  : _authProvider = authProvider,
-        _repository = repository ?? NotificationRepository(),
-        _cacheManager = cacheManager ?? NotificationCacheManager() {
+  }) : _authProvider = authProvider,
+       _repository = repository ?? NotificationRepository(),
+       _cacheManager = cacheManager ?? NotificationCacheManager() {
     _authProvider.addListener(_onAuthChanged);
     _authSignature = _buildAuthSignature();
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
   }
+
+  static const Duration _pollingInterval = Duration(seconds: 30);
 
   final AuthProvider _authProvider;
   final NotificationRepository _repository;
   final NotificationCacheManager _cacheManager;
   final Map<String, Future<void>> _inFlightLoads = <String, Future<void>>{};
+  Timer? _pollingTimer;
 
-  List<NotificationRecipientEntry> _items = const <NotificationRecipientEntry>[];
+  List<NotificationRecipientEntry> _items =
+      const <NotificationRecipientEntry>[];
   bool _isLoading = false;
   bool _isRefreshing = false;
   bool _isSending = false;
@@ -71,12 +77,39 @@ class NotificationsProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _authProvider.removeListener(_onAuthChanged);
     super.dispose();
   }
 
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(_pollingInterval, (_) {
+      if (_authProvider.currentUserProfile != null &&
+          !_authProvider.profileLoading &&
+          !_isLoading) {
+        unawaited(loadNotifications(forceRefresh: true));
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      if (_authProvider.currentUserProfile != null &&
+          !_authProvider.profileLoading) {
+        unawaited(loadNotifications(forceRefresh: true));
+      }
+    } else if (state == AppLifecycleState.paused) {
+      _pollingTimer?.cancel();
+    }
+  }
+
   Future<void> loadNotifications({bool forceRefresh = false}) async {
-    if (_authProvider.profileLoading && _authProvider.currentUserProfile == null) {
+    if (_authProvider.profileLoading &&
+        _authProvider.currentUserProfile == null) {
       _isLoading = true;
       notifyListeners();
       return;
@@ -196,12 +229,8 @@ class NotificationsProvider with ChangeNotifier {
     final now = DateTime.now();
     _items = _items
         .map(
-          (entry) => entry.isRead
-              ? entry
-              : entry.copyWith(
-                  isRead: true,
-                  readAt: now,
-                ),
+          (entry) =>
+              entry.isRead ? entry : entry.copyWith(isRead: true, readAt: now),
         )
         .toList();
     _unreadCount = 0;
@@ -273,7 +302,8 @@ class NotificationsProvider with ChangeNotifier {
     final profile = _authProvider.currentUserProfile;
     return _repository.fetchTroopTargets(
       senderRoleRank: _authProvider.selectedRoleRank,
-      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)?.trim(),
+      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)
+          ?.trim(),
     );
   }
 
@@ -283,7 +313,8 @@ class NotificationsProvider with ChangeNotifier {
     final profile = _authProvider.currentUserProfile;
     return _repository.fetchPatrolTargets(
       senderRoleRank: _authProvider.selectedRoleRank,
-      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)?.trim(),
+      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)
+          ?.trim(),
       troopId: selectedTroopId,
     );
   }
@@ -294,7 +325,8 @@ class NotificationsProvider with ChangeNotifier {
     final profile = _authProvider.currentUserProfile;
     return _repository.fetchIndividualTargets(
       senderRoleRank: _authProvider.selectedRoleRank,
-      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)?.trim(),
+      senderTroopId: (profile?.managedTroopId ?? profile?.signupTroopId)
+          ?.trim(),
       troopId: selectedTroopId,
     );
   }
@@ -370,19 +402,20 @@ class NotificationsProvider with ChangeNotifier {
     }
   }
 
-  String _mapUserFacingError(
-    Object error, {
-    required String fallback,
-  }) {
+  String _mapUserFacingError(Object error, {required String fallback}) {
     if (error is NotificationSendRateLimitException) {
       final details = error.details;
       if (details.reason == 'cooldown') {
-        final seconds = details.retryAfterSeconds < 1 ? 1 : details.retryAfterSeconds;
+        final seconds = details.retryAfterSeconds < 1
+            ? 1
+            : details.retryAfterSeconds;
         return 'Rate limit active. Please wait $seconds seconds before sending again.';
       }
 
       if (details.reason == 'daily_quota') {
-        final totalSeconds = details.retryAfterSeconds < 1 ? 1 : details.retryAfterSeconds;
+        final totalSeconds = details.retryAfterSeconds < 1
+            ? 1
+            : details.retryAfterSeconds;
         final hours = totalSeconds ~/ 3600;
         final minutes = (totalSeconds % 3600) ~/ 60;
         if (hours > 0) {
@@ -428,20 +461,27 @@ class NotificationsProvider with ChangeNotifier {
 
   void _onAuthChanged() {
     final nextSignature = _buildAuthSignature();
+
+    if (_authProvider.currentUserProfile == null) {
+      if (_authSignature != 'anonymous') {
+        _authSignature = 'anonymous';
+        _inFlightLoads.clear();
+        _cacheManager.clear();
+        _clearState();
+      }
+      return;
+    }
+
     if (_authSignature == nextSignature) {
+      if (!_authProvider.profileLoading && _items.isEmpty && !_isLoading) {
+        unawaited(loadNotifications());
+      }
       return;
     }
 
     _authSignature = nextSignature;
 
-    if (_authProvider.currentUserProfile == null) {
-      _inFlightLoads.clear();
-      _cacheManager.clear();
-      _clearState();
-      return;
-    }
-
-    if (_authProvider.profileLoading && _authProvider.currentUserProfile == null) {
+    if (_authProvider.profileLoading) {
       return;
     }
 
