@@ -177,3 +177,96 @@ void main() async {
     ),
   );
 }
+
+Future<void> restartApp() async {
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, AdminProvider>(
+          create: (context) =>
+              AdminProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? AdminProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, UserManagementProvider>(
+          create: (context) => UserManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? UserManagementProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, RoleManagementProvider>(
+          create: (context) => RoleManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? RoleManagementProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, SeasonManagementProvider>(
+          create: (context) => SeasonManagementProvider(),
+          update: (context, auth, previous) =>
+              previous ?? SeasonManagementProvider(),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, PatrolsManagementProvider>(
+          create: (context) => PatrolsManagementProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? PatrolsManagementProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, LibraryProvider>(
+          create: (context) =>
+              LibraryProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) {
+            if (previous != null) {
+              return previous;
+            }
+            return LibraryProvider(authProvider: auth);
+          },
+        ),
+        ChangeNotifierProvider(create: (_) => SeasonManagementProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, SeasonStandingsProvider>(
+          create: (context) => SeasonStandingsProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? SeasonStandingsProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, HomeOverviewStatsProvider>(
+          create: (context) => HomeOverviewStatsProvider(
+            authProvider: context.read<AuthProvider>(),
+          ),
+          update: (context, auth, previous) =>
+              previous ?? HomeOverviewStatsProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, NotificationsProvider>(
+          create: (context) =>
+              NotificationsProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? NotificationsProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, MeetingsProvider>(
+          create: (context) =>
+              MeetingsProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? MeetingsProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, AttendanceProvider>(
+          create: (context) =>
+              AttendanceProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? AttendanceProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, PointsProvider>(
+          create: (context) =>
+              PointsProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? PointsProvider(authProvider: auth),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
+}

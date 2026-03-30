@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/config/theme_config.dart';
@@ -7,33 +8,46 @@ import 'core/services/connectivity_service.dart';
 import 'routing/app_router.dart';
 import 'routing/navigation_service.dart';
 
-/// Main application widget
-///
-/// Root widget that:
-/// - Consumes ThemeProvider for theme management
-/// - Configures Material 3 with centralized theme system
-/// - Sets up navigation routing
-/// - Provides app-wide configuration
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late bool _isOnline;
+  StreamSubscription<bool>? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _isOnline = ConnectivityService.instance.isOnline;
+    _subscription = ConnectivityService.instance.statusStream.listen((online) {
+      if (!mounted) return;
+      setState(() {
+        _isOnline = online;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Listen to theme changes from ThemeProvider
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          // App identity
           title: 'Scout Digital Library',
           debugShowCheckedModeBanner: false,
           navigatorKey: NavigationService.navigatorKey,
-
-          // Theme configuration - uses centralized AppTheme
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-
-          // Navigation configuration
           initialRoute: AppRouter.startup,
           routes: AppRouter.routes,
           onGenerateRoute: AppRouter.onGenerateRoute,
@@ -41,11 +55,9 @@ class MyApp extends StatelessWidget {
           builder: (context, child) {
             if (child == null) return const SizedBox.shrink();
 
-            final isOffline = !ConnectivityService.instance.isOnline;
             final mediaQuery = MediaQuery.of(context);
 
-            // When offline, add padding at top to account for banner so AppBar isn't covered
-            final newMediaQuery = isOffline
+            final newMediaQuery = !_isOnline
                 ? mediaQuery.copyWith(
                     padding: mediaQuery.padding.copyWith(
                       top: mediaQuery.padding.top + 40,
@@ -58,9 +70,9 @@ class MyApp extends StatelessWidget {
               child: Stack(
                 children: [
                   child,
-                  if (isOffline)
+                  if (!_isOnline)
                     Positioned(
-                      top: mediaQuery.padding.top, // Position below status bar
+                      top: mediaQuery.padding.top,
                       left: 0,
                       right: 0,
                       child: SizedBox(

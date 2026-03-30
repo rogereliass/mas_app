@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher.dart'
+    show LaunchMode, canLaunchUrl, launchUrl;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../core/config/theme_provider.dart';
 import '../../routing/app_router.dart';
+import '../../main.dart' show restartApp;
 
 /// Reusable Settings Dialog Widget
 ///
@@ -20,6 +22,7 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   String? _version;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -53,18 +56,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               padding: const EdgeInsets.fromLTRB(24, 24, 16, 16),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.settings,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24,
-                    ),
-                  ),
+                  _AnimatedSettingsIcon(colorScheme: colorScheme),
                   const SizedBox(width: 12),
                   Text(
                     'Settings',
@@ -82,6 +74,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 ],
               ),
             ),
+
             const Divider(height: 1),
 
             // Scrollable Settings Content
@@ -96,13 +89,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       title: 'Appearance',
                       icon: Icons.palette_outlined,
                       children: [
-                        _SettingItem(
-                          icon: Icons.brightness_6_outlined,
-                          title: 'Theme',
-                          subtitle: _getThemeModeLabel(themeProvider.themeMode),
-                          onTap: () =>
-                              _showThemeSelector(context, themeProvider),
-                        ),
+                        _AnimatedThemeToggle(themeProvider: themeProvider),
                       ],
                     ),
 
@@ -209,30 +196,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       icon: Icons.info_outline,
                       children: [
                         _SettingItem(
-                          icon: Icons.privacy_tip_outlined,
-                          title: 'Privacy Policy',
-                          subtitle: 'View our privacy policy',
-                          onTap: () {
-                            // TODO: Show privacy policy
-                            Navigator.pop(context);
-                          },
-                        ),
-                        _SettingItem(
-                          icon: Icons.description_outlined,
-                          title: 'Terms of Service',
-                          subtitle: 'View terms and conditions',
-                          onTap: () {
-                            // TODO: Show terms
-                            Navigator.pop(context);
-                          },
-                        ),
-                        _SettingItem(
-                          icon: Icons.update_outlined,
-                          title: 'App Version',
-                          subtitle: _version ?? '...',
-                          onTap: null, // Non-interactive
-                        ),
-                        _SettingItem(
                           icon: Icons.info_rounded,
                           title: 'About App',
                           subtitle: 'Learn more about this app',
@@ -240,6 +203,35 @@ class _SettingsDialogState extends State<SettingsDialog> {
                             Navigator.pop(context);
                             Navigator.pushNamed(context, AppRouter.about);
                           },
+                        ),
+                        _SettingItem(
+                          icon: Icons.privacy_tip_outlined,
+                          title: 'Privacy Policy',
+                          subtitle: 'View our privacy policy',
+                          onTap: () async {
+                            Navigator.pop(context);
+                            final uri = Uri.parse(
+                              'https://sites.google.com/view/masdigitalteam/app/privacy-policy?authuser=0',
+                            );
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
+                          },
+                        ),
+                        _SettingItem(
+                          icon: Icons.refresh,
+                          title: 'Reload App',
+                          subtitle: 'Restart the app (cold start)',
+                          onTap: () => restartApp(),
+                        ),
+                        _SettingItem(
+                          icon: Icons.update_outlined,
+                          title: 'App Version',
+                          subtitle: _version ?? '...',
+                          onTap: null,
                         ),
                       ],
                     ),
@@ -251,17 +243,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
         ),
       ),
     );
-  }
-
-  String _getThemeModeLabel(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return 'Light Mode';
-      case ThemeMode.dark:
-        return 'Dark Mode';
-      case ThemeMode.system:
-        return 'System Default';
-    }
   }
 
   /// Show logout confirmation dialog
@@ -323,78 +304,191 @@ class _SettingsDialogState extends State<SettingsDialog> {
     );
 
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       debugPrint('Could not launch email client');
     }
   }
+}
 
-  void _showThemeSelector(BuildContext context, ThemeProvider themeProvider) {
+/// Animated Theme Toggle Widget (iOS-style)
+class _AnimatedThemeToggle extends StatelessWidget {
+  final ThemeProvider themeProvider;
+
+  const _AnimatedThemeToggle({required this.themeProvider});
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: () {
+        if (isDark) {
+          themeProvider.setLightMode();
+        } else {
+          themeProvider.setDarkMode();
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
           children: [
-            // Handle bar
             Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isDark ? Icons.dark_mode : Icons.light_mode,
+                size: 20,
+                color: isDark ? colorScheme.tertiary : Colors.orange,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Choose Theme',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dark Mode',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    isDark ? 'On' : 'Off',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _IOSSwitch(
+              isOn: isDark,
+              onChanged: (value) {
+                if (value) {
+                  themeProvider.setDarkMode();
+                } else {
+                  themeProvider.setLightMode();
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated Settings Icon with rotation
+class _AnimatedSettingsIcon extends StatefulWidget {
+  final ColorScheme colorScheme;
+
+  const _AnimatedSettingsIcon({required this.colorScheme});
+
+  @override
+  State<_AnimatedSettingsIcon> createState() => _AnimatedSettingsIconState();
+}
+
+class _AnimatedSettingsIconState extends State<_AnimatedSettingsIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: widget.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: RotationTransition(
+        turns: Tween(begin: 0.0, end: 1.0).animate(_controller),
+        child: Icon(
+          Icons.settings,
+          color: widget.colorScheme.onPrimaryContainer,
+          size: 24,
+        ),
+      ),
+    );
+  }
+}
+
+/// iOS-style Animated Switch
+class _IOSSwitch extends StatelessWidget {
+  final bool isOn;
+  final ValueChanged<bool> onChanged;
+
+  const _IOSSwitch({required this.isOn, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onTap: () => onChanged(!isOn),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        width: 51,
+        height: 31,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: isOn
+              ? colorScheme.primary
+              : colorScheme.surfaceContainerHighest,
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          alignment: isOn ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 27,
+            height: 27,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  isOn ? Icons.dark_mode : Icons.light_mode,
+                  key: ValueKey(isOn),
+                  size: 14,
+                  color: isOn ? colorScheme.primary : Colors.orange,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            _ThemeModeOption(
-              icon: Icons.light_mode,
-              title: 'Light Mode',
-              subtitle: 'Clean and bright interface',
-              isSelected: themeProvider.themeMode == ThemeMode.light,
-              onTap: () async {
-                await themeProvider.setLightMode();
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
-            _ThemeModeOption(
-              icon: Icons.dark_mode,
-              title: 'Dark Mode',
-              subtitle: 'Easy on the eyes',
-              isSelected: themeProvider.themeMode == ThemeMode.dark,
-              onTap: () async {
-                await themeProvider.setDarkMode();
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
-            _ThemeModeOption(
-              icon: Icons.brightness_auto,
-              title: 'System Default',
-              subtitle: 'Follow device settings',
-              isSelected: themeProvider.themeMode == ThemeMode.system,
-              onTap: () async {
-                await themeProvider.setSystemMode();
-                if (context.mounted) Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ),
       ),
     );
@@ -514,84 +608,6 @@ class _SettingItem extends StatelessWidget {
                 color: colorScheme.onSurfaceVariant,
                 size: 20,
               ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Theme Mode Option Tile
-class _ThemeModeOption extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ThemeModeOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? colorScheme.primaryContainer
-                    : colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: isSelected
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      color: isSelected
-                          ? colorScheme.primary
-                          : colorScheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(Icons.check_circle, color: colorScheme.primary, size: 24),
           ],
         ),
       ),
