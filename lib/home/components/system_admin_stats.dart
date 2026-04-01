@@ -84,8 +84,10 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
                   subtitle: 'Define & assign user roles',
                   icon: Icons.shield_moon_rounded,
                   color: const Color.fromARGB(255, 123, 28, 28), // Violet
-                  onTap: () =>
-                      _navigateOnlineOnly(AppRouter.manageRoles, 'Manage Roles'),
+                  onTap: () => _navigateOnlineOnly(
+                    AppRouter.manageRoles,
+                    'Manage Roles',
+                  ),
                 ),
                 PremiumActionCard(
                   title: 'User Acceptance',
@@ -129,7 +131,7 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
                 ),
                 PremiumActionCard(
                   title: 'Eftekad',
-                  subtitle: 'Open Eftekad tools (coming soon)',
+                  subtitle: 'Track follow-ups across troops',
                   icon: Icons.fact_check_rounded,
                   color: const Color.fromARGB(255, 25, 58, 156),
                   onTap: () =>
@@ -242,15 +244,9 @@ class _SystemAdminStatsState extends State<SystemAdminStats> {
               ],
             ),
             const SizedBox(height: 16),
-            _HealthIndicator(
-              label: 'Database',
-              status: HealthStatus.healthy,
-            ),
+            _HealthIndicator(label: 'Database', status: HealthStatus.healthy),
             const SizedBox(height: 8),
-            _HealthIndicator(
-              label: 'Storage',
-              status: HealthStatus.healthy,
-            ),
+            _HealthIndicator(label: 'Storage', status: HealthStatus.healthy),
             const SizedBox(height: 8),
             _HealthIndicator(
               label: 'Authentication',
@@ -305,11 +301,7 @@ class _StatCard extends StatelessWidget {
                 color: backgroundColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: color,
-              ),
+              child: Icon(icon, size: 20, color: color),
             ),
             const SizedBox(height: 8),
             // Label and Value
@@ -352,10 +344,7 @@ class _ActivitySummaryCard extends StatelessWidget {
   final String title;
   final List<_ActivityItem> items;
 
-  const _ActivitySummaryCard({
-    required this.title,
-    required this.items,
-  });
+  const _ActivitySummaryCard({required this.title, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -380,41 +369,43 @@ class _ActivitySummaryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ...items.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          item.icon,
-                          size: 16,
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        item.icon,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item.label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          item.label,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                    ),
+                    Text(
+                      item.value,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
                       ),
-                      Text(
-                        item.value,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -436,21 +427,14 @@ class _ActivityItem {
 }
 
 /// Health Status Enum
-enum HealthStatus {
-  healthy,
-  warning,
-  error,
-}
+enum HealthStatus { healthy, warning, error }
 
 /// Health Indicator Widget
 class _HealthIndicator extends StatelessWidget {
   final String label;
   final HealthStatus status;
 
-  const _HealthIndicator({
-    required this.label,
-    required this.status,
-  });
+  const _HealthIndicator({required this.label, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -476,18 +460,9 @@ class _HealthIndicator extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          statusIcon,
-          size: 16,
-          color: statusColor,
-        ),
+        Icon(statusIcon, size: 16, color: statusColor),
         const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: theme.textTheme.bodyMedium,
-          ),
-        ),
+        Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
@@ -498,8 +473,8 @@ class _HealthIndicator extends StatelessWidget {
             status == HealthStatus.healthy
                 ? 'Operational'
                 : status == HealthStatus.warning
-                    ? 'Warning'
-                    : 'Error',
+                ? 'Warning'
+                : 'Error',
             style: theme.textTheme.labelSmall?.copyWith(
               color: statusColor,
               fontWeight: FontWeight.w600,

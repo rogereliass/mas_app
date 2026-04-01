@@ -18,6 +18,7 @@ import 'home/pages/patrols_management/logic/patrols_management_provider.dart';
 import 'home/logic/season_standings_provider.dart';
 import 'home/logic/home_overview_stats_provider.dart';
 import 'home/pages/notifications/logic/notifications_provider.dart';
+import 'home/pages/eftekad/logic/eftekad_provider.dart';
 import 'meetings/pages/meeting_creation/logic/meetings_provider.dart';
 import 'meetings/pages/attendance/logic/attendance_provider.dart';
 import 'meetings/pages/points/logic/points_provider.dart';
@@ -157,6 +158,13 @@ void main() async {
               previous ?? NotificationsProvider(authProvider: auth),
         ),
 
+        ChangeNotifierProxyProvider<AuthProvider, EftekadProvider>(
+          create: (context) =>
+              EftekadProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? EftekadProvider(authProvider: auth),
+        ),
+
         // AttendanceProvider depends on AuthProvider for role/scope checks
         ChangeNotifierProxyProvider<AuthProvider, AttendanceProvider>(
           create: (context) =>
@@ -246,6 +254,12 @@ Future<void> restartApp() async {
               NotificationsProvider(authProvider: context.read<AuthProvider>()),
           update: (context, auth, previous) =>
               previous ?? NotificationsProvider(authProvider: auth),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, EftekadProvider>(
+          create: (context) =>
+              EftekadProvider(authProvider: context.read<AuthProvider>()),
+          update: (context, auth, previous) =>
+              previous ?? EftekadProvider(authProvider: auth),
         ),
         ChangeNotifierProxyProvider<AuthProvider, MeetingsProvider>(
           create: (context) =>

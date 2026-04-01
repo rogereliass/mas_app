@@ -50,10 +50,7 @@ class _TroopHeadStatsState extends State<TroopHeadStats> {
     });
   }
 
-  String _valueOrPlaceholder({
-    required int? value,
-    required bool isLoading,
-  }) {
+  String _valueOrPlaceholder({required int? value, required bool isLoading}) {
     if (value != null) {
       return value.toString();
     }
@@ -100,11 +97,10 @@ class _TroopHeadStatsState extends State<TroopHeadStats> {
             ),
             PremiumActionCard(
               title: 'Eftekad',
-              subtitle: 'Open Eftekad tools (coming soon)',
+              subtitle: 'Track follow-ups for troop members',
               icon: Icons.fact_check_rounded,
               color: AppColors.primaryBlue,
-              onTap: () =>
-                  _navigateOnlineOnly(AppRouter.eftekad, 'Eftekad'),
+              onTap: () => _navigateOnlineOnly(AppRouter.eftekad, 'Eftekad'),
             ),
           ],
           stats: [

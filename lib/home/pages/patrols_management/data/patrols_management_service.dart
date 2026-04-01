@@ -33,7 +33,9 @@ class PatrolsManagementService with ScopedServiceMixin {
 
     final managedTroopId = currentUser.managedTroopId;
     if (managedTroopId == null || managedTroopId.isEmpty) {
-      throw Exception('No troop is assigned to your role, please contact support for assistance');
+      throw Exception(
+        'No troop is assigned to your role, please contact support for assistance',
+      );
     }
 
     return managedTroopId;
@@ -64,15 +66,23 @@ class PatrolsManagementService with ScopedServiceMixin {
   Future<List<TroopMember>> fetchTroopMembers({
     required UserProfile currentUser,
     required String troopId,
+    bool includePending = false,
   }) async {
     try {
       _validateTroopAccess(currentUser: currentUser, troopId: troopId);
 
-      final response = await _supabase
+      var query = _supabase
           .from(_profilesTable)
-          .select('id, first_name, middle_name, last_name, phone, signup_troop, patrol_id')
-          .eq('approved', true)
-          .eq('signup_troop', troopId)
+          .select(
+            'id, first_name, middle_name, last_name, phone, address, approved, signup_troop, patrol_id',
+          )
+          .eq('signup_troop', troopId);
+
+      if (!includePending) {
+        query = query.eq('approved', true);
+      }
+
+      final response = await query
           .order('first_name', ascending: true)
           .order('last_name', ascending: true);
 
@@ -96,15 +106,14 @@ class PatrolsManagementService with ScopedServiceMixin {
   }) async {
     try {
       _validateTroopAccess(currentUser: currentUser, troopId: troopId);
-      await _assertPatrolNameAvailable(
-        troopId: troopId,
-        name: name,
-      );
+      await _assertPatrolNameAvailable(troopId: troopId, name: name);
 
       final payload = {
         'troop_id': troopId,
         'name': name.trim(),
-        'description': description?.trim().isEmpty == true ? null : description?.trim(),
+        'description': description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
         'patrol_leader_profile_id': patrolLeaderProfileId,
         'assistant_1_profile_id': assistant1ProfileId,
         'assistant_2_profile_id': assistant2ProfileId,
@@ -156,7 +165,9 @@ class PatrolsManagementService with ScopedServiceMixin {
       // Fetch current patrol to identify old leadership roles for syncing
       final currentPatrolResponse = await _supabase
           .from(_patrolsTable)
-          .select('patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id')
+          .select(
+            'patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id',
+          )
           .eq('id', patrolId)
           .single();
 
@@ -164,7 +175,9 @@ class PatrolsManagementService with ScopedServiceMixin {
           .from(_patrolsTable)
           .update({
             'name': name.trim(),
-            'description': description?.trim().isEmpty == true ? null : description?.trim(),
+            'description': description?.trim().isEmpty == true
+                ? null
+                : description?.trim(),
             'patrol_leader_profile_id': patrolLeaderProfileId,
             'assistant_1_profile_id': assistant1ProfileId,
             'assistant_2_profile_id': assistant2ProfileId,
@@ -205,10 +218,10 @@ class PatrolsManagementService with ScopedServiceMixin {
       if (kDebugMode) {
         debugPrint('🔄 Syncing leadership roles for patrol $patrolId...');
       }
-      
+
       final roleRepo = RoleRepository();
       final roles = await roleRepo.getAllRoles();
-      
+
       // Helper to find a role by its unique rank value
       Role? findRoleByRank(int rankValue) {
         try {
@@ -229,8 +242,12 @@ class PatrolsManagementService with ScopedServiceMixin {
       if (kDebugMode) {
         debugPrint('🎭 Identified Roles by Rank:');
         debugPrint('   - Leader (Rank 30): ${leaderRole?.name ?? 'NOT FOUND'}');
-        debugPrint('   - Asst 1 (Rank 25): ${assistant1Role?.name ?? 'NOT FOUND'}');
-        debugPrint('   - Asst 2 (Rank 20): ${assistant2Role?.name ?? 'NOT FOUND'}');
+        debugPrint(
+          '   - Asst 1 (Rank 25): ${assistant1Role?.name ?? 'NOT FOUND'}',
+        );
+        debugPrint(
+          '   - Asst 2 (Rank 20): ${assistant2Role?.name ?? 'NOT FOUND'}',
+        );
       }
 
       final leadershipRoleIds = [
@@ -246,7 +263,7 @@ class PatrolsManagementService with ScopedServiceMixin {
 
       // Map of profileId -> targetLeadershipRole (one of the 3, or null)
       final Map<String, String?> targetLeadershipRoles = {};
-      
+
       final Set<String> involvedProfiles = {
         if (oldLeader != null) oldLeader,
         if (oldAssistant1 != null) oldAssistant1,
@@ -277,7 +294,8 @@ class PatrolsManagementService with ScopedServiceMixin {
 
       final Map<String, String> currentLeadershipRoles = {};
       for (final row in currentRolesResponse as List) {
-        currentLeadershipRoles[row['profile_id'] as String] = row['role_id'] as String;
+        currentLeadershipRoles[row['profile_id'] as String] =
+            row['role_id'] as String;
       }
 
       // Apply changes (Smart update/delete/insert)
@@ -295,7 +313,9 @@ class PatrolsManagementService with ScopedServiceMixin {
               .eq('profile_id', profileId)
               .eq('role_id', current);
           if (kDebugMode) {
-            debugPrint('🎭 Updated leadership role for $profileId: $current -> $target');
+            debugPrint(
+              '🎭 Updated leadership role for $profileId: $current -> $target',
+            );
           }
         } else if (current != null && target == null) {
           // DELETE: User is no longer a leader in any capacity
@@ -309,13 +329,11 @@ class PatrolsManagementService with ScopedServiceMixin {
           }
         } else if (current == null && target != null) {
           // INSERT: User just became a leader
-          await _supabase
-              .from(_profileRolesTable)
-              .insert({
-                'profile_id': profileId,
-                'role_id': target,
-                'assigned_by': currentUser.id,
-              });
+          await _supabase.from(_profileRolesTable).insert({
+            'profile_id': profileId,
+            'role_id': target,
+            'assigned_by': currentUser.id,
+          });
           if (kDebugMode) {
             debugPrint('🎭 Added new leadership role for $profileId: $target');
           }
@@ -344,13 +362,15 @@ class PatrolsManagementService with ScopedServiceMixin {
       // Identify leadership roles to remove them
       final currentPatrolResponse = await _supabase
           .from(_patrolsTable)
-          .select('patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id')
+          .select(
+            'patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id',
+          )
           .eq('id', patrolId)
           .single();
 
       final roleRepo = RoleRepository();
       final roles = await roleRepo.getAllRoles();
-      
+
       // Identify leadership roles by their unique ranks (30, 25, 20)
       final leadershipRoleIds = roles
           .where((r) => r.rank == 30 || r.rank == 25 || r.rank == 20)
@@ -372,9 +392,11 @@ class PatrolsManagementService with ScopedServiceMixin {
               .inFilter('profile_id', leaderProfileIds)
               .inFilter('role_id', leadershipRoleIds)
               .select('id');
-              
+
           if (kDebugMode) {
-            debugPrint('🎭 Cleaned up ${deletedRows.length} leadership roles for profiles: $leaderProfileIds');
+            debugPrint(
+              '🎭 Cleaned up ${deletedRows.length} leadership roles for profiles: $leaderProfileIds',
+            );
           }
         }
       }
@@ -525,15 +547,17 @@ class PatrolsManagementService with ScopedServiceMixin {
       // Fetch current leadership state for this patrol
       final patrolRow = await _supabase
           .from(_patrolsTable)
-          .select('patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id')
+          .select(
+            'patrol_leader_profile_id, assistant_1_profile_id, assistant_2_profile_id',
+          )
           .eq('id', patrolId)
           .maybeSingle();
 
       if (patrolRow == null) return;
 
       final leaderId = patrolRow['patrol_leader_profile_id'] as String?;
-      final asst1Id  = patrolRow['assistant_1_profile_id']  as String?;
-      final asst2Id  = patrolRow['assistant_2_profile_id']  as String?;
+      final asst1Id = patrolRow['assistant_1_profile_id'] as String?;
+      final asst2Id = patrolRow['assistant_2_profile_id'] as String?;
 
       // Build a map of slot → profileId for any removed member holding a leadership slot
       final Map<String, String?> patchPayload = {};
@@ -561,7 +585,9 @@ class PatrolsManagementService with ScopedServiceMixin {
           .eq('id', patrolId);
 
       if (kDebugMode) {
-        debugPrint('🧹 Cleared leadership slots for patrol $patrolId: $patchPayload');
+        debugPrint(
+          '🧹 Cleared leadership slots for patrol $patrolId: $patchPayload',
+        );
       }
 
       // 2. Remove their leadership role records from profile_roles
@@ -582,12 +608,16 @@ class PatrolsManagementService with ScopedServiceMixin {
             .select('id');
 
         if (kDebugMode) {
-          debugPrint('🧹 Removed ${deleted.length} leadership profile_roles for: $affectedProfileIds');
+          debugPrint(
+            '🧹 Removed ${deleted.length} leadership profile_roles for: $affectedProfileIds',
+          );
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('⚠️ _cleanupLeadershipForRemovedMembers error (non-fatal): $e');
+        debugPrint(
+          '⚠️ _cleanupLeadershipForRemovedMembers error (non-fatal): $e',
+        );
       }
       // Non-fatal: don't rethrow, the member move itself is the primary operation
     }
@@ -617,7 +647,9 @@ class PatrolsManagementService with ScopedServiceMixin {
 
       final existingName = (row['name'] as String?)?.trim().toLowerCase();
       if (existingName == trimmedName.toLowerCase()) {
-        throw Exception('A patrol with this name already exists in the selected troop');
+        throw Exception(
+          'A patrol with this name already exists in the selected troop',
+        );
       }
     }
   }
@@ -645,4 +677,3 @@ class PatrolsManagementService with ScopedServiceMixin {
     }
   }
 }
-

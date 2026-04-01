@@ -6,7 +6,7 @@ class AppColors {
   // Scout Elite Design System Colors (Core Palette)
   static const Color scoutEliteNavy = Color(0xFF0F172A); // Richer navy (Slate 900) - Background
   static const Color cardDarkElevated = Color(0xFF1E293B); // Slightly lighter navy (Slate 800) - Cards/Surfaces
-  static const Color goldAccent = Color(0xFFC5A059); // Muted, elegant gold - Primary/Accent
+  static const Color goldAccent = Color(0xFFD4A74F); // Muted, elegant gold - Primary/Accent
   static const Color sectionHeaderGray = Color(0xFF94A3B8); // Slate 400 - Secondary Text
   
   // Leaderboard Header Themes (Royal/Gold Complement)
