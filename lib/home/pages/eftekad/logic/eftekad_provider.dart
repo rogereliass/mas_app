@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../auth/logic/auth_provider.dart';
@@ -524,6 +525,59 @@ class EftekadProvider with ChangeNotifier {
 
   bool _isOnline() {
     return ConnectivityService.instance.isOnline;
+  }
+
+  Future<void> updateMemberAddressMaps({
+    required String profileId,
+    required String? addressMaps,
+  }) async {
+    try {
+      await _service.updateMemberAddressMaps(
+        profileId: profileId,
+        addressMaps: addressMaps,
+      );
+
+      final memberIndex = _members.indexWhere((m) => m.id == profileId);
+      if (memberIndex != -1) {
+        final member = _members[memberIndex];
+        _members[memberIndex] = EftekadMember(
+          id: member.id,
+          troopId: member.troopId,
+          firstName: member.firstName,
+          middleName: member.middleName,
+          lastName: member.lastName,
+          phone: member.phone,
+          address: member.address,
+          scoutCode: member.scoutCode,
+          addressMaps: addressMaps,
+          patrolId: member.patrolId,
+          patrolName: member.patrolName,
+          approved: member.approved,
+          patrolOrderPriority: member.patrolOrderPriority,
+        );
+        _applyFilters();
+      }
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to update address link.';
+      notifyListeners();
+    }
+  }
+
+  Future<void> openMapsLink(String url) async {
+    String normalizedUrl = url.trim();
+    if (!normalizedUrl.startsWith('http://') &&
+        !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://$normalizedUrl';
+    }
+
+    final uri = Uri.tryParse(normalizedUrl);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _error = 'Unable to open location link.';
+      notifyListeners();
+    }
   }
 
   bool isNotContactedRecently(String profileId) {

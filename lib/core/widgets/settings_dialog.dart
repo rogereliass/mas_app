@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart'
-    show LaunchMode, canLaunchUrl, launchUrl;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../core/config/theme_provider.dart';
+import '../../core/utils/external_launcher.dart';
 import '../../routing/app_router.dart';
 import '../../main.dart' show restartApp;
 
@@ -210,15 +209,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           subtitle: 'View our privacy policy',
                           onTap: () async {
                             Navigator.pop(context);
-                            final uri = Uri.parse(
+                            await ExternalLauncher.openExternalUrl(
+                              context,
                               'https://sites.google.com/view/masdigitalteam/app/privacy-policy?authuser=0',
                             );
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(
-                                uri,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            }
                           },
                         ),
                         _SettingItem(
@@ -296,18 +290,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Future<void> _reportIssue() async {
     final emailAddress =
         dotenv.env['ISSUE_EMAIL_ADDRESS'] ?? 'support.masdigitalteam@gmail.com';
-    final uri = Uri(
-      scheme: 'mailto',
-      path: emailAddress,
-      query:
-          'subject=MAS App Issue Report&body=Please describe the issue you encountered:',
+    await ExternalLauncher.composeEmail(
+      context,
+      email: emailAddress,
+      subject: 'MAS App Issue Report',
+      body: 'Please describe the issue you encountered:',
     );
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      debugPrint('Could not launch email client');
-    }
   }
 }
 

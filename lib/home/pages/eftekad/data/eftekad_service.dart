@@ -80,6 +80,8 @@ class EftekadService with ScopedServiceMixin {
                 lastName: member.lastName,
                 phone: member.phone,
                 address: member.address,
+                scoutCode: member.scoutCode,
+                addressMaps: member.addressMaps,
                 patrolId: member.patrolId,
                 patrolName: patrol?.name,
                 approved: member.approved,
@@ -156,13 +158,53 @@ class EftekadService with ScopedServiceMixin {
   }) async {
     final response = await _supabase
         .from(_recordsTable)
-        .select()
+        .select('''
+          *,
+          creator:profiles!eftekad_records_created_by_profile_id_fkey(
+            first_name,
+            middle_name,
+            last_name
+          )
+        ''')
         .eq('profile_id', profileId)
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
 
     return (response as List)
-        .map((row) => EftekadRecord.fromJson(row as Map<String, dynamic>))
+        .map((row) {
+          final map = row as Map<String, dynamic>;
+          final creator = map['creator'] as Map<String, dynamic>?;
+          String? createdByName;
+          if (creator != null) {
+            final parts = [
+              creator['first_name'] as String?,
+              creator['middle_name'] as String?,
+              creator['last_name'] as String?,
+            ].where((p) => p != null && p.trim().isNotEmpty).toList();
+            if (parts.isNotEmpty) {
+              createdByName = parts.join(' ');
+            }
+          }
+          return EftekadRecord(
+            id: map['id'] as String,
+            profileId: map['profile_id'] as String,
+            createdByProfileId: map['created_by_profile_id'] as String,
+            createdByName: createdByName,
+            createdAt: DateTime.parse(map['created_at'] as String),
+            updatedAt: map['updated_at'] != null
+                ? DateTime.tryParse(map['updated_at'] as String)
+                : null,
+            type: EftekadRecordTypeX.fromDbValue(
+              (map['type'] as String?) ?? 'other',
+            ),
+            reason: (map['reason'] as String?)?.trim() ?? '',
+            notes: (map['notes'] as String?)?.trim() ?? '',
+            outcome: (map['outcome'] as String?)?.trim(),
+            nextFollowUpDate: map['next_follow_up_date'] != null
+                ? DateTime.tryParse(map['next_follow_up_date'] as String)
+                : null,
+          );
+        })
         .toList(growable: false);
   }
 
@@ -210,5 +252,15 @@ class EftekadService with ScopedServiceMixin {
     if (!canAccessTroop(currentUser, troopId)) {
       throw Exception('Access denied for target profile troop.');
     }
+  }
+
+  Future<void> updateMemberAddressMaps({
+    required String profileId,
+    required String? addressMaps,
+  }) async {
+    await _supabase
+        .from(_profilesTable)
+        .update({'address_maps': addressMaps})
+        .eq('id', profileId);
   }
 }

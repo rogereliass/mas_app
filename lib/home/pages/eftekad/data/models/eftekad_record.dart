@@ -47,6 +47,7 @@ class EftekadRecord {
     required this.id,
     required this.profileId,
     required this.createdByProfileId,
+    this.createdByName,
     required this.createdAt,
     required this.type,
     required this.reason,
@@ -59,6 +60,7 @@ class EftekadRecord {
   final String id;
   final String profileId;
   final String createdByProfileId;
+  final String? createdByName;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final EftekadRecordType type;
@@ -72,6 +74,7 @@ class EftekadRecord {
       id: json['id'] as String,
       profileId: json['profile_id'] as String,
       createdByProfileId: json['created_by_profile_id'] as String,
+      createdByName: json['created_by_name'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'] as String)

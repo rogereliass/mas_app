@@ -5,6 +5,8 @@ class TroopMember {
   final String? lastName;
   final String? phone;
   final String? address;
+  final String? scoutCode;
+  final String? addressMaps;
   final bool approved;
   final String troopId;
   final String? patrolId;
@@ -16,6 +18,8 @@ class TroopMember {
     this.lastName,
     this.phone,
     this.address,
+    this.scoutCode,
+    this.addressMaps,
     this.approved = false,
     required this.troopId,
     this.patrolId,
@@ -49,13 +53,20 @@ class TroopMember {
       lastName: json['last_name'] as String?,
       phone: json['phone'] as String?,
       address: json['address'] as String?,
+      scoutCode: json['scout_code'] as String?,
+      addressMaps: json['address_maps'] as String?,
       approved: json['approved'] as bool? ?? false,
       troopId: json['signup_troop'] as String? ?? '',
       patrolId: json['patrol_id'] as String?,
     );
   }
 
-  TroopMember copyWith({String? patrolId, bool clearPatrolId = false}) {
+  TroopMember copyWith({
+    String? patrolId,
+    bool clearPatrolId = false,
+    String? addressMaps,
+    bool clearAddressMaps = false,
+  }) {
     return TroopMember(
       id: id,
       firstName: firstName,
@@ -63,6 +74,8 @@ class TroopMember {
       lastName: lastName,
       phone: phone,
       address: address,
+      scoutCode: scoutCode,
+      addressMaps: clearAddressMaps ? null : (addressMaps ?? this.addressMaps),
       approved: approved,
       troopId: troopId,
       patrolId: clearPatrolId ? null : (patrolId ?? this.patrolId),

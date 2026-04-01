@@ -7,6 +7,8 @@ class EftekadMember {
     this.lastName,
     this.phone,
     this.address,
+    this.scoutCode,
+    this.addressMaps,
     this.patrolId,
     this.patrolName,
     required this.approved,
@@ -20,6 +22,8 @@ class EftekadMember {
   final String? lastName;
   final String? phone;
   final String? address;
+  final String? scoutCode;
+  final String? addressMaps;
   final String? patrolId;
   final String? patrolName;
   final bool approved;

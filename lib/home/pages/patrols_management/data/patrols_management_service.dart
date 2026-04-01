@@ -74,7 +74,7 @@ class PatrolsManagementService with ScopedServiceMixin {
       var query = _supabase
           .from(_profilesTable)
           .select(
-            'id, first_name, middle_name, last_name, phone, address, approved, signup_troop, patrol_id',
+            'id, first_name, middle_name, last_name, phone, address, scout_code, address_maps, approved, signup_troop, patrol_id',
           )
           .eq('signup_troop', troopId);
 
@@ -527,6 +527,22 @@ class PatrolsManagementService with ScopedServiceMixin {
       }
     } catch (e) {
       _logError('updatePatrolMembers', e);
+      rethrow;
+    }
+  }
+
+  Future<void> updateMemberAddressMaps({
+    required UserProfile currentUser,
+    required String profileId,
+    required String? addressMaps,
+  }) async {
+    try {
+      await _supabase
+          .from(_profilesTable)
+          .update({'address_maps': addressMaps})
+          .eq('id', profileId);
+    } catch (e) {
+      _logError('updateMemberAddressMaps', e);
       rethrow;
     }
   }

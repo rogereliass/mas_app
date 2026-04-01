@@ -1,12 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../auth/logic/auth_provider.dart';
 import '../../core/widgets/app_bottom_nav_bar.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/config/social_config.dart';
+import '../../core/utils/external_launcher.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -129,13 +129,7 @@ class _AboutContentState extends State<AboutContent> {
   }
 
   Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    }
+    await ExternalLauncher.openExternalUrl(context, url);
   }
 
   @override
@@ -343,7 +337,10 @@ class _AboutContentState extends State<AboutContent> {
                     const SizedBox(width: 15),
                     _buildSocialButton(
                       Icons.email_outlined,
-                      () => _launchUrl('mailto:${SocialConfig.contactEmail}'),
+                      () => ExternalLauncher.composeEmail(
+                        context,
+                        email: SocialConfig.contactEmail,
+                      ),
                       label: 'Mail',
                       isDark: isDark,
                     ),
