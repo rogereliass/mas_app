@@ -1,0 +1,31 @@
+workflows:
+  ios-workflow:
+    name: iOS Automatic Signing
+    environment:
+      groups:
+        - appstore_credentials # The group name you created in the UI
+      vars:
+        BUNDLE_ID: "com.masapp.digitalteam" 
+        XCODE_SCHEME: "Runner"   # Replace with your Xcode scheme
+    scripts:
+      - name: Initialize keychain
+        script: |
+          keychain initialize
+      - name: Fetch signing files
+        script: |
+          # Fetches or creates profiles/certificates automatically
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+      - name: Configure Xcode code signing
+        script: |
+          # Updates the Xcode project to use the fetched profiles
+          xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "ios/Runner.xcworkspace" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
