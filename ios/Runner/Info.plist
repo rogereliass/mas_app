@@ -49,5 +49,15 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required to scan QR codes for attendance and meetings.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is needed to select and upload photos for profiles and content.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Permission is required to save photos to your photo library.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access helps with location-based features for meetings and events.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Contact access is needed to help you invite members and manage your troop.</string>
 </dict>
 </plist>
