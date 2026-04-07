@@ -2,13 +2,13 @@ workflows:
   ios-workflow:
     name: iOS Automatic Signing
     environment:
+      ios_signing:
+          distribution_type: app_store
+          bundle_identifier: com.masapp.digitalteam
       vars:
         BUNDLE_ID: "com.masapp.digitalteam"
         XCODE_SCHEME: "Runner"
         # Apple secrets are defined in Codemagic UI, not here
-        ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.masapp.digitalteam
     scripts:
       - name: Install Flutter
         script: |
