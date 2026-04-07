@@ -1,6 +1,8 @@
 workflows:
   ios-workflow:
     name: iOS Automatic Signing
+    integrations:
+      app_store_connect: MAS
     environment:
       ios_signing:
           distribution_type: app_store
@@ -21,7 +23,7 @@ workflows:
         script: flutter clean
       - name: Build iOS IPA
         script: |
-          flutter build ios --release --no-codesign
+          flutter build ipa --release
           # Codemagic will automatically sign using secrets in UI
     artifacts:
       - build/ios/ipa/*.ipa
