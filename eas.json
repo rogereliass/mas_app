@@ -1,0 +1,9 @@
+{
+  "build": {
+    "production": {
+      "env": {
+        "FLUTTER_VERSION": "3.41.6"
+      }
+    }
+  }
+}
