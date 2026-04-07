@@ -21,7 +21,7 @@ class SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<SettingsDialog> {
   String? _version;
-  bool _isLoggingOut = false;
+  final bool _isLoggingOut = false;
 
   @override
   void initState() {
